@@ -1,0 +1,28 @@
+{
+  "compilerOptions": {
+    "esModuleInterop": true,
+    "paths": {
+      "@app/*": [
+        "src/*"
+      ],
+      "@store/*": [
+        "src/store/*"
+      ],
+      "@models/*": [
+        "src/models/*"
+      ],
+      "@store": [
+        "src/store/"
+      ],
+      "@components": [
+        "src/components/index"
+      ],
+      "@modules/*": [
+        "src/modules/*"
+      ],
+      "@pages/*": [
+        "src/pages/*"
+      ]
+    }
+  }
+}

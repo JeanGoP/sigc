@@ -1,0 +1,23 @@
+[
+  {
+    "id": "1",
+    "nombre": "Campaña Primavera 2024",
+    "fechaInicio": "2024-03-01",
+    "fechaFin": "2024-05-31",
+    "detalles": "Campaña enfocada en clientes nuevos para la temporada de primavera."
+  },
+  {
+    "id": "2",
+    "nombre": "Campaña Verano 2024",
+    "fechaInicio": "2024-06-01",
+    "fechaFin": "2024-08-31",
+    "detalles": "Campaña de fidelización para clientes recurrentes en verano."
+  },
+  {
+    "id": "3",
+    "nombre": "Campaña Black Friday 2024",
+    "fechaInicio": "2024-11-01",
+    "fechaFin": "2024-11-30",
+    "detalles": "Promociones especiales para Black Friday."
+  }
+] 

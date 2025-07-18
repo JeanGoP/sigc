@@ -1,0 +1,7 @@
+[
+  { "id": "1", "clienteId": "C001", "factura": "F1001", "saldo": 120000, "edad": "30", "cuentaContable": "1105", "usuarioAsignado": null },
+  { "id": "2", "clienteId": "C002", "factura": "F1002", "saldo": 95000, "edad": "60", "cuentaContable": "1305", "usuarioAsignado": null },
+  { "id": "3", "clienteId": "C003", "factura": "F1003", "saldo": 50000, "edad": "PV", "cuentaContable": "1105", "usuarioAsignado": null },
+  { "id": "4", "clienteId": "C004", "factura": "F1004", "saldo": 200000, "edad": "+90", "cuentaContable": "1405", "usuarioAsignado": null },
+  { "id": "5", "clienteId": "C005", "factura": "F1005", "saldo": 75000, "edad": "90", "cuentaContable": "1305", "usuarioAsignado": null }
+] 
