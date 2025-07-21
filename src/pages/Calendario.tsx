@@ -13,9 +13,13 @@ import {
 } from "react-bootstrap";
 import { SingleSelect } from "@app/components/singleSelect/singleSelect";
 import { StringToMoney } from "@app/utils/formattersFunctions";
+import { current } from "@reduxjs/toolkit";
+import { useAppSelector } from "@app/store/store";
 
 moment.locale("es"); // Configurar el locale a español
 const localizer = momentLocalizer(moment);
+
+const API_URL = import.meta.env.VITE_API_URL;
 
 interface Option {
   label: string;
@@ -49,19 +53,20 @@ const Calendario: React.FC = () => {
   );
   const [eventosDelDia, setEventosDelDia] = useState<Evento[]>([]);
   const [fechaSeleccionada, setFechaSeleccionada] = useState<Date | null>(null);
+    const currentUser = useAppSelector((state) => state.auth.currentUser);
 
   useEffect(() => {
     const fetchUsuarios = async () => {
       try {
         const response = await fetch(
-          "https://localhost:7013/api/ListarUsuariosPorRol/PorRol",
+          `${API_URL}/api/ListarUsuariosPorRol/PorRol`,
           {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
               Accept: "*/*",
             },
-            body: JSON.stringify({ roleName: "" }),
+            body: JSON.stringify({ roleName: "Asesor", iduser: currentUser?.id}),
           }
         );
 
@@ -96,7 +101,7 @@ const Calendario: React.FC = () => {
         queryParams.append("userId", usuarioFiltro.toString());
       }
 
-      const url = `https://localhost:7013/api/EventoCalendario?${queryParams.toString()}`;
+      const url = `${API_URL}/api/EventoCalendario?${queryParams.toString()}`;
 
       const response = await fetch(url);
       const result = await response.json();
@@ -224,7 +229,7 @@ const Calendario: React.FC = () => {
 
       {/* Modal evento */}
       <Modal show={mostrarModalEvento} onHide={cerrarModalEvento}>
-        <Modal.Header closeButton>
+        <Modal.Header closeButton={true} {...({} as any)}>
           <Modal.Title>Detalle del evento</Modal.Title>
         </Modal.Header>
         <Modal.Body>
@@ -289,7 +294,7 @@ const Calendario: React.FC = () => {
 
       {/* Modal día */}
       <Modal show={mostrarModalDia} onHide={cerrarModalDia}>
-        <Modal.Header closeButton>
+        <Modal.Header closeButton={true} {...({} as any)}>
           <Modal.Title>Eventos del día</Modal.Title>
         </Modal.Header>
         <Modal.Body>

@@ -1,5 +1,7 @@
 import { ApiResponse } from '@app/models/apiResponse';
 
+const API_URL = import.meta.env.VITE_API_URL;
+
 export interface EstadoCuentaRequest {
     cuenta: string;
     fecha: string;
@@ -19,7 +21,7 @@ const getAuthHeaders = () => {
 
 export const FetchEstadoCuentaClienteFactura = async (request: EstadoCuentaRequest): Promise<ApiResponse<any>> => {
   try {
-    const response = await fetch('https://localhost:7013/api/EstadoCuentaClienteFactura', {
+    const response = await fetch(`${API_URL}/api/EstadoCuentaClienteFactura`, {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify(request)

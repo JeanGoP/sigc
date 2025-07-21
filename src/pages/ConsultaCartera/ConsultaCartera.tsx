@@ -63,6 +63,9 @@ import { obtenerCliente, ClienteInfo } from "@app/services/ClienteService";
 import { TablaBitacoras } from "./components/TablaBitacoras";
 import { useAppSelector } from "@app/store/store";
 import { toast } from "react-toastify";
+import { EtiquetasClienteGestion } from "./components/EtiquetasClientesGestion";
+
+const API_URL = import.meta.env.VITE_API_URL;
 
 interface EventoXML {
   id: number;
@@ -211,7 +214,7 @@ export const ConsultaCartera: React.FC = () => {
 
       const token = localStorage.getItem("token");
       const response = await fetch(
-        "https://localhost:7013/api/FacturasListConsultaCarteras",
+        `${API_URL}/api/FacturasListConsultaCarteras`,
         {
           method: "POST",
           headers: {
@@ -311,7 +314,7 @@ export const ConsultaCartera: React.FC = () => {
       try {
         const token = localStorage.getItem("token");
         const response = await fetch(
-          "https://localhost:7013/api/EmailTemplateMaster/GetListTemplate?tipo=email",
+          `${API_URL}/api/EmailTemplateMaster/GetListTemplate?tipo=email`,
           {
             method: "GET",
             headers: {
@@ -516,123 +519,59 @@ export const ConsultaCartera: React.FC = () => {
     setEtiquetasCliente(etiquetasCliente.filter((id) => id !== idEtiqueta));
   };
 
-  // Plantillas de ejemplo
-  // const plantillasCorreo = [
-  //   {
-  //     id: 1,
-  //     nombre: "Bienvenida",
-  //     texto: "Estimado cliente, bienvenido a nuestra empresa.",
-  //   },
-  //   {
-  //     id: 2,
-  //     nombre: "Recordatorio de pago",
-  //     texto:
-  //       "Le recordamos que tiene un pago pendiente. Por favor, póngase al día.",
-  //   },
-  //   {
-  //     id: 3,
-  //     nombre: "Agradecimiento",
-  //     texto: "Gracias por confiar en nosotros. ¡Esperamos seguir atendiéndole!",
-  //   },
-  //   {
-  //     id: 4,
-  //     nombre: "Notificación de cuenta en mora",
-  //     texto:
-  //       "Asunto: 📌 Notificación de cuenta en mora – {X} días de atraso\n\n" +
-  //       "Estimado/a {Nombre del Cliente},\n\n" +
-  //       "Esperamos que se encuentre bien. Nos permitimos recordarle que su cuenta presenta un saldo vencido con una antigüedad de {X} días, correspondiente al siguiente concepto:\n\n" +
-  //       "Número de factura/contrato: {Número}\n" +
-  //       "Monto vencido: {Valor}\n" +
-  //       "Fecha de vencimiento: {Fecha}\n\n" +
-  //       "Le invitamos a regularizar su situación financiera lo antes posible para evitar la generación de intereses adicionales o la suspensión del servicio.\n\n" +
-  //       "Si ya ha realizado el pago, por favor ignore este mensaje o envíenos el comprobante al correo {correo de soporte}.\n\n" +
-  //       "Agradecemos su atención y quedamos atentos a su comunicación.\n\n" +
-  //       "Cordialmente,\n" +
-  //       "{Nombre del asesor o entidad}\n" +
-  //       "{Teléfono / Correo de contacto}",
-  //   },
-  //   {
-  //     id: 5,
-  //     nombre: "Recordatorio de Pago Próximo",
-  //     texto:
-  //       "Asunto: ⏰ Recordatorio de pago – Próxima cuota vence pronto\n\n" +
-  //       "Hola {Nombre del Cliente},\n\n" +
-  //       "Le escribimos para recordarle que próximamente se vencerá una de sus cuotas pendientes. A continuación, los detalles:\n\n" +
-  //       "Número de cuota o factura: {Número}\n" +
-  //       "Fecha de vencimiento: {Fecha}\n" +
-  //       "Valor a pagar: {Valor}\n\n" +
-  //       "Evite contratiempos realizando el pago oportunamente antes de la fecha mencionada. Puede hacerlo a través de {medio de pago o enlace}.\n\n" +
-  //       "Si tiene alguna duda o necesita asistencia, no dude en comunicarse con nosotros.\n\n" +
-  //       "Gracias por su confianza,\n" +
-  //       "{Nombre del asesor o entidad}",
-  //   },
-  // ];
-  // const [plantillaSeleccionada, setPlantillaSeleccionada] = useState<number>(
-  //   plantillasCorreo[0].id
-  // );
   const [showModalCorreo, setShowModalCorreo] = useState(false);
   const [enviandoCorreo, setEnviandoCorreo] = useState(false);
-  // const plantillaActual = plantillasCorreo.find(
-  //   (p) => p.id === plantillaSeleccionada
-  // );
   const handlePrevisualizarCorreo = () => setShowModalCorreo(true);
   const handleCerrarModalCorreo = () => setShowModalCorreo(false);
   const handleEnviarCorreo = async () => {
-  if (!registroSeleccionado) {
-    toast.error("Debe seleccionar un cliente y una factura");
-    return;
-  }
-
-  setEnviandoCorreo(true);
-  try {
-    const token = localStorage.getItem("token");
-    const body = {
-      cliente: registroSeleccionado.cliente,
-      factura: registroSeleccionado.numefac,
-      cuenta: registroSeleccionado.cuenta,
-      plantillaKey: plantillaSeleccionadaKey,
-      fecha: fechaConsultaFacturas,
-      idUser: currentUser?.id || 0,
-    };
-
-    const response = await fetch(
-      "https://localhost:7013/api/EmailTemplateMaster/SendWithTemplate",
-      {
-        method: "POST",
-        headers: {
-          accept: "*/*",
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(body),
-      }
-    );
-
-    const result = await response.json();
-    if (result.success) {
-      toast.success("Correo enviado correctamente");
-      setShowModalCorreo(false);
-    } else {
-      toast.error(`Error: ${result.message}`);
-      console.error(result.errors);
+    if (!registroSeleccionado) {
+      toast.error("Debe seleccionar un cliente y una factura");
+      return;
     }
-  } catch (error) {
-    console.error(error);
-    toast.error("Error al enviar el correo");
-  } finally {
-    setEnviandoCorreo(false);
-  }
-};
+
+    setEnviandoCorreo(true);
+    try {
+      const token = localStorage.getItem("token");
+      const body = {
+        cliente: registroSeleccionado.cliente,
+        factura: registroSeleccionado.numefac,
+        cuenta: registroSeleccionado.cuenta,
+        plantillaKey: plantillaSeleccionadaKey,
+        fecha: fechaConsultaFacturas,
+        idUser: currentUser?.id || 0,
+      };
+
+      const response = await fetch(
+        `${API_URL}/api/EmailTemplateMaster/SendWithTemplate`,
+        {
+          method: "POST",
+          headers: {
+            accept: "*/*",
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(body),
+        }
+      );
+
+      const result = await response.json();
+      if (result.success) {
+        toast.success("Correo enviado correctamente");
+        setShowModalCorreo(false);
+      } else {
+        toast.error(`Error: ${result.message}`);
+        console.error(result.errors);
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Error al enviar el correo");
+    } finally {
+      setEnviandoCorreo(false);
+    }
+  };
 
   return (
-    <div
-    // style={{
-    //   height: "100vh",
-    //   // display: "flex",
-    //   flexDirection: "column",
-    //   // overflow: "hidden",
-    // }}
-    >
+    <div>
       {/* <ContentHeader title="Consulta de Cartera" /> */}
       <section className="content">
         <div className="container-fluid">
@@ -919,7 +858,7 @@ export const ConsultaCartera: React.FC = () => {
                       />
                     </Col>
                     <Col xs={12} md={6}>
-                      <div className="d-flex justify-content-between align-items-center">
+                      {/* <div className="d-flex justify-content-between align-items-center">
                         <h6 className="mb-0">Etiquetas</h6>
                         <Button
                           variant="outline-primary"
@@ -961,7 +900,9 @@ export const ConsultaCartera: React.FC = () => {
                             </Badge>
                           );
                         })}
-                      </div>
+                      </div> */}
+
+                      <EtiquetasClienteGestion cliente={selectedValue} />
                     </Col>
                   </Row>
 
@@ -1115,6 +1056,12 @@ export const ConsultaCartera: React.FC = () => {
                   <TimelineSeguimientos
                     seguimientos={seguimientos}
                     onNuevoSeguimiento={handleNuevoSeguimiento}
+                    contextoEvento={{
+                      idUsuario: currentUser?.id || 0,
+                      cliente: registroSeleccionado?.cliente || "",
+                      factura: registroSeleccionado?.numefac || "",
+                      cuenta: registroSeleccionado?.cuenta || "",
+                    }}
                   />
                 </Tab>
                 <Tab eventKey="bitacora" title="Bitácora">
@@ -1183,13 +1130,8 @@ export const ConsultaCartera: React.FC = () => {
       </div>
 
       {/* Modal de previsualización de correo */}
-      <Modal
-        show={showModalCorreo}
-        onHide={handleCerrarModalCorreo}
-        centered
-        
-      >
-        <Modal.Header  {...({ closeButton: true } as any)}>
+      <Modal show={showModalCorreo} onHide={handleCerrarModalCorreo} centered>
+        <Modal.Header {...({ closeButton: true } as any)}>
           <Modal.Title>Confirmar el envio del correo.</Modal.Title>
         </Modal.Header>
         <Modal.Body>

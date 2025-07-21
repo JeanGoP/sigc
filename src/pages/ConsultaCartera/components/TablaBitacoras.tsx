@@ -201,7 +201,7 @@ export const TablaBitacoras: React.FC<Props> = ({ cliente }) => {
           </Table>
 
           <Modal show={showModal} onHide={() => setShowModal(false)}>
-            <Modal.Header closeButton>
+            <Modal.Header closeButton={true} {...({} as any)}>
               <Modal.Title>Nueva Bitácora</Modal.Title>
             </Modal.Header>
             <Modal.Body>
@@ -252,7 +252,7 @@ export const TablaBitacoras: React.FC<Props> = ({ cliente }) => {
           </Modal>
 
           <Modal show={showComentarioModal} onHide={() => setShowComentarioModal(false)}>
-            <Modal.Header closeButton style={{ backgroundColor: '#f8f9fa', borderBottom: '1px solid #dee2e6' }}>
+            <Modal.Header closeButton={true} {...({} as any)} style={{ backgroundColor: '#f8f9fa', borderBottom: '1px solid #dee2e6' }}>
               <Modal.Title>
                 <FontAwesomeIcon icon={faStar} className="text-warning me-2" />
                 Detalle del Comentario

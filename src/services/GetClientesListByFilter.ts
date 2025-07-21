@@ -1,5 +1,7 @@
 import { handleApiResponse } from "@app/utils/handleApiResponse";
 
+const API_URL = import.meta.env.VITE_API_URL;
+
 export type ClientesListRequest = {
     page: number;
     numpage: number;
@@ -11,7 +13,7 @@ export type ClientesListRequest = {
   
 export const  getClientesList = async (data: ClientesListRequest): Promise<ClientesResponse> =>{
     try {
-      const response = await fetch("https://localhost:7013/api/Clientes", {
+      const response = await fetch(`${API_URL}/api/Clientes`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

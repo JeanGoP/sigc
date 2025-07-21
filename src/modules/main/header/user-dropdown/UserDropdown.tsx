@@ -11,9 +11,10 @@ import {
 } from '@app/styles/dropdown-menus';
 // import { firebaseAuth } from '@app/firebase';
 import {} from '@app/index';
-import { useAppSelector } from '@app/store/store';
+import {useAppSelector } from '@app/store/store';
 // import { DateTime } from 'luxon';
 import { saveObjectToLocalStorage } from '@app/utils/localStorageHandler';
+
 
 const UserDropdown = () => {
   const navigate = useNavigate();
@@ -27,8 +28,7 @@ const UserDropdown = () => {
     console.log('User logged out');
     event.preventDefault();
     setDropdownOpen(false);
-    // window.location.reload();
-    navigate('/');
+    window.location.reload();
   };
 
   const navigateToProfile = (event: any) => {

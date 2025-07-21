@@ -1,5 +1,7 @@
 import { handleApiResponse } from '@app/utils/handleApiResponse';
 
+
+const API_URL = import.meta.env.VITE_API_URL;
 export interface Gestion {
   id: number;
   numefac: string;
@@ -38,7 +40,7 @@ export interface MonitorGestionResponse {
 
 export const obtenerGestionesEventos = async (pageNumber: number, pageSize: number): Promise<MonitorGestionResponse> => {
   try {
-    const response = await fetch(`https://localhost:7013/api/MonitorGestion/gestiones-eventos?pageNumber=${pageNumber}&pageSize=${pageSize}`, {
+    const response = await fetch(`${API_URL}/api/MonitorGestion/gestiones-eventos?pageNumber=${pageNumber}&pageSize=${pageSize}`, {
       method: 'GET',
       headers: {
         'accept': '*/*'

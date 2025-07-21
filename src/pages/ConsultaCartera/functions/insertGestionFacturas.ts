@@ -1,5 +1,7 @@
 import { ApiResponse } from "@app/models/apiResponse";
 
+const API_URL = import.meta.env.VITE_API_URL;
+
 export interface GestionFacturaRequest {
   numefac: string;
   cliente: string;
@@ -15,7 +17,7 @@ export const insertarGestionFactura = async (
   data: GestionFacturaRequest
 ): Promise<ApiResponse<null>> => {
   try {
-    const response = await fetch('https://localhost:7013/api/GestionFactura', {
+    const response = await fetch(`${API_URL}/api/GestionFactura`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

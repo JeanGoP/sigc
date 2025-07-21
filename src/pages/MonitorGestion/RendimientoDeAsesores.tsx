@@ -30,11 +30,13 @@ export const RendimientoDeAsesores: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const currentUser = useAppSelector((state) => state.auth.currentUser);
 
+  const API_URL = import.meta.env.VITE_API_URL;
+
   const fetchData = async () => {
     setLoading(true);
     setError(null);
     try {
-      const url = `https://localhost:7013/api/ProductividadAsesores/GetList?IdUsuario=${currentUser?.id}&FechaInicial=${fechaInicial}&FechaFinal=${fechaFinal}`;
+      const url = `${API_URL}/api/ProductividadAsesores/GetList?IdUsuario=${currentUser?.id}&FechaInicial=${fechaInicial}&FechaFinal=${fechaFinal}`;
       const response = await fetch(url);
       const result = await response.json();
       if (result.success) {

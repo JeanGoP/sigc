@@ -8,6 +8,7 @@ import {
   DynamicTablePagination,
   TableColumn,
 } from "@app/pages/ConsultaClientes/components/tablaReutilizablePaginacion";
+const API_URL = import.meta.env.VITE_API_URL;
 
 const StyledCard = styled.div`
   margin-bottom: 1rem;
@@ -76,7 +77,7 @@ interface TipoContacto {
   estado: boolean;
 }
 
-const API_URL = "https://localhost:7013/api/TiposContacto";
+const URL_API = `${API_URL}/api/TiposContacto`;
 
 const EstadosEventos: React.FC = () => {
   const [tiposContacto, setTiposContacto] = useState<TipoContacto[]>([]);
@@ -103,7 +104,7 @@ const EstadosEventos: React.FC = () => {
         pageSize: rowsPerPage.toString(),
       });
 
-      const url = `${API_URL}?${queryParams.toString()}`;
+      const url = `${URL_API}?${queryParams.toString()}`;
       console.log("URL generada:", url); // Opcional: para debug
 
       const response = await fetch(url, {
@@ -162,10 +163,11 @@ const EstadosEventos: React.FC = () => {
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
-    const { name, value, type, checked } = e.target;
+    const target = e.target as HTMLInputElement;
+    const { name, value, type } = target;
     setFormData((prev) => ({
       ...prev,
-      [name]: type === "checkbox" ? checked : value,
+      [name]: type === "checkbox" ? target.checked : value,
     }));
   };
 
@@ -181,7 +183,7 @@ const EstadosEventos: React.FC = () => {
         idUser: 2, // ⚠️ Ajusta esto dinámicamente si usas autenticación
       };
 
-      const response = await fetch(API_URL, {
+      const response = await fetch(URL_API, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -214,7 +216,7 @@ const EstadosEventos: React.FC = () => {
     try {
       setLoading(true);
 
-      const response = await fetch(`${API_URL}/${id}`, {
+      const response = await fetch(`${URL_API}/${id}`, {
         method: "DELETE",
         headers: {
           accept: "*/*", // Como en el curl
@@ -307,7 +309,7 @@ const EstadosEventos: React.FC = () => {
       </section>
 
       <StyledModal show={modalOpen} onHide={handleCloseModal} centered>
-        <Modal.Header closeButton>
+        <Modal.Header closeButton={true} {...({} as any)}>
           <Modal.Title>
             {selected ? "Editar Tipo de Contacto" : "Nuevo Tipo de Contacto"}
           </Modal.Title>

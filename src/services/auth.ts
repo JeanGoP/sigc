@@ -3,6 +3,8 @@ import { User } from '@app/models/auth/User.model';
 // import { firebaseAuth } from '@app/firebase';
 import { IUser } from '@app/types/user';
 import { saveObjectToLocalStorage } from '@app/utils/localStorageHandler';
+
+const API_URL = import.meta.env.VITE_API_URL;
 // import { createUserWithEmailAndPassword } from '@firebase/auth';
 // import { signInWithEmailAndPassword, signInWithPopup } from 'firebase/auth';
 // import { GoogleAuthProvider } from 'firebase/auth';
@@ -77,7 +79,7 @@ interface LoginResponse {
 
 export const loginWithEmail = async (username: string, password: string): Promise<User | null> => {
   try {
-    const response = await fetch('https://localhost:7013/api/Auth/login', {
+    const response = await fetch(`${API_URL}/api/Auth/login`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

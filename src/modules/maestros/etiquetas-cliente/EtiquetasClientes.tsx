@@ -9,6 +9,8 @@ import {
   TableColumn,
 } from "@app/pages/ConsultaClientes/components/tablaReutilizablePaginacion";
 
+const API_URL = import.meta.env.VITE_API_URL;
+
 interface EtiquetaCliente {
   id: number;
   nombre: string;
@@ -16,7 +18,7 @@ interface EtiquetaCliente {
   estado: boolean;
 }
 
-const API_URL = "https://localhost:7013/api/EtiquetaCliente";
+const URL_FOR_API = `${API_URL}/api/EtiquetaCliente`;
 
 const StyledCard = styled.div`
   margin-bottom: 1rem;
@@ -94,7 +96,7 @@ const [formData, setFormData] = useState({
 
   const fetchEtiquetas = async (filter: string = "") => {
     try {
-      const url = `${API_URL}?filter=${encodeURIComponent(filter)}`;
+      const url = `${URL_FOR_API}?filter=${encodeURIComponent(filter)}`;
       const res = await fetch(url);
       const result = await res.json();
       if (result.success) setEtiquetas(result.data);
@@ -146,7 +148,7 @@ const [formData, setFormData] = useState({
       estado: formData.estado,
     };
 
-    const res = await fetch(API_URL, {
+    const res = await fetch(URL_FOR_API, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -176,7 +178,7 @@ const [formData, setFormData] = useState({
     if (!window.confirm("¿Está seguro de eliminar esta etiqueta?")) return;
     try {
       setLoading(true);
-      const res = await fetch(`${API_URL}/${id}`, {
+      const res = await fetch(`${URL_FOR_API}/${id}`, {
         method: "DELETE",
         headers: { Accept: "*/*" },
       });
@@ -276,7 +278,7 @@ const [formData, setFormData] = useState({
         </section>
 
         <StyledModal show={modalOpen} onHide={handleCloseModal} centered>
-          <Modal.Header>
+          <Modal.Header closeButton={true} {...({} as any)}  >
             <Modal.Title>
               {selectedEtiqueta ? "Editar" : "Nueva"} Etiqueta
             </Modal.Title>

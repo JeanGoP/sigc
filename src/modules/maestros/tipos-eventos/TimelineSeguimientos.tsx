@@ -28,6 +28,9 @@ import {
   obtenerTiposContacto,
   TipoContacto,
 } from "@app/services/ObtenerTiposContacto";
+import { toast } from "react-toastify";
+
+const API_URL = import.meta.env.VITE_API_URL;
 
 interface EventoXML {
   id: number;
@@ -60,43 +63,23 @@ export type Seguimiento = {
   grabacion: string | null;
 };
 
-const iconosEventos: Record<
-  string,
-  { icon: any; color: string; label: string }
-> = {
-  agendar_llamada: {
-    icon: faPhone,
-    color: "#1976d2",
-    label: "Agendar llamada",
-  },
-  compromiso_pago: {
-    icon: faHandHoldingUsd,
-    color: "#388e3c",
-    label: "Compromiso de pago",
-  },
-  penalizacion: {
-    icon: faExclamationTriangle,
-    color: "#d32f2f",
-    label: "Penalización",
-  },
-  visita: { icon: faHome, color: "#fbc02d", label: "Visita" },
-  acercarse_oficina: {
-    icon: faBuilding,
-    color: "#512da8",
-    label: "Acercarse a la oficina",
-  },
-};
-
 interface TimelineSeguimientosProps {
   seguimientos: Seguimiento[];
   onNuevoSeguimiento: (
     seguimiento: Omit<Seguimiento, "id" | "usuario" | "fecha" | "hora">
   ) => Promise<boolean>;
+  contextoEvento?: {
+    idUsuario?: string | number;
+    cliente?: string;
+    factura?: string;
+    cuenta?: string;
+  };
 }
 
 export const TimelineSeguimientos: React.FC<TimelineSeguimientosProps> = ({
   seguimientos,
   onNuevoSeguimiento,
+  contextoEvento,
 }) => {
   const [showModal, setShowModal] = React.useState(false);
   const [showAudio, setShowAudio] = React.useState(false);
@@ -111,6 +94,18 @@ export const TimelineSeguimientos: React.FC<TimelineSeguimientosProps> = ({
   const [nuevoTipoContacto, setNuevoTipoContacto] = React.useState<
     string | number
   >(0);
+  const emptyFormEvento: Evento = {
+    id: 0,
+    tipo: "",
+    fecha: "",
+    hora: null,
+    valor: undefined,
+  };
+  const [formEvento, setFormEvento] = React.useState<Evento>(emptyFormEvento);
+  const [editIndex, setEditIndex] = React.useState<number | null>(null);
+  const [errorValidacion, setErrorValidacion] = React.useState<string | null>(
+    null
+  );
 
   React.useEffect(() => {
     const cargarTiposEvento = async () => {
@@ -118,8 +113,16 @@ export const TimelineSeguimientos: React.FC<TimelineSeguimientosProps> = ({
         const tipos = await obtenerTiposEvento();
         setTiposEvento(tipos);
 
+        if (tipos.length > 0) {
+          setFormEvento((prev) => ({
+            ...prev,
+            tipo: tipos[0].nombre,
+            id: tipos[0].id,
+          }));
+        }
+
         const tiposCon = await obtenerTiposContacto("");
-        console.log("Tipos de evento cargados: ", tiposCon);
+        // console.log("Tipos de evento cargados: ", tiposCon);
         setTiposContacto(tiposCon);
       } catch (error) {
         console.error("Error al cargar tipos de evento: ", error);
@@ -127,6 +130,46 @@ export const TimelineSeguimientos: React.FC<TimelineSeguimientosProps> = ({
     };
     cargarTiposEvento();
   }, []);
+
+  function setFormCampo<K extends keyof Evento>(campo: K, valor: Evento[K]) {
+    setFormEvento((prev) => ({ ...prev, [campo]: valor }));
+  }
+
+  async function validarEventoBackend(
+    e: Evento
+  ): Promise<{ ok: boolean; message?: string }> {
+    const url = `${API_URL}/api/TipoEvento/validar-evento`;
+    const tipoObj = tiposEvento.find(
+      (t) => t.nombre === e.tipo || t.id === e.id
+    );
+    // normalizar fecha a YYYY/MM/DD
+    const fechaApi = e.fecha //? e.fecha.replace(/-/g, "/") : "";
+    const payload = {
+      tipo: tipoObj?.id ?? e.id ?? 0,
+      fecha: fechaApi || null,
+      hora: e.hora ?? null,
+      monto: typeof e.valor === "number" ? e.valor : 0,
+      idUsuario: contextoEvento?.idUsuario ?? null,
+      cliente: contextoEvento?.cliente ?? null,
+      factura: contextoEvento?.factura ?? null,
+      cuenta: contextoEvento?.cuenta ?? null,
+    };
+
+    try {
+      const resp = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const json = await resp.json();
+      if (json?.success) return { ok: true };
+      toast.error(json.message || "Error, valide los campos.");
+      return { ok: false, message: json?.message || "Validación fallida." };
+    } catch (err: any) {
+      toast.error(err?.message || "Error, valide los campos.");
+      return { ok: false, message: err?.message || "Error de red al validar." };
+    }
+  }
 
   const handleVerMas = (seguimiento: Seguimiento) => {
     setSeguimientoActivo(seguimiento);
@@ -156,19 +199,72 @@ export const TimelineSeguimientos: React.FC<TimelineSeguimientosProps> = ({
     );
   };
 
-  const handleAgregarEvento = () => {
-    if (tiposEvento.length > 0) {
-      setNuevoEventos((evts) => [
-        ...evts,
-        {
-          id: tiposEvento[0].id,
-          tipo: tiposEvento[0].nombre,
-          hora: null,
-          fecha: "",
-          valor: undefined,
-        },
-      ]);
+  // const handleAgregarEvento = () => {
+  //   if (tiposEvento.length > 0) {
+  //     setNuevoEventos((evts) => [
+  //       ...evts,
+  //       {
+  //         id: tiposEvento[0].id,
+  //         tipo: tiposEvento[0].nombre,
+  //         hora: null,
+  //         fecha: "",
+  //         valor: undefined,
+  //       },
+  //     ]);
+  //   }
+  // };
+
+  const handleAgregarEventoValidado = async () => {
+    setErrorValidacion(null);
+    const eventoEnviar = { ...formEvento };
+
+    // Si aún no se seleccionó tipo, usamos el primero (como hacías antes)
+    if (!eventoEnviar.tipo && tiposEvento.length > 0) {
+      eventoEnviar.id = tiposEvento[0].id;
+      eventoEnviar.tipo = tiposEvento[0].nombre;
     }
+
+    const { ok, message } = await validarEventoBackend(eventoEnviar);
+    if (!ok) {
+      setErrorValidacion(message || "No se pudo validar el evento.");
+      return;
+    }
+
+    // Validado: agregamos
+    setNuevoEventos((evts) => [...evts, eventoEnviar]);
+    setFormEvento(emptyFormEvento);
+  };
+
+  const handleActualizarEventoValidado = async () => {
+    if (editIndex === null) return;
+    setErrorValidacion(null);
+
+    const eventoEnviar = { ...formEvento };
+
+    const { ok, message } = await validarEventoBackend(eventoEnviar);
+    if (!ok) {
+      setErrorValidacion(message || "No se pudo validar el evento.");
+      return;
+    }
+
+    setNuevoEventos((evts) =>
+      evts.map((evt, i) => (i === editIndex ? eventoEnviar : evt))
+    );
+    setEditIndex(null);
+    setFormEvento(emptyFormEvento);
+  };
+
+  const handleCancelarEdicionEvento = () => {
+    setEditIndex(null);
+    setFormEvento(emptyFormEvento);
+    setErrorValidacion(null);
+  };
+
+  const handleEditarEvento = (idx: number) => {
+    const evt = nuevoEventos[idx];
+    setFormEvento({ ...evt });
+    setEditIndex(idx);
+    setErrorValidacion(null);
   };
 
   const handleEliminarEvento = (idx: number) => {
@@ -403,133 +499,194 @@ export const TimelineSeguimientos: React.FC<TimelineSeguimientosProps> = ({
             <label style={{ fontWeight: 500, marginBottom: 8 }}>
               Eventos programados
             </label>
-            {nuevoEventos.map((evt, idx) => (
-              <div
-                key={idx}
-                style={{
-                  display: "flex",
-                  alignItems: "end",
-                  gap: 12,
-                  marginBottom: 12,
-                  background: "#fff",
-                  borderRadius: 8,
-                  padding: 12,
-                  boxShadow: "0 2px 4px rgba(0,0,0,0.05)",
-                }}
-              >
-                <SingleSelect
-                  options={tiposEvento.map((tipo) => ({
-                    label: tipo.nombre,
-                    value: tipo.nombre, // Puedes usar `tipo.id` si prefieres usar el ID como valor único
-                  }))}
-                  selectedValue={evt.tipo}
-                  label="Tipo de evento"
-                  onChange={(val) => {
-                    const selectedTipo = tiposEvento.find(
-                      (t) => t.nombre === val
-                    );
-                    handleNuevoEventoChange(idx, "tipo", val);
-                    if (selectedTipo) {
-                      handleNuevoEventoChange(idx, "id", selectedTipo.id);
-                    }
-                  }}
-                />
-                {tiposEvento.find((t) => t.nombre === evt.tipo)
-                  ?.requiereFecha && (
-                  <Form.Group>
-                    <Form.Label>Fecha</Form.Label>
-                    <input
-                      type="date"
-                      className="form-control"
-                      style={{ width: 140, borderRadius: 6, margin: 0 }}
-                      value={evt.fecha || ""}
-                      onChange={(e) =>
-                        handleNuevoEventoChange(idx, "fecha", e.target.value)
-                      }
-                    />
-                  </Form.Group>
-                )}
-                {tiposEvento.find((t) => t.nombre === evt.tipo)
-                  ?.requiereHora && (
-                  <Form.Group>
-                    <Form.Label>Hora</Form.Label>
-                    <input
-                      type="time"
-                      className="form-control"
-                      style={{ width: 110, borderRadius: 6 }}
-                      value={evt.hora || ""}
-                      onChange={(e) =>
-                        handleNuevoEventoChange(idx, "hora", e.target.value)
-                      }
-                    />
-                  </Form.Group>
 
-                  // </div>
-                )}
-                {tiposEvento.find((t) => t.nombre === evt.tipo)
-                  ?.requiereMonto && (
-                  <Form.Group>
-                    <Form.Label>Monto</Form.Label>
-                    <input
-                      type="number"
-                      className="form-control"
-                      style={{ width: 120, borderRadius: 6 }}
-                      placeholder="Valor"
-                      value={evt.valor || ""}
-                      onChange={(e) =>
-                        handleNuevoEventoChange(
-                          idx,
-                          "valor",
-                          Number(e.target.value)
-                        )
-                      }
-                    />
-                  </Form.Group>
-                )}
-                <Form.Group>
-                  <Button
-                    // size="sm"
-                    variant="danger"
-                    onClick={() => handleEliminarEvento(idx)}
-                    title="Eliminar evento"
-                    style={{ borderRadius: 6 }}
-                  >
-                    &times;
-                  </Button>
-                </Form.Group>
-
-                {/* <OverlayTrigger
-                  placement="top"
-                  overlay={renderTooltip(evt, idx)}
-                >
-                  <span
-                    style={{
-                      color: iconosEventos[evt.tipo]?.color || "#666",
-                      fontSize: 18,
-                      marginLeft: 8,
-                      cursor: "pointer",
-                    }}
-                  >
-                    <FontAwesomeIcon
-                      icon={
-                        iconosEventos[evt.tipo]?.icon || faExclamationTriangle
-                      }
-                    />
-                  </span>
-                </OverlayTrigger> */}
-              </div>
-            ))}
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={handleAgregarEvento}
+            {/* --- Formulario fijo de captura/edición --- */}
+            <div
               style={{
-                borderRadius: 6,
-                marginTop: 8,
+                display: "flex",
+                alignItems: "end",
+                flexWrap: "wrap",
+                gap: 12,
+                marginBottom: 16,
+                background: "#fff",
+                borderRadius: 8,
+                padding: 12,
+                boxShadow: "0 2px 4px rgba(0,0,0,0.05)",
               }}
             >
-              + Agregar evento
-            </Button>
+              <SingleSelect
+                options={tiposEvento.map((tipo) => ({
+                  label: tipo.nombre,
+                  value: tipo.nombre, // seguimos usando nombre para no romper nada
+                }))}
+                selectedValue={formEvento.tipo}
+                label="Tipo de evento"
+                onChange={(val) => {
+                  const selectedTipo = tiposEvento.find(
+                    (t) => t.nombre === val
+                  );
+                  setFormCampo("tipo", val as any);
+                  if (selectedTipo) {
+                    setFormCampo("id", selectedTipo.id as any);
+                  }
+                }}
+              />
+
+              {/* Campos condicionales como en la versión actual */}
+              {(() => {
+                const t = tiposEvento.find(
+                  (tt) => tt.nombre === formEvento.tipo
+                );
+                return (
+                  <>
+                    {t?.requiereFecha && (
+                      <Form.Group>
+                        <Form.Label>Fecha</Form.Label>
+                        <input
+                          type="date"
+                          className="form-control"
+                          style={{ width: 140, borderRadius: 6, margin: 0 }}
+                          value={formEvento.fecha || ""}
+                          onChange={(e) =>
+                            setFormCampo("fecha", e.target.value as any)
+                          }
+                        />
+                      </Form.Group>
+                    )}
+
+                    {t?.requiereHora && (
+                      <Form.Group>
+                        <Form.Label>Hora</Form.Label>
+                        <input
+                          type="time"
+                          className="form-control"
+                          style={{ width: 110, borderRadius: 6 }}
+                          value={formEvento.hora || ""}
+                          onChange={(e) =>
+                            setFormCampo("hora", e.target.value as any)
+                          }
+                        />
+                      </Form.Group>
+                    )}
+
+                    {t?.requiereMonto && (
+                      <Form.Group>
+                        <Form.Label>Monto</Form.Label>
+                        <input
+                          type="number"
+                          className="form-control"
+                          style={{ width: 120, borderRadius: 6 }}
+                          placeholder="Valor"
+                          value={formEvento.valor ?? ""}
+                          onChange={(e) =>
+                            setFormCampo("valor", Number(e.target.value) as any)
+                          }
+                        />
+                      </Form.Group>
+                    )}
+                  </>
+                );
+              })()}
+
+              {/* Botones Agregar / Actualizar */}
+              <Form.Group>
+                {editIndex === null ? (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={handleAgregarEventoValidado}
+                    style={{ borderRadius: 6 }}
+                  >
+                    + Agregar
+                  </Button>
+                ) : (
+                  <>
+                    <Button
+                      size="sm"
+                      variant="success"
+                      onClick={handleActualizarEventoValidado}
+                      style={{ borderRadius: 6, marginRight: 4 }}
+                    >
+                      Actualizar
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline-secondary"
+                      onClick={handleCancelarEdicionEvento}
+                      style={{ borderRadius: 6 }}
+                    >
+                      Cancelar
+                    </Button>
+                  </>
+                )}
+              </Form.Group>
+            </div>
+
+            {/* Mensaje de validación backend */}
+            {errorValidacion && (
+              <div style={{ color: "#d32f2f", fontSize: 12, marginBottom: 8 }}>
+                {errorValidacion}
+              </div>
+            )}
+
+            {/* --- Lista de eventos agregados (solo lectura) --- */}
+            {nuevoEventos.map((evt, idx) => {
+              const t = tiposEvento.find((tt) => tt.nombre === evt.tipo);
+              return (
+                <div
+                  key={idx}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    flexWrap: "wrap",
+                    gap: 12,
+                    marginBottom: 8,
+                    background: "#fff",
+                    borderRadius: 8,
+                    padding: 12,
+                    boxShadow: "0 2px 4px rgba(0,0,0,0.05)",
+                    opacity: editIndex === idx ? 0.6 : 1,
+                  }}
+                >
+                  <div style={{ minWidth: 160, fontWeight: 500 }}>
+                    {evt.tipo}
+                  </div>
+                  {t?.requiereFecha && (
+                    <div style={{ minWidth: 100 }}>
+                      Fecha: {evt.fecha || "-"}
+                    </div>
+                  )}
+                  {t?.requiereHora && (
+                    <div style={{ minWidth: 80 }}>Hora: {evt.hora || "-"}</div>
+                  )}
+                  {t?.requiereMonto && (
+                    <div style={{ minWidth: 100 }}>
+                      Monto: {evt.valor ?? "-"}
+                    </div>
+                  )}
+
+                  <div style={{ marginLeft: "auto", display: "flex", gap: 4 }}>
+                    <Button
+                      size="sm"
+                      variant="outline-primary"
+                      onClick={() => handleEditarEvento(idx)}
+                      style={{ borderRadius: 6 }}
+                    >
+                      Editar
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="danger"
+                      onClick={() => handleEliminarEvento(idx)}
+                      style={{ borderRadius: 6 }}
+                      title="Eliminar evento"
+                    >
+                      &times;
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
           </div>
           <div className="mb-3">
             <label style={{ fontWeight: 500, marginBottom: 8 }}>
@@ -757,7 +914,6 @@ export const TimelineSeguimientos: React.FC<TimelineSeguimientosProps> = ({
         handleClose={handleClose}
         seguimientoActivo={seguimientoActivo}
         parseEventos={parseEventos}
-        iconosEventos={iconosEventos}
         IconMap={IconMap}
         StringToMoney={StringToMoney}
       />

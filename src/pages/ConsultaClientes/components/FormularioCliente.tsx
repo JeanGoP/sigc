@@ -110,7 +110,7 @@ export const FormularioCliente = () => {
         </Row>
         {/* Modal de previsualización */}
         <Modal show={showModal} onHide={handleCerrarModal} centered>
-          <Modal.Header closeButton>
+          <Modal.Header closeButton={true} {...({} as any)}>
             <Modal.Title>Previsualización de correo</Modal.Title>
           </Modal.Header>
           <Modal.Body>

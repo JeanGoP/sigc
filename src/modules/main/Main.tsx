@@ -148,7 +148,7 @@ const Main = () => {
                 : '0px',
           }}
         /> */}
-        <ControlSidebar />
+        {/* <ControlSidebar /> */}
         <div
           id="sidebar-overlay"
           role="presentation"

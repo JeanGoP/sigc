@@ -7,6 +7,7 @@ import { FacturaListado } from "@app/models/facturaConsultaclienteModel";
 import { ObtenerRecibosCajaPorFactura } from "@app/services/GetRecibosCajaListService";
 import { handleApiResponse } from "@app/utils/handleApiResponse";
 
+const API_URL = import.meta.env.VITE_API_URL;
 interface Props {
   cliente: string;
   fecha: string;
@@ -51,7 +52,7 @@ export const ClienteEstadoCuenta = forwardRef<FetchFacturasRef, Props>(({
     
           const token = localStorage.getItem('token');
           const response = await fetch(
-            `https://localhost:7013/api/FacturasListByClient?${queryParams.toString()}`,
+            `${API_URL}/api/FacturasListByClient?${queryParams.toString()}`,
             {
               method: "GET",
               headers: {

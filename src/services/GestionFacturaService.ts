@@ -2,6 +2,8 @@ import { ApiResponse } from "@app/models/apiResponse";
 import { faC } from "@fortawesome/free-solid-svg-icons";
 import { toast } from "react-toastify";
 
+const API_URL = import.meta.env.VITE_API_URL;
+
 export interface GestionFactura {
   id: number;
   factura: string;
@@ -87,7 +89,7 @@ export const buscarGestiones = async (
 ): Promise<ApiResponse<GestionesEventosFacturaResulta>> => {
   try {
     const response = await fetch(
-      `https://localhost:7013/api/GestionFactura/gestiones-eventos?numefac=${factura}&cliente=${cliente}&cuenta=${cuenta}`,
+      `${API_URL}/api/GestionFactura/gestiones-eventos?numefac=${factura}&cliente=${cliente}&cuenta=${cuenta}`,
       {
         method: "GET",
         headers: getAuthHeaders(),
@@ -116,7 +118,7 @@ export const GestionarFactura = async (
 ): Promise<ApiResponse<null>> => {
   let responseData2: any;
   try {
-    const response = await fetch("https://localhost:7013/api/GestionFactura", {
+    const response = await fetch(`${API_URL}/api/GestionFactura`, {
       method: "POST",
       headers: getAuthHeaders(),
       body: JSON.stringify(gestion),

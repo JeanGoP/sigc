@@ -12,6 +12,7 @@ import UserDropdown from '@app/modules/main/header/user-dropdown/UserDropdown';
 import { styled } from 'styled-components';
 import { Image } from '@profabric/react-components';
 import { useAppDispatch, useAppSelector } from '@app/store/store';
+import EventsDropdown from './events-dropdown/EventsDropdown';
 
 const StyledBrandImage = styled(Image)`
   float: left;
@@ -110,9 +111,10 @@ const Header = ({ containered, ...rest }: { containered?: boolean } & any) => {
           </li> */}
         </ul>
         <ul className="navbar-nav ml-auto">
-          <MessagesDropdown />
+          {/* <MessagesDropdown /> */}
           {/* <NotificationsDropdown /> */}
           {/* <LanguagesDropdown /> */}
+          <EventsDropdown />
           <UserDropdown />
           <li className="nav-item">
             <button

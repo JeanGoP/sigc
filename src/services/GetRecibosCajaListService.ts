@@ -3,6 +3,8 @@ import { handleApiResponse } from "@app/utils/handleApiResponse";
 import { ReciboCajaListModel } from "../models/recibocaja/recibocajaListoModel";
 import { ApiResponse } from "@app/models/apiResponse";
 
+const API_URL = import.meta.env.VITE_API_URL;
+
 const getAuthHeaders = () => {
   const token = localStorage.getItem('token');
   return {
@@ -18,7 +20,7 @@ export async function ObtenerRecibosCajaPorFactura(
   factura: string
 ): Promise<ApiResponse<ReciboCajaListModel[]>> {
   try {
-    const url = new URL('https://localhost:7013/api/GetRecibosCajaListByFactura');
+    const url = new URL(`${API_URL}/api/GetRecibosCajaListByFactura`);
     url.searchParams.append('fecha', fecha);
     url.searchParams.append('cliente', cliente);
     url.searchParams.append('factura', factura);

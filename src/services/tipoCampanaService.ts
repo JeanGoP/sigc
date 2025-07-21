@@ -11,11 +11,13 @@ interface ApiResponse {
   errors: any[];
 }
 
-const API_URL = 'https://localhost:7013/api';
+const API_URL = import.meta.env.VITE_API_URL;
+
+const URL_API = API_URL;
 
 export const fetchTiposCampana = async (): Promise<TipoCampana[]> => {
   try {
-    const response = await fetch(`${API_URL}/TipoCampanas/listar`);
+    const response = await fetch(`${URL_API}/api/TipoCampanas/listar`);
     if (!response.ok) {
       throw new Error('Error al obtener los tipos de campaña');
     }

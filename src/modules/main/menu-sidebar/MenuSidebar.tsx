@@ -19,11 +19,11 @@ export const MENU: IMenuItem[] = [
     icon: 'fas fa-tachometer-alt nav-icon',
     path: '/',
   },
-  {
-    name: i18n.t('menusidebar.label.blank'),
-    icon: 'fas fa-wrench nav-icon',
-    path: '/blank',
-  },
+  // {
+  //   name: i18n.t('menusidebar.label.blank'),
+  //   icon: 'fas fa-wrench nav-icon',
+  //   path: '/blank',
+  // },
   {
     name: "Consulta por Cliente",
     icon: 'fas fa-wrench nav-icon',
@@ -60,38 +60,38 @@ export const MENU: IMenuItem[] = [
       },
     ],
   },
-  {
-    name: i18n.t('menusidebar.label.mainMenu'),
-    icon: 'far fa-caret-square-down nav-icon',
-    children: [
-      {
-        name: i18n.t('menusidebar.label.subMenu'),
-        icon: 'fas fa-hammer nav-icon',
-        path: '/sub-menu-1',
-      },
+  // {
+  //   name: i18n.t('menusidebar.label.mainMenu'),
+  //   icon: 'far fa-caret-square-down nav-icon',
+  //   children: [
+  //     {
+  //       name: i18n.t('menusidebar.label.subMenu'),
+  //       icon: 'fas fa-hammer nav-icon',
+  //       path: '/sub-menu-1',
+  //     },
 
-      {
-        name: i18n.t('menusidebar.label.blank'),
-        icon: 'fas fa-cogs nav-icon',
-        path: '/sub-menu-2',
-      },
-    ],
-  },
-  {
-    name: "Monitor de seguimientos",
-    icon: 'fas fa-list nav-icon',
-    path: '/monitor_seguimientos',
-  },
+  //     {
+  //       name: i18n.t('menusidebar.label.blank'),
+  //       icon: 'fas fa-cogs nav-icon',
+  //       path: '/sub-menu-2',
+  //     },
+  //   ],
+  // },
+  // {
+  //   name: "Monitor de seguimientos",
+  //   icon: 'fas fa-list nav-icon',
+  //   path: '/monitor_seguimientos',
+  // },
   {
     name: "Monitor de Asesores",
     icon: 'fas fa-tasks nav-icon',
     path: '/rendimiento_asesores',
   },
-  {
-    name: "Campañas",
-    icon: 'fas fa-bullhorn nav-icon',
-    path: '/campanas',
-  },
+  // {
+  //   name: "Campañas",
+  //   icon: 'fas fa-bullhorn nav-icon',
+  //   path: '/campanas',
+  // },
   {
     name: "Calendario",
     icon: 'fas fa-calendar-alt nav-icon',

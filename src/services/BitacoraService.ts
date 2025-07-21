@@ -1,5 +1,7 @@
 import { ApiResponse } from '@app/models/apiResponse';
 
+const API_URL = import.meta.env.VITE_API_URL;
+
 export interface Bitacora {
   id: number;
   cliente: string;
@@ -55,7 +57,7 @@ const getAuthHeaders = () => {
 
 export const obtenerBitacoras = async (cliente: string): Promise<ApiResponse<Bitacora[]>> => {
   try {
-    const response = await fetch(`https://localhost:7013/api/BitacoraCliente/listar/${cliente}`, {
+    const response = await fetch(`${API_URL}/api/BitacoraCliente/listar/${cliente}`, {
       method: 'GET',
       headers: getAuthHeaders()
     });
@@ -78,7 +80,7 @@ export const obtenerBitacoras = async (cliente: string): Promise<ApiResponse<Bit
 
 export const crearBitacora = async (bitacora: Omit<Bitacora, 'id'>): Promise<ApiResponse<null>> => {
   try {
-    const response = await fetch('https://localhost:7013/api/BitacoraCliente/insertar', {
+    const response = await fetch(`${API_URL}/api/BitacoraCliente/insertar`, {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify({
@@ -109,7 +111,7 @@ export const crearBitacora = async (bitacora: Omit<Bitacora, 'id'>): Promise<Api
 
 export const obtenerResumenBitacora = async (cliente: string): Promise<ApiResponse<ResumenBitacora>> => {
   try {
-    const response = await fetch(`https://localhost:7013/api/BitacoraCliente/resumen_bitacora/${cliente}`, {
+    const response = await fetch(`${API_URL}/api/BitacoraCliente/resumen_bitacora/${cliente}`, {
       method: 'GET',
       headers: getAuthHeaders()
     });

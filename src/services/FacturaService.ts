@@ -1,5 +1,7 @@
 import { ApiResponse } from '@app/models/apiResponse';
 
+const API_URL = import.meta.env.VITE_API_URL;
+
 export interface Factura {
   id: number;
   numero: string;
@@ -19,7 +21,7 @@ const getAuthHeaders = () => {
 
 export const obtenerFacturas = async (idCliente: string): Promise<ApiResponse<Factura[]>> => {
   try {
-    const response = await fetch(`https://localhost:7013/api/Factura/${idCliente}`, {
+    const response = await fetch(`${API_URL}/api/Factura/${idCliente}`, {
       method: 'GET',
       headers: getAuthHeaders()
     });

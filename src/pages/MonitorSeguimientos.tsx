@@ -220,7 +220,7 @@ const MonitorSeguimientos: React.FC = () => {
         </Card.Body>
       </Card>
       <Modal show={showModal} onHide={() => setShowModal(false)}>
-        <Modal.Header closeButton>
+        <Modal.Header closeButton={true} {...({} as any)}>
           <Modal.Title>Eventos programados</Modal.Title>
         </Modal.Header>
         <Modal.Body>
@@ -241,7 +241,7 @@ const MonitorSeguimientos: React.FC = () => {
         </Modal.Footer>
       </Modal>
       <Modal show={showDetalle} onHide={() => setShowDetalle(false)} centered size="lg">
-        <Modal.Header closeButton>
+        <Modal.Header closeButton={true} {...({} as any)}>
           <Modal.Title>Detalle del seguimiento</Modal.Title>
         </Modal.Header>
         <Modal.Body>

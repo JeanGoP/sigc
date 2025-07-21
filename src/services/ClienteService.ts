@@ -1,5 +1,7 @@
 import { ApiResponse } from '@app/models/apiResponse';
 
+const API_URL = import.meta.env.VITE_API_URL;
+
 export interface ClienteInfo {
   cliente: string;
   nombre: string;
@@ -30,7 +32,7 @@ const getAuthHeaders = () => {
 export const obtenerCliente = async (cliente: string): Promise<ApiResponse<ClienteInfo>> => {
   
   try {
-    const response = await fetch(`https://localhost:7013/api/Cliente/${cliente}`, {
+    const response = await fetch(`${API_URL}/api/Cliente/${cliente}`, {
       method: 'GET',
       headers: getAuthHeaders()
     });

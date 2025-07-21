@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Routes, Route, useLocation } from 'react-router-dom';
-import { ToastContainer } from 'react-toastify';
+import { toast, ToastContainer } from 'react-toastify';
 import Main from '@modules/main/Main';
 import Login from '@modules/login/Login';
 import Register from '@modules/register/Register';
@@ -10,6 +10,8 @@ import { useWindowSize } from '@app/hooks/useWindowSize';
 import { calculateWindowSize } from '@app/utils/helpers';
 import { setWindowSize } from '@app/store/reducers/ui';
 import ReactGA from 'react-ga4';
+// Use Vite's import.meta.env directly for API_URL
+const API_URL = import.meta.env.VITE_API_URL;
 
 import Dashboard from '@pages/Dashboard';
 import Blank from '@pages/Blank';
@@ -54,6 +56,7 @@ const App = () => {
 
         if (!userData) {
           dispatch(setCurrentUser(null));
+          toast.info("No user session found, please log in.");
           return;
         }
 
@@ -70,7 +73,7 @@ const App = () => {
         );
 
         // Validar el token con el backend
-        const response = await fetch('https://localhost:7013/api/Auth/validate-token', {
+        const response = await fetch(`${API_URL}/api/Auth/validate-token`, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
@@ -95,7 +98,7 @@ const App = () => {
     };
   
     checkUserSession();
-  }, []);
+  }, [location.pathname]);
   
   
 async function fetchUserFromToken(token: User) {
@@ -174,6 +177,8 @@ async function fetchUserFromToken(token: User) {
         hideProgressBar={false}
         newestOnTop
         closeOnClick
+
+
         rtl={false}
         pauseOnHover
       />

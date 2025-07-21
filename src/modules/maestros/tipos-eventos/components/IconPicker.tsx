@@ -74,7 +74,7 @@ const IconPickerModal: React.FC<IconPickerModalProps> = ({
       </Button>
 
       <Modal show={show} onHide={() => setShow(false)} size="lg" centered>
-        <Modal.Header>
+        <Modal.Header closeButton={true} {...({} as any)}>
           <Modal.Title>Seleccionar ícono</Modal.Title>
         </Modal.Header>
         <Modal.Body>

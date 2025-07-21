@@ -3,12 +3,14 @@ export interface TipoContacto {
   descripcion: string;
 }
 
+const API_URL = import.meta.env.VITE_API_URL;
+
 export const obtenerTiposContacto = async (
   filtro: string
 ): Promise<TipoContacto[]> => {
   filtro = "";
   const response = await fetch(
-    `https://localhost:7013/api/TiposContacto/listarForNuevaGestion?filtro=${encodeURIComponent("w")}`,
+    `${API_URL}/api/TiposContacto/listarForNuevaGestion?filtro=${encodeURIComponent("w")}`,
     {
       method: "GET",
       headers: {

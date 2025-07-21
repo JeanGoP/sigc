@@ -8,7 +8,6 @@ interface Props {
   handleClose: () => void;
   seguimientoActivo: any;
   parseEventos: (eventosRaw: string) => any[];
-  iconosEventos: any;
   IconMap: any;
   StringToMoney: (val: number) => string;
 }
@@ -18,13 +17,13 @@ const ModalSeguimientoDetalle: React.FC<Props> = ({
   handleClose,
   seguimientoActivo,
   parseEventos,
-  iconosEventos,
+  // iconosEventos,
   IconMap,
   StringToMoney,
 }) => {
   return (
     <Modal show={showModal} onHide={handleClose} size="lg" centered>
-      <Modal.Header closeButton>
+      <Modal.Header closeButton={true} {...({} as any)}>
         <Modal.Title>Detalle del Seguimiento</Modal.Title>
       </Modal.Header>
       <Modal.Body>

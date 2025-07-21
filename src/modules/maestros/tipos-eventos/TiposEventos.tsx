@@ -9,6 +9,7 @@ import { Box } from "@mui/material";
 import IconPickerModal from "./components/IconPicker";
 import ColorPickerModal from "./components/ColorPickerTipoEventos";
 import { toast } from "react-toastify";
+const API_URL = import.meta.env.VITE_API_URL;
 
 const StyledCard = styled.div`
   margin-bottom: 1rem;
@@ -119,7 +120,8 @@ interface TipoEvento {
   nombre: string;
   descripcion: string;
   color?: string;
-  Icon?: string;
+  icono?: string;
+  minutos: number;
   requiereMonto: boolean;
   requiereFecha: boolean;
   requiereHora: boolean;
@@ -133,7 +135,7 @@ interface ApiResponse {
   errors: string[];
 }
 
-const API_URL = "https://localhost:7013/api/TipoEvento";
+const URL_API = `${API_URL}/api/TipoEvento`;
 
 const TiposEventos: React.FC = () => {
   const [tiposEventos, setTiposEventos] = useState<TipoEvento[]>([]);
@@ -145,6 +147,7 @@ const TiposEventos: React.FC = () => {
     descripcion: "",
     color: "",
     icono: "",
+    minutos: 0,
     requiereMonto: false,
     requiereFecha: false,
     requiereHora: false,
@@ -181,7 +184,7 @@ const TiposEventos: React.FC = () => {
         nombre: searchText,
       });
 
-      const response = await fetch(`${API_URL}?${queryParams}`);
+      const response = await fetch(`${URL_API}?${queryParams}`);
       if (!response.ok) {
         throw new Error("Error al cargar los tipos de evento");
       }
@@ -229,19 +232,21 @@ const TiposEventos: React.FC = () => {
 
   const handleOpenModal = (tipoEvento?: TipoEvento) => {
     if (tipoEvento) {
+      console.log("Editando tipo de evento:", tipoEvento.minutos);
       setTipoEventoSeleccionado(tipoEvento);
       setFormData({
         nombre: tipoEvento.nombre,
         descripcion: tipoEvento.descripcion,
         color: tipoEvento.color || "#2ecc71",
-        icono: tipoEvento.Icon || "",
+        icono: tipoEvento.icono || "",
+        minutos: tipoEvento.minutos, // Asignar un valor por defecto o el que necesites
         requiereMonto: tipoEvento.requiereMonto,
         requiereFecha: tipoEvento.requiereFecha,
         requiereHora: tipoEvento.requiereHora,
       });
       // Sincronizar los estados separados
       setColor(tipoEvento.color || "#2ecc71");
-      setIcon(tipoEvento.Icon || "");
+      setIcon(tipoEvento.icono || "");
     } else {
       setTipoEventoSeleccionado(null);
       setFormData({
@@ -249,6 +254,7 @@ const TiposEventos: React.FC = () => {
         descripcion: "",
         color: "#2ecc71",
         icono: "",
+        minutos: 0,
         requiereMonto: false,
         requiereFecha: false,
         requiereHora: false,
@@ -268,8 +274,36 @@ const TiposEventos: React.FC = () => {
     setError(null);
   };
 
+  const handleOnBlurMinutos = (e: React.FocusEvent<HTMLInputElement>) => {
+    const value = parseInt(e.target.value, 10);
+
+    if (isNaN(value)) {
+      toast.warning("Advertencia: El tiempo promedio de duración debe ser un número.");
+      setFormData((prev) => ({ ...prev, minutos: 10 })); // Resetear a 0 o a un valor por defecto
+      return;
+    }
+    if (value < 10) {
+      toast.warning("Advertencia: El tiempo promedio de duración no puede ser menor a 10 minutos.");
+      setFormData((prev) => ({ ...prev, minutos: 10 })); // Resetear a 0 o a un valor por defecto
+      return;
+    } 
+    if (value > 30) {
+      toast.warning("Advertencia: El tiempo promedio de duración no puede ser mayor a 30 minutos.");
+      setFormData((prev) => ({ ...prev, minutos: 30 }));
+      return;
+    }
+    setFormData((prev) => ({ ...prev, minutos: value }));
+  }
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
+    // if ( name === "minutos") {
+    //   const numericValue = parseInt(value, 10);
+    //   if (isNaN(numericValue) || numericValue < 10 || numericValue > 30) {
+    //     toast.error("El tiempo promedio de duración debe ser un número entre 10 y 30.");
+    //     return;
+    //   }
+    // }
     setFormData((prev) => ({
       ...prev,
       [name]: type === "checkbox" ? checked : value,
@@ -288,7 +322,7 @@ const TiposEventos: React.FC = () => {
 
       console.log("Payload enviado:", payload);
 
-      const response = await fetch(API_URL, {
+      const response = await fetch(URL_API, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -327,26 +361,26 @@ const TiposEventos: React.FC = () => {
         setLoading(true);
         setError(null);
 
-        const response = await fetch(`${API_URL}/${id}`, {
+        const response = await fetch(`${URL_API}/${id}`, {
           method: "DELETE",
           headers: {
             accept: "*/*",
           },
         });
 
-        if (!response.ok) {
-          throw new Error("Error al eliminar el tipo de evento");
-        }
-
         const result = await response.json();
 
+        if (!response.ok) {
+          throw new Error("Error: " + result.message);
+        }
+        
         if (result.success) {
           await fetchTiposEventos();
         } else {
           setError(result.message || "Error al eliminar el tipo de evento");
         }
       } catch (error) {
-        setError(
+        toast.error(
           error instanceof Error
             ? error.message
             : "Error al eliminar el tipo de evento"
@@ -464,7 +498,7 @@ const TiposEventos: React.FC = () => {
       </section>
 
       <StyledModal show={modalOpen} onHide={handleCloseModal} centered>
-        <Modal.Header>
+        <Modal.Header closeButton={true} {...({} as any)}>
           <Modal.Title>
             {tipoEventoSeleccionado
               ? "Editar Tipo de Evento"
@@ -508,6 +542,26 @@ const TiposEventos: React.FC = () => {
               />
               <Form.Text className="text-muted">
                 Máximo 255 caracteres
+              </Form.Text>
+            </StyledFormGroup>
+            <StyledFormGroup>
+              <Form.Label>Tiempo promedio de duración (Minutos)</Form.Label>
+              <Form.Control
+                type="number"
+                name="minutos"
+                value={formData.minutos}
+                onChange={handleInputChange}
+                onBlur={handleOnBlurMinutos}
+                // maxLength={255}
+                min={10}
+                max={30}
+                placeholder="Munitos promedio de duración"
+                disabled={loading}
+              />
+              
+              <Form.Text className="text-muted">
+                Este campo solo será usado cuando el tipo de evento requiera de fecha y hora.
+                Debe ser un número entre 10 y 30 minutos.
               </Form.Text>
             </StyledFormGroup>
             <StyledFormGroup>

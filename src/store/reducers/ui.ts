@@ -35,9 +35,9 @@ const initialState: UiState = {
   headerFixed: true,
   footerFixed: true,
   layoutBoxed: false,
-  menuItemFlat: false,
+  menuItemFlat: true,
   menuChildIndent: true,
-  layoutFixed: true,
+  layoutFixed: false,
   topNavigation: false,
 };
 
