@@ -9,6 +9,8 @@ import { Box } from "@mui/material";
 import IconPickerModal from "./components/IconPicker";
 import ColorPickerModal from "./components/ColorPickerTipoEventos";
 import { toast } from "react-toastify";
+import { current } from "@reduxjs/toolkit";
+import { useAppSelector } from "@app/store/store";
 const API_URL = import.meta.env.VITE_API_URL;
 
 const StyledCard = styled.div`
@@ -135,7 +137,7 @@ interface ApiResponse {
   errors: string[];
 }
 
-const URL_API = `${API_URL}/api/TipoEvento`;
+// const URL_API = `${API_URL}/api/v1/TipoEvento`;
 
 const TiposEventos: React.FC = () => {
   const [tiposEventos, setTiposEventos] = useState<TipoEvento[]>([]);
@@ -157,6 +159,7 @@ const TiposEventos: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [icon, setIcon] = useState<string>("");
   const [color, setColor] = useState<string>("black"); // Color por defecto
+  const currentUser = useAppSelector((state) => state.auth.currentUser);
 
   // Efecto para sincronizar el color cuando cambie
   useEffect(() => {
@@ -184,7 +187,7 @@ const TiposEventos: React.FC = () => {
         nombre: searchText,
       });
 
-      const response = await fetch(`${URL_API}?${queryParams}`);
+      const response = await fetch(`${API_URL}/api/v1/ListarTiposEvento?${queryParams}`);
       if (!response.ok) {
         throw new Error("Error al cargar los tipos de evento");
       }
@@ -317,12 +320,13 @@ const TiposEventos: React.FC = () => {
 
       const payload = {
         id: tipoEventoSeleccionado?.id || 0,
+        idUser: currentUser?.id, // Asignar el ID del usuario actual
         ...formData,
       };
 
       console.log("Payload enviado:", payload);
 
-      const response = await fetch(URL_API, {
+      const response = await fetch(API_URL +"/api/v1/GuardarTipoEvento", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -361,7 +365,7 @@ const TiposEventos: React.FC = () => {
         setLoading(true);
         setError(null);
 
-        const response = await fetch(`${URL_API}/${id}`, {
+        const response = await fetch(`${API_URL}/${id}`, {
           method: "DELETE",
           headers: {
             accept: "*/*",

@@ -142,9 +142,9 @@ const EventsDropdown: React.FC = () => {
    * Nota: localhost -> asegúrate de que el cert https funcione
    * Puedes reemplazar URL por import.meta.env.VITE_API_BASE_URL, etc.
    * ---------------------------------- */
-  const API_BASE = import.meta.env.VITE_API_BASE_URL ?? 'https://localhost:7013';
+ const API_URL_BASE = import.meta.env.VITE_API_URL;
   const USER_ID = 2; // si quieres parametrizar
-  const endpoint = `${API_BASE}/api/TipoEvento/eventos-diarios?idUser=${USER_ID}`;
+  const endpoint = `${API_URL_BASE}/api/v1/eventos-diarios?idUser=${USER_ID}`;
 
   const fetchEvents = useCallback(async () => {
     abortRef.current?.abort();

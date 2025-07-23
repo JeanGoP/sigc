@@ -10,7 +10,7 @@ export const obtenerTiposContacto = async (
 ): Promise<TipoContacto[]> => {
   filtro = "";
   const response = await fetch(
-    `${API_URL}/api/TiposContacto/listarForNuevaGestion?filtro=${encodeURIComponent("w")}`,
+    `${API_URL}/api/v1/listarForNuevaGestion?filtro=${encodeURIComponent("w")}`,
     {
       method: "GET",
       headers: {

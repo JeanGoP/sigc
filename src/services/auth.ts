@@ -77,17 +77,17 @@ interface LoginResponse {
   errors: string[];
 }
 
-export const loginWithEmail = async (username: string, password: string): Promise<User | null> => {
+export const loginWithEmail = async (Username: string, Password: string): Promise<User | null> => {
   try {
-    const response = await fetch(`${API_URL}/api/Auth/login`, {
+    const response = await fetch(`${API_URL}/api/v1/login`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'accept': '*/*'
       },
       body: JSON.stringify({
-        username,
-        password
+        Username,
+        Password
       })
     });
 

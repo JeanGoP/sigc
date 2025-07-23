@@ -77,8 +77,6 @@ interface TipoContacto {
   estado: boolean;
 }
 
-const URL_API = `${API_URL}/api/TiposContacto`;
-
 const EstadosEventos: React.FC = () => {
   const [tiposContacto, setTiposContacto] = useState<TipoContacto[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
@@ -104,7 +102,7 @@ const EstadosEventos: React.FC = () => {
         pageSize: rowsPerPage.toString(),
       });
 
-      const url = `${URL_API}?${queryParams.toString()}`;
+      const url = `${API_URL}/api/v1/ListarTiposContacto?${queryParams.toString()}`;
       console.log("URL generada:", url); // Opcional: para debug
 
       const response = await fetch(url, {
@@ -183,7 +181,7 @@ const EstadosEventos: React.FC = () => {
         idUser: 2, // ⚠️ Ajusta esto dinámicamente si usas autenticación
       };
 
-      const response = await fetch(URL_API, {
+      const response = await fetch(API_URL + "/api/v1/Guardar", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -216,10 +214,10 @@ const EstadosEventos: React.FC = () => {
     try {
       setLoading(true);
 
-      const response = await fetch(`${URL_API}/${id}`, {
+      const response = await fetch(`${API_URL}/api/v1/id?id=${id}`, {
         method: "DELETE",
         headers: {
-          accept: "*/*", // Como en el curl
+          accept: "*/*",
         },
       });
 

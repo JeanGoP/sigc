@@ -20,8 +20,8 @@ const getAuthHeaders = () => {
 };
 
 export const obtenerFacturas = async (idCliente: string): Promise<ApiResponse<Factura[]>> => {
-  try {
-    const response = await fetch(`${API_URL}/api/Factura/${idCliente}`, {
+  try { ///VERIFICAR
+    const response = await fetch(`${API_URL}/api/v1/Factura/${idCliente}`, {
       method: 'GET',
       headers: getAuthHeaders()
     });

@@ -214,7 +214,7 @@ export const ConsultaCartera: React.FC = () => {
 
       const token = localStorage.getItem("token");
       const response = await fetch(
-        `${API_URL}/api/FacturasListConsultaCarteras`,
+        `${API_URL}/api/v1/GetFacturasList`,
         {
           method: "POST",
           headers: {
@@ -313,16 +313,16 @@ export const ConsultaCartera: React.FC = () => {
     const fetchPlantillas = async () => {
       try {
         const token = localStorage.getItem("token");
-        const response = await fetch(
-          `${API_URL}/api/EmailTemplateMaster/GetListTemplate?tipo=email`,
-          {
-            method: "GET",
-            headers: {
-              accept: "*/*",
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
+       const response = await fetch(
+  `${API_URL}/api/v1/GetListTemplate?tipo=${encodeURIComponent("email")}`,
+  {
+    method: "GET",
+    headers: {
+      accept: "*/*",
+      Authorization: `Bearer ${token}`,
+    },
+  }
+);
         const data = await response.json();
         if (data.success && Array.isArray(data.data)) {
           setPlantillasApi(data.data);
@@ -542,7 +542,7 @@ export const ConsultaCartera: React.FC = () => {
       };
 
       const response = await fetch(
-        `${API_URL}/api/EmailTemplateMaster/SendWithTemplate`,
+        `${API_URL}/api/v1/SendWithTemplate`,
         {
           method: "POST",
           headers: {
@@ -902,7 +902,7 @@ export const ConsultaCartera: React.FC = () => {
                         })}
                       </div> */}
 
-                      <EtiquetasClienteGestion cliente={selectedValue} />
+                      <EtiquetasClienteGestion cliente={selectedValue} idUser={currentUser?.id ?? 0} />
                     </Col>
                   </Row>
 

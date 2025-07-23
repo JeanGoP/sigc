@@ -17,7 +17,7 @@ const URL_API = API_URL;
 
 export const fetchTiposCampana = async (): Promise<TipoCampana[]> => {
   try {
-    const response = await fetch(`${URL_API}/api/TipoCampanas/listar`);
+    const response = await fetch(`${URL_API}/api/v1/listar`);
     if (!response.ok) {
       throw new Error('Error al obtener los tipos de campaña');
     }

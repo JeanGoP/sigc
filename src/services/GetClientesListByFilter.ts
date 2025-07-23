@@ -13,7 +13,7 @@ export type ClientesListRequest = {
   
 export const  getClientesList = async (data: ClientesListRequest): Promise<ClientesResponse> =>{
     try {
-      const response = await fetch(`${API_URL}/api/Clientes`, {
+      const response = await fetch(`${API_URL}/api/v1/GetClientes`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

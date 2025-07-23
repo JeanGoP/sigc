@@ -36,7 +36,7 @@ export const RendimientoDeAsesores: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const url = `${API_URL}/api/ProductividadAsesores/GetList?IdUsuario=${currentUser?.id}&FechaInicial=${fechaInicial}&FechaFinal=${fechaFinal}`;
+      const url = `${API_URL}/api/v1/GetList?IdUsuario=${currentUser?.id}&FechaInicial=${fechaInicial}&FechaFinal=${fechaFinal}`;
       const response = await fetch(url);
       const result = await response.json();
       if (result.success) {

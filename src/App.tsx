@@ -73,7 +73,7 @@ const App = () => {
         );
 
         // Validar el token con el backend
-        const response = await fetch(`${API_URL}/api/Auth/validate-token`, {
+        const response = await fetch(`${API_URL}/api/v1/validate-token`, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',

@@ -10,7 +10,7 @@ export interface TipoEvento {
 const API_URL = import.meta.env.VITE_API_URL;
 
 export const obtenerTiposEvento = async (): Promise<TipoEvento[]> => {
-  const response = await fetch(`${API_URL}/api/TipoEvento/Listartodo`, {
+  const response = await fetch(`${API_URL}/api/v1/Listartodo`, {
     method: 'GET',
     headers: {
       'accept': '*/*',

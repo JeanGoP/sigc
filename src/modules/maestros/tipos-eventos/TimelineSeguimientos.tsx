@@ -138,7 +138,7 @@ export const TimelineSeguimientos: React.FC<TimelineSeguimientosProps> = ({
   async function validarEventoBackend(
     e: Evento
   ): Promise<{ ok: boolean; message?: string }> {
-    const url = `${API_URL}/api/TipoEvento/validar-evento`;
+    const url = `${API_URL}/api/v1/validar-evento`;
     const tipoObj = tiposEvento.find(
       (t) => t.nombre === e.tipo || t.id === e.id
     );

@@ -20,7 +20,7 @@ export async function ObtenerRecibosCajaPorFactura(
   factura: string
 ): Promise<ApiResponse<ReciboCajaListModel[]>> {
   try {
-    const url = new URL(`${API_URL}/api/GetRecibosCajaListByFactura`);
+    const url = new URL(`${API_URL}/api/v1/GetRecibos`);
     url.searchParams.append('fecha', fecha);
     url.searchParams.append('cliente', cliente);
     url.searchParams.append('factura', factura);

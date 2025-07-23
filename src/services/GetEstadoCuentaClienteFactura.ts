@@ -21,7 +21,7 @@ const getAuthHeaders = () => {
 
 export const FetchEstadoCuentaClienteFactura = async (request: EstadoCuentaRequest): Promise<ApiResponse<any>> => {
   try {
-    const response = await fetch(`${API_URL}/api/EstadoCuentaClienteFactura`, {
+    const response = await fetch(`${API_URL}/api/v1/GetEstadoDeCuenta`, {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify(request)

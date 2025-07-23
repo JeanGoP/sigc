@@ -52,7 +52,7 @@ export const ClienteEstadoCuenta = forwardRef<FetchFacturasRef, Props>(({
     
           const token = localStorage.getItem('token');
           const response = await fetch(
-            `${API_URL}/api/FacturasListByClient?${queryParams.toString()}`,
+            `${API_URL}/api/v1/GetFacturas?${queryParams.toString()}`,
             {
               method: "GET",
               headers: {

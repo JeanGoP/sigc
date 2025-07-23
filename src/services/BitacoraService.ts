@@ -1,4 +1,4 @@
-import { ApiResponse } from '@app/models/apiResponse';
+import { ApiResponse } from "@app/models/apiResponse";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -47,41 +47,48 @@ export interface ResumenBitacoraResponse {
 }
 
 const getAuthHeaders = () => {
-  const token = localStorage.getItem('token');
+  const token = localStorage.getItem("token");
   return {
-    'accept': '*/*',
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${token}`
+    accept: "*/*",
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${token}`,
   };
 };
 
-export const obtenerBitacoras = async (cliente: string): Promise<ApiResponse<Bitacora[]>> => {
+export const obtenerBitacoras = async (
+  cliente: string
+): Promise<ApiResponse<Bitacora[]>> => {
   try {
-    const response = await fetch(`${API_URL}/api/BitacoraCliente/listar/${cliente}`, {
-      method: 'GET',
-      headers: getAuthHeaders()
-    });
+    const response = await fetch(
+      `${API_URL}/api/v1/listar?cliente=${encodeURIComponent(cliente)}`,
+      {
+        method: "GET",
+        headers: getAuthHeaders(),
+      }
+    );
 
     if (!response.ok) {
-      throw new Error('Error al obtener las bitácoras');
+      throw new Error("Error al obtener las bitácoras");
     }
 
     return await response.json();
   } catch (error: any) {
     return {
       success: false,
-      message: 'Error al obtener las bitácoras',
+      message: "Error al obtener las bitácoras",
       data: [],
       statusCode: 500,
-      errors: [error.message || 'Error desconocido']
+      errors: [error.message || "Error desconocido"],
     };
   }
 };
 
-export const crearBitacora = async (bitacora: Omit<Bitacora, 'id'>): Promise<ApiResponse<null>> => {
+export const crearBitacora = async (
+  bitacora: Omit<Bitacora, "id">
+): Promise<ApiResponse<null>> => {
   try {
-    const response = await fetch(`${API_URL}/api/BitacoraCliente/insertar`, {
-      method: 'POST',
+    const response = await fetch(`${API_URL}/api/v1/insertar`, {
+      method: "POST",
       headers: getAuthHeaders(),
       body: JSON.stringify({
         id: 0,
@@ -89,42 +96,47 @@ export const crearBitacora = async (bitacora: Omit<Bitacora, 'id'>): Promise<Api
         usuario: bitacora.usuario,
         fechaHora: bitacora.fechaHora,
         comentario: bitacora.comentario,
-        calificacion: bitacora.calificacion
-      })
+        calificacion: bitacora.calificacion,
+      }),
     });
 
     if (!response.ok) {
-      throw new Error('Error al crear la bitácora');
+      throw new Error("Error al crear la bitácora");
     }
 
     return await response.json();
   } catch (error: any) {
     return {
       success: false,
-      message: 'Error al crear la bitácora',
+      message: "Error al crear la bitácora",
       data: null,
       statusCode: 500,
-      errors: [error.message || 'Error desconocido']
+      errors: [error.message || "Error desconocido"],
     };
   }
 };
 
-export const obtenerResumenBitacora = async (cliente: string): Promise<ApiResponse<ResumenBitacora>> => {
+export const obtenerResumenBitacora = async (
+  cliente: string
+): Promise<ApiResponse<ResumenBitacora>> => {
   try {
-    const response = await fetch(`${API_URL}/api/BitacoraCliente/resumen_bitacora/${cliente}`, {
-      method: 'GET',
-      headers: getAuthHeaders()
-    });
+    const response = await fetch(
+      `${API_URL}/api/v1/resumen_bitacora?cliente=${encodeURIComponent(cliente)}`,
+      {
+        method: "GET",
+        headers: getAuthHeaders(),
+      }
+    );
 
     if (!response.ok) {
-      throw new Error('Error al obtener el resumen de la bitácora');
+      throw new Error("Error al obtener el resumen de la bitácora");
     }
 
     return await response.json();
   } catch (error: any) {
     return {
       success: false,
-      message: 'Error al obtener el resumen de la bitácora',
+      message: "Error al obtener el resumen de la bitácora",
       data: {
         cliente: cliente,
         totalCalificaciones: 0,
@@ -133,10 +145,10 @@ export const obtenerResumenBitacora = async (cliente: string): Promise<ApiRespon
         cantidad2: 0,
         cantidad3: 0,
         cantidad4: 0,
-        cantidad5: 0
+        cantidad5: 0,
       },
       statusCode: 500,
-      errors: [error.message || 'Error desconocido']
+      errors: [error.message || "Error desconocido"],
     };
   }
 };

@@ -1,21 +1,357 @@
-// EtiquetasClienteComponent
-// -----------------------------------------------------------------------------
-// Objetivo: Extraer TODO lo relacionado con las etiquetas de clientes que hoy
-// está incrustado en ConsultaCartera.tsx, sin alterar el resto del componente.
-// Este nuevo componente:
-//   • Recibe por props el identificador del cliente (string).
-//   • Maneja internamente: carga de catálogo de etiquetas, etiquetas asignadas
-//     al cliente, UI de badges, modal de gestión (agregar / quitar), estados de
-//     carga y persistencia vía API.
-//   • NO altera ningún otro estado ni lógica de ConsultaCartera.
-//   • Emite ningún onChange (a menos que quieras agregarlo luego). Todo se
-//     mantiene encapsulado. (Se incluye prop opcional de callback deshabilitada
-//     por defecto, solo por si la necesitas sin romper contratos.)
-//   • Replica la apariencia existente para que la UI se vea igual.
-//   • Está preparado para integración con backend (endpoints placeholders).
-//
-// Instrucciones de integración mínima en ConsultaCartera.tsx (ver más abajo).
-// -----------------------------------------------------------------------------
+// import React, { useCallback, useEffect, useMemo, useState } from "react";
+// import { Badge, Button, Spinner } from "react-bootstrap";
+// import Modal from "react-bootstrap/Modal";
+// import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+// import { faTag, faTimes } from "@fortawesome/free-solid-svg-icons";
+// import { toast } from "react-toastify";
+
+// // -----------------------------------------------------------------------------
+// // Tipos compartidos
+// // -----------------------------------------------------------------------------
+// export interface EtiquetaCliente {
+//   id: number;
+//   nombre: string;
+//   color: string | null; // hex o css; puede venir null -> usamos fallback
+//   estado?: boolean; // opcional (activo/inactivo) — no usado aquí pero se respeta
+// }
+
+// export interface EtiquetaClienteListado extends EtiquetaCliente {
+//   asignado: boolean; // true => cliente tiene la etiqueta
+// }
+
+// export interface EtiquetaClienteAPIResponse<T = unknown> {
+//   success: boolean;
+//   message: string;
+//   data: T;
+//   statusCode?: number;
+//   errors?: any;
+// }
+
+// // -----------------------------------------------------------------------------
+// // Config base API
+// // -----------------------------------------------------------------------------
+// const API_URL: string = (import.meta as any).env?.VITE_API_URL || ""; // ajusta según tu build
+
+// async function authHeaders(): Promise<HeadersInit> {
+//   const token = localStorage.getItem("token");
+//   const headers: HeadersInit = {
+//     accept: "*/*",
+//     "Content-Type": "application/json",
+//   };
+//   if (token) headers["Authorization"] = `Bearer ${token}`;
+//   return headers;
+// }
+
+// // -----------------------------------------------------------------------------
+// // Servicio: Listar etiquetas para un cliente (devuelve asignado true/false)
+// // GET /api/EtiquetaCliente/listar-etiquetas-cliente?idUser=2&cliente=1000184575
+// // -----------------------------------------------------------------------------
+// export async function fetchEtiquetasListar(
+//   idUser: number | string,
+//   cliente: string
+// ): Promise<EtiquetaClienteAPIResponse<EtiquetaClienteListado[]>> {
+//   try {
+//     const resp = await fetch(
+//       `${API_URL}/api/EtiquetaCliente/listar-etiquetas-cliente?idUser=${encodeURIComponent(
+//         String(idUser)
+//       )}&cliente=${encodeURIComponent(cliente)}`,
+//       {
+//         method: "GET",
+//         headers: await authHeaders(),
+//       }
+//     );
+//     const data = await resp.json();
+//     return data as EtiquetaClienteAPIResponse<EtiquetaClienteListado[]>;
+//   } catch (err) {
+//     console.error("fetchEtiquetasListar error", err);
+//     return {
+//       success: false,
+//       message: "Error de red al cargar etiquetas.",
+//       data: [],
+//     } as EtiquetaClienteAPIResponse<EtiquetaClienteListado[]>;
+//   }
+// }
+
+// // -----------------------------------------------------------------------------
+// // Servicio: Toggle asignación etiqueta
+// // POST /api/EtiquetaCliente/gestionarEtiquetaCliente
+// // Body: { idUser:number, cliente:string, idEtiqueta:number }
+// // Backend decide: si la tiene -> quita; si no -> asigna.
+// // -----------------------------------------------------------------------------
+// export async function postGestionarEtiquetaCliente(
+//   idUser: number | string,
+//   cliente: string,
+//   idEtiqueta: number
+// ): Promise<EtiquetaClienteAPIResponse<null>> {
+//   let data: any;
+//   try {
+//     if(window.confirm("¿Seguro que desea gestionar la etiqueta?"))
+//     {
+
+//       const resp = await fetch(`${API_URL}/api/EtiquetaCliente/gestionarEtiquetaCliente`, {
+//         method: "POST",
+//         headers: await authHeaders(),
+//         body: JSON.stringify({ idUser, cliente, idEtiqueta }),
+//       });
+//       data = await resp.json();
+//       return data as EtiquetaClienteAPIResponse<null>;
+//     }
+//     return data as EtiquetaClienteAPIResponse<null>;
+
+//   } catch (err) {
+//     console.error("postGestionarEtiquetaCliente error", err);
+//     return {
+//       success: false,
+//       message: "Error de red al gestionar etiqueta.",
+//       data: null,
+//     } as EtiquetaClienteAPIResponse<null>;
+//   }
+// }
+
+// // -----------------------------------------------------------------------------
+// // Props del componente
+// // -----------------------------------------------------------------------------
+// export interface EtiquetasClienteProps {
+//   cliente: string; // identificación del cliente
+//   idUser: number | string; // requerido por la API
+//   disabled?: boolean;
+//   className?: string;
+//   label?: string; // por defecto "Etiquetas"
+//   onChangeIds?: (ids: number[]) => void; // opcional; no requerido
+// }
+
+// // -----------------------------------------------------------------------------
+// // Helpers: normalización de datos
+// // -----------------------------------------------------------------------------
+// function coerceBoolean(v: any): boolean {
+//   // Acepta: true/false, 1/0, "1"/"0", "true"/"false"
+//   if (typeof v === "boolean") return v;
+//   if (typeof v === "number") return v === 1;
+//   if (typeof v === "string") {
+//     const low = v.trim().toLowerCase();
+//     return low === "1" || low === "true" || low === "t" || low === "si" || low === "sí";
+//   }
+//   return false;
+// }
+
+// function normalizarLista(raw: any[]): EtiquetaClienteListado[] {
+//   if (!Array.isArray(raw)) return [];
+//   return raw.map((r) => ({
+//     id: Number(r.id),
+//     nombre: r.nombre ?? String(r.id),
+//     color: r.color ?? null,
+//     asignado: coerceBoolean(r.asignado),
+//     estado: r.estado ?? true,
+//   }));
+// }
+
+// // -----------------------------------------------------------------------------
+// // Componente principal
+// // -----------------------------------------------------------------------------
+// export const EtiquetasClienteGestion: React.FC<EtiquetasClienteProps> = ({
+//   cliente,
+//   idUser,
+//   disabled = false,
+//   className,
+//   label = "Etiquetas",
+//   onChangeIds,
+// }) => {
+//   // Estado principal: lista completa con flag asignado
+//   const [lista, setLista] = useState<EtiquetaClienteListado[]>([]);
+
+//   // Flags
+//   const [loading, setLoading] = useState(false); // carga inicial / recargas
+//   const [updatingId, setUpdatingId] = useState<number | null>(null); // id en gestión
+//   const [showModal, setShowModal] = useState(false);
+
+//   // Cargar / recargar lista
+//   const cargarLista = useCallback(async () => {
+//     if (!cliente) {
+//       setLista([]);
+//       onChangeIds?.([]);
+//       return;
+//     }
+//     setLoading(true);
+//     const resp = await fetchEtiquetasListar(idUser, cliente);
+
+//     // Debug opcional:
+//     // console.log("[EtiquetasClienteGestion] raw resp", resp);
+
+//     if (resp.success && Array.isArray(resp.data)) {
+//       const listaNorm = normalizarLista(resp.data as any[]);
+//       setLista(listaNorm);
+//       const idsAsignados = listaNorm.filter((e) => e.asignado).map((e) => e.id);
+//       onChangeIds?.(idsAsignados);
+//     } else {
+//       console.warn("No se pudo cargar etiquetas", resp.message);
+//       toast.error(resp.message || "No se pudo cargar etiquetas.");
+//       setLista([]);
+//       onChangeIds?.([]);
+//     }
+//     setLoading(false);
+//   }, [cliente, idUser, onChangeIds]);
+
+//   // Cargar al montar y cuando cambie cliente
+//   useEffect(() => {
+//     cargarLista();
+//   }, [cargarLista]);
+
+//   // Derivados
+//   const etiquetasAsignadas = useMemo(() => lista.filter((e) => e.asignado), [lista]);
+//   const etiquetasNoAsignadas = useMemo(() => lista.filter((e) => !e.asignado), [lista]);
+
+//   // Toggle etiqueta
+//   const toggleEtiqueta = useCallback(
+//     async (idEtiqueta: number) => {
+//       if (!cliente || updatingId !== null) return; // evita doble click
+//       setUpdatingId(idEtiqueta);
+//       const resp = await postGestionarEtiquetaCliente(idUser, cliente, idEtiqueta);
+//       if (resp.success) {
+//         toast.success("Operación exitosa.");
+//         await cargarLista(); // re-consultar estado real
+//       } else {
+//         toast.error(resp.message || "Error gestionando etiqueta.");
+//       }
+//       setUpdatingId(null);
+//     },
+//     [cliente, idUser, updatingId, cargarLista]
+//   );
+
+//   // Modal open/close
+//   const abrirModal = useCallback(() => setShowModal(true), []);
+//   const cerrarModal = useCallback(() => setShowModal(false), []);
+
+//   // Color helper
+//   const resolveColor = (hex?: string | null) => {
+//     if (!hex) return "#6c757d"; // fallback gris Bootstrap-ish
+//     return hex;
+//   };
+
+//   // Estilos comunes badge
+//   const makeStyle = (hex?: string | null): React.CSSProperties => {
+//     const c = resolveColor(hex);
+//     return {
+//       backgroundColor: c + "20", // leve tint
+//       color: c,
+//       border: `1px solid ${c}`,
+//       padding: "0.5rem 0.75rem",
+//       cursor: disabled ? "default" : "pointer",
+//       display: "inline-flex",
+//       alignItems: "center",
+//       gap: "0.25rem",
+//     };
+//   };
+
+//   // ---------------------------------------------------------------------------
+//   // Render
+//   // ---------------------------------------------------------------------------
+//   return (
+//     <div className={className}>
+//       <div className="d-flex justify-content-between align-items-center">
+//         <h6 className="mb-0">{label}</h6>
+//         <Button
+//           variant="outline-primary"
+//           size="sm"
+//           onClick={abrirModal}
+//           disabled={disabled || !cliente || loading}
+//         >
+//           <FontAwesomeIcon icon={faTag} className="me-1" /> Gestionar etiquetas
+//         </Button>
+//       </div>
+
+//       {/* Badges asignadas */}
+//       <div className="d-flex flex-wrap gap-2 mt-2">
+//         {loading ? (
+//           <span className="d-inline-flex align-items-center gap-2">
+//             <Spinner animation="border" size="sm" /> Cargando...
+//           </span>
+//         ) : etiquetasAsignadas.length === 0 ? (
+//           <span className="text-muted" style={{ fontStyle: "italic" }}>
+//             Sin etiquetas.
+//           </span>
+//         ) : (
+//           etiquetasAsignadas.map((etiqueta) => (
+//             <Badge
+//               key={etiqueta.id}
+//               className="d-flex align-items-center"
+//               style={makeStyle(etiqueta.color)}
+//               onClick={() => !disabled && toggleEtiqueta(etiqueta.id)}
+//             >
+//               {etiqueta.nombre}
+//               {!disabled && (
+//                 <FontAwesomeIcon
+//                   icon={faTimes}
+//                   className="ms-2"
+//                   style={{ pointerEvents: "none" }}
+//                 />
+//               )}
+//             </Badge>
+//           ))
+//         )}
+//       </div>
+
+//       {/* Modal de selección / gestión */}
+//       <Modal show={showModal} onHide={cerrarModal} centered>
+//         <Modal.Header closeButton>
+//           <Modal.Title>Gestionar etiquetas</Modal.Title>
+//         </Modal.Header>
+//         <Modal.Body>
+//           {loading ? (
+//             <p className="d-flex align-items-center gap-2 mb-0">
+//               <Spinner animation="border" size="sm" className="me-2" /> Cargando...
+//             </p>
+//           ) : (
+//             <>
+//               {/* SOLO DISPONIBLES (no asignadas) */}
+//               {etiquetasNoAsignadas.length === 0 ? (
+//                 <p className="text-muted mb-0" style={{ fontStyle: "italic" }}>
+//                   No hay etiquetas disponibles para agregar.
+//                 </p>
+//               ) : (
+//                 <div className="d-flex flex-wrap gap-2">
+//                   {etiquetasNoAsignadas.map((e) => (
+//                     <Button
+//                       key={e.id}
+//                       variant="light"
+//                       size="sm"
+//                       disabled={updatingId === e.id}
+//                       onClick={() => toggleEtiqueta(e.id)}
+//                       style={{
+//                         ...makeStyle(e.color),
+//                         borderRadius: 4,
+//                         padding: "0.25rem 0.5rem",
+//                         cursor: updatingId === e.id ? "wait" : "pointer",
+//                       }}
+//                       title="Asignar etiqueta"
+//                     >
+//                       {updatingId === e.id ? (
+//                         <Spinner animation="border" size="sm" />
+//                       ) : (
+//                         e.nombre
+//                       )}
+//                     </Button>
+//                   ))}
+//                 </div>
+//               )}
+//             </>
+//           )}
+//         </Modal.Body>
+//         <Modal.Footer>
+//           <Button variant="secondary" onClick={cerrarModal} disabled={updatingId !== null}>
+//             Cerrar
+//           </Button>
+//         </Modal.Footer>
+//       </Modal>
+//     </div>
+//   );
+// };
+
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { Badge, Button, Spinner } from "react-bootstrap";
+import Modal from "react-bootstrap/Modal";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faTag, faTimes } from "@fortawesome/free-solid-svg-icons";
+import { toast } from "react-toastify";
 
 // -----------------------------------------------------------------------------
 // Tipos compartidos
@@ -23,28 +359,28 @@
 export interface EtiquetaCliente {
   id: number;
   nombre: string;
-  color: string; // hex o css
-  estado?: boolean; // opcional (activo/inactivo)
+  color: string | null; // hex o css; puede venir null -> usamos fallback
+  estado?: boolean; // opcional (activo/inactivo) — no usado aquí pero se respeta
+}
+
+export interface EtiquetaClienteListado extends EtiquetaCliente {
+  asignado: boolean; // true => cliente tiene la etiqueta
 }
 
 export interface EtiquetaClienteAPIResponse<T = unknown> {
   success: boolean;
   message: string;
   data: T;
+  statusCode?: number;
   errors?: any;
 }
 
 // -----------------------------------------------------------------------------
-// Servicio de Etiquetas (placeholder listo para backend real)
+// Config base API
 // -----------------------------------------------------------------------------
-// Ajusta los paths según tu API real.
-// Se asume autenticación vía token en localStorage (estilo de otros servicios).
-// Retorna promesas tipadas.
-// Puedes mover este bloque a un archivo aparte: "@app/services/EtiquetaClienteService".
-// -----------------------------------------------------------------------------
-const API_URL: string = (import.meta as any).env?.VITE_API_URL || "";
+const API_URL: string = (import.meta as any).env?.VITE_API_URL || ""; // ajusta según tu build
 
-async function authHeaders() {
+async function authHeaders(): Promise<HeadersInit> {
   const token = localStorage.getItem("token");
   const headers: HeadersInit = {
     accept: "*/*",
@@ -54,221 +390,208 @@ async function authHeaders() {
   return headers;
 }
 
-/** Obtiene el catálogo completo de etiquetas disponibles. */
-export async function fetchEtiquetasCatalogo(): Promise<EtiquetaClienteAPIResponse<EtiquetaCliente[]>> {
-  try {
-    const resp = await fetch(`${API_URL}/api/EtiquetaCliente/catalogo`, {
-      method: "GET",
-      headers: await authHeaders(),
-    });
-    const data = await resp.json();
-    // Estructura esperada: {success:boolean, data:EtiquetaCliente[]}
-    return data as EtiquetaClienteAPIResponse<EtiquetaCliente[]>;
-  } catch (err) {
-    console.error("fetchEtiquetasCatalogo error", err);
-    return { success: false, message: "Error de red", data: [] };
-  }
-}
-
-/** Obtiene las etiquetas actualmente asignadas a un cliente. */
-export async function fetchEtiquetasPorCliente(
-  clienteId: string
-): Promise<EtiquetaClienteAPIResponse<number[]>> {
-  try {
-    const resp = await fetch(`${API_URL}/api/EtiquetaCliente/cliente/${encodeURIComponent(clienteId)}`, {
-      method: "GET",
-      headers: await authHeaders(),
-    });
-    const data = await resp.json();
-    // Estructura esperada: {success:boolean, data:number[]} (solo ids) o data:EtiquetaCliente[]
-    // Si tu API devuelve objetos, ajusta la conversión más abajo en el componente.
-    return data as EtiquetaClienteAPIResponse<number[]>;
-  } catch (err) {
-    console.error("fetchEtiquetasPorCliente error", err);
-    return { success: false, message: "Error de red", data: [] };
-  }
-}
-
-/** Asigna UNA etiqueta a un cliente. */
-export async function postAsignarEtiqueta(
-  clienteId: string,
-  etiquetaId: number
-): Promise<EtiquetaClienteAPIResponse> {
-  try {
-    const resp = await fetch(`${API_URL}/api/EtiquetaCliente/asignar`, {
-      method: "POST",
-      headers: await authHeaders(),
-      body: JSON.stringify({ cliente: clienteId, etiquetaId }),
-    });
-    const data = await resp.json();
-    return data as EtiquetaClienteAPIResponse;
-  } catch (err) {
-    console.error("postAsignarEtiqueta error", err);
-    return { success: false, message: "Error de red", data: null } as any;
-  }
-}
-
-/** Quita UNA etiqueta de un cliente. */
-export async function deleteQuitarEtiqueta(
-  clienteId: string,
-  etiquetaId: number
-): Promise<EtiquetaClienteAPIResponse> {
+// -----------------------------------------------------------------------------
+// Servicio: Listar etiquetas para un cliente (devuelve asignado true/false)
+// GET /api/EtiquetaCliente/listar-etiquetas-cliente?idUser=2&cliente=1000184575
+// -----------------------------------------------------------------------------
+export async function fetchEtiquetasListar(
+  idUser: number | string,
+  cliente: string
+): Promise<EtiquetaClienteAPIResponse<EtiquetaClienteListado[]>> {
   try {
     const resp = await fetch(
-      `${API_URL}/api/EtiquetaCliente/quitar?cliente=${encodeURIComponent(clienteId)}&etiquetaId=${etiquetaId}`,
+      `${API_URL}/api/v1/listar-etiquetas-cliente?idUser=${encodeURIComponent(
+        String(idUser)
+      )}&cliente=${encodeURIComponent(cliente)}`,
       {
-        method: "DELETE",
+        method: "GET",
         headers: await authHeaders(),
       }
     );
     const data = await resp.json();
-    return data as EtiquetaClienteAPIResponse;
+    return data as EtiquetaClienteAPIResponse<EtiquetaClienteListado[]>;
   } catch (err) {
-    console.error("deleteQuitarEtiqueta error", err);
-    return { success: false, message: "Error de red", data: null } as any;
+    console.error("fetchEtiquetasListar error", err);
+    return {
+      success: false,
+      message: "Error de red al cargar etiquetas.",
+      data: [],
+    } as EtiquetaClienteAPIResponse<EtiquetaClienteListado[]>;
   }
 }
 
 // -----------------------------------------------------------------------------
-// Componente: EtiquetasCliente
+// Servicio: Toggle asignación etiqueta (SIN confirm UI)
+// POST /api/EtiquetaCliente/gestionarEtiquetaCliente
+// Body: { idUser:number, cliente:string, idEtiqueta:number }
+// Backend decide: si la tiene -> quita; si no -> asigna.
 // -----------------------------------------------------------------------------
-// Props mínimos: cliente (string identificador).
-// Props opcionales: disabled (bloquea UI si no hay cliente seleccionado),
-// onChange? (por si en el futuro quieres notificar al padre; actualmente no indispensable).
-// -----------------------------------------------------------------------------
-import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Badge, Button, Form } from "react-bootstrap";
-import Modal from "react-bootstrap/Modal";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faTag, faTimes } from "@fortawesome/free-solid-svg-icons";
-import { toast } from "react-toastify";
+export async function postGestionarEtiquetaCliente(
+  idUser: number | string,
+  cliente: string,
+  idEtiqueta: number
+): Promise<EtiquetaClienteAPIResponse<null>> {
+  try {
+    const resp = await fetch(`${API_URL}/api/v1/gestionarEtiquetaCliente`, {
+      method: "POST",
+      headers: await authHeaders(),
+      body: JSON.stringify({ idUser, cliente, idEtiqueta }),
+    });
+    const data = await resp.json();
+    return data as EtiquetaClienteAPIResponse<null>;
+  } catch (err) {
+    console.error("postGestionarEtiquetaCliente error", err);
+    return {
+      success: false,
+      message: "Error de red al gestionar etiqueta.",
+      data: null,
+    } as EtiquetaClienteAPIResponse<null>;
+  }
+}
 
-interface EtiquetasClienteProps {
+// -----------------------------------------------------------------------------
+// Props del componente
+// -----------------------------------------------------------------------------
+export interface EtiquetasClienteProps {
   cliente: string; // identificación del cliente
+  idUser: number | string; // requerido por la API
   disabled?: boolean;
   className?: string;
   label?: string; // por defecto "Etiquetas"
-  onChangeIds?: (ids: number[]) => void; // opcional, no requerido
+  onChangeIds?: (ids: number[]) => void; // opcional; no requerido
 }
 
+// -----------------------------------------------------------------------------
+// Helpers: normalización de datos
+// -----------------------------------------------------------------------------
+function coerceBoolean(v: any): boolean {
+  // Acepta: true/false, 1/0, "1"/"0", "true"/"false"
+  if (typeof v === "boolean") return v;
+  if (typeof v === "number") return v === 1;
+  if (typeof v === "string") {
+    const low = v.trim().toLowerCase();
+    return low === "1" || low === "true" || low === "t" || low === "si" || low === "sí";
+  }
+  return false;
+}
+
+function normalizarLista(raw: any[]): EtiquetaClienteListado[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map((r) => ({
+    id: Number(r.id),
+    nombre: r.nombre ?? String(r.id),
+    color: r.color ?? null,
+    asignado: coerceBoolean(r.asignado),
+    estado: r.estado ?? true,
+  }));
+}
+
+// -----------------------------------------------------------------------------
+// Componente principal
+// -----------------------------------------------------------------------------
 export const EtiquetasClienteGestion: React.FC<EtiquetasClienteProps> = ({
   cliente,
+  idUser,
   disabled = false,
   className,
   label = "Etiquetas",
   onChangeIds,
 }) => {
-  // Catálogo total de etiquetas (se carga desde API)
-  const [catalogo, setCatalogo] = useState<EtiquetaCliente[]>([]);
-  // Ids asignados al cliente
-  const [etiquetasCliente, setEtiquetasCliente] = useState<number[]>([]);
-  // UI modal
+  // Estado principal: lista completa con flag asignado
+  const [lista, setLista] = useState<EtiquetaClienteListado[]>([]);
+
+  // Flags
+  const [loading, setLoading] = useState(false); // carga inicial / recargas
+  const [updatingId, setUpdatingId] = useState<number | null>(null); // id en gestión
   const [showModal, setShowModal] = useState(false);
-  // loading flags
-  const [loadingCatalogo, setLoadingCatalogo] = useState(false);
-  const [loadingCliente, setLoadingCliente] = useState(false);
-  const [updating, setUpdating] = useState(false);
 
-  // Cargar catálogo al montar (una vez)
-  useEffect(() => {
-    let cancel = false;
-    const load = async () => {
-      setLoadingCatalogo(true);
-      const resp = await fetchEtiquetasCatalogo();
-      if (!cancel) {
-        if (resp.success && Array.isArray(resp.data)) {
-          setCatalogo(resp.data);
-        } else {
-          console.warn("No se pudo cargar catálogo de etiquetas", resp.message);
-        }
-        setLoadingCatalogo(false);
-      }
-    };
-    load();
-    return () => {
-      cancel = true;
-    };
-  }, []);
-
-  // Cargar etiquetas del cliente cuando cambia cliente
-  useEffect(() => {
+  // Cargar / recargar lista
+  const cargarLista = useCallback(async () => {
     if (!cliente) {
-      setEtiquetasCliente([]);
+      setLista([]);
+      onChangeIds?.([]);
       return;
     }
-    let cancel = false;
-    const load = async () => {
-      setLoadingCliente(true);
-      const resp = await fetchEtiquetasPorCliente(cliente);
-      if (!cancel) {
-        if (resp.success && Array.isArray(resp.data)) {
-          // Si backend devuelve objetos, mapea aquí; asumimos ids.
-          setEtiquetasCliente(resp.data as number[]);
-          onChangeIds?.(resp.data as number[]);
-        } else {
-          console.warn("No se pudieron cargar etiquetas del cliente", resp.message);
-          setEtiquetasCliente([]);
-          onChangeIds?.([]);
-        }
-        setLoadingCliente(false);
-      }
-    };
-    load();
-    return () => {
-      cancel = true;
-    };
-  }, [cliente, onChangeIds]);
+    setLoading(true);
+    const resp = await fetchEtiquetasListar(idUser, cliente);
 
-  const handleAsignar = useCallback(
+    if (resp.success && Array.isArray(resp.data)) {
+      const listaNorm = normalizarLista(resp.data as any[]);
+      setLista(listaNorm);
+      const idsAsignados = listaNorm.filter((e) => e.asignado).map((e) => e.id);
+      onChangeIds?.(idsAsignados);
+    } else {
+      console.warn("No se pudo cargar etiquetas", resp.message);
+      toast.error(resp.message || "No se pudo cargar etiquetas.");
+      setLista([]);
+      onChangeIds?.([]);
+    }
+    setLoading(false);
+  }, [cliente, idUser, onChangeIds]);
+
+  // Cargar al montar y cuando cambie cliente
+  useEffect(() => {
+    cargarLista();
+  }, [cargarLista]);
+
+  // Derivados
+  const etiquetasAsignadas = useMemo(() => lista.filter((e) => e.asignado), [lista]);
+  const etiquetasNoAsignadas = useMemo(() => lista.filter((e) => !e.asignado), [lista]);
+
+  // Toggle etiqueta con confirm contextual
+  const toggleEtiqueta = useCallback(
     async (idEtiqueta: number) => {
-      if (!cliente) return;
-      setUpdating(true);
-      const resp = await postAsignarEtiqueta(cliente, idEtiqueta);
+      if (!cliente || updatingId !== null) return; // evita doble click durante update
+
+      // Determinar si actualmente está asignada o no
+      const etiqueta = lista.find((x) => x.id === idEtiqueta);
+      const esAsignada = !!etiqueta?.asignado;
+      const nombre = etiqueta?.nombre ?? "esta etiqueta";
+      const msg = esAsignada
+        ? `¿Quitar la etiqueta "${nombre}" de este cliente?`
+        : `¿Asignar la etiqueta "${nombre}" a este cliente?`;
+
+      // Confirmar con el usuario
+      const ok = window.confirm(msg);
+      if (!ok) return; // cancelado por el usuario
+
+      setUpdatingId(idEtiqueta);
+      const resp = await postGestionarEtiquetaCliente(idUser, cliente, idEtiqueta);
       if (resp.success) {
-        setEtiquetasCliente((prev) => {
-          const next = prev.includes(idEtiqueta) ? prev : [...prev, idEtiqueta];
-          onChangeIds?.(next);
-          return next;
-        });
-        toast.success("Etiqueta asignada.");
+        toast.success("Operación exitosa.");
+        await cargarLista(); // re-consultar estado real
       } else {
-        toast.error(`Error asignando etiqueta: ${resp.message}`);
+        toast.error(resp.message || "Error gestionando etiqueta.");
       }
-      setUpdating(false);
+      setUpdatingId(null);
     },
-    [cliente, onChangeIds]
+    [cliente, idUser, lista, updatingId, cargarLista]
   );
 
-  const handleQuitar = useCallback(
-    async (idEtiqueta: number) => {
-      if (!cliente) return;
-      setUpdating(true);
-      const resp = await deleteQuitarEtiqueta(cliente, idEtiqueta);
-      if (resp.success) {
-        setEtiquetasCliente((prev) => {
-          const next = prev.filter((id) => id !== idEtiqueta);
-          onChangeIds?.(next);
-          return next;
-        });
-        toast.success("Etiqueta removida.");
-      } else {
-        toast.error(`Error quitando etiqueta: ${resp.message}`);
-      }
-      setUpdating(false);
-    },
-    [cliente, onChangeIds]
-  );
-
-  const etiquetasAsignadas = useMemo(() => {
-    return catalogo.filter((e) => etiquetasCliente.includes(e.id));
-  }, [catalogo, etiquetasCliente]);
-
-  const etiquetasDisponibles = useMemo(() => {
-    return catalogo.filter((e) => !etiquetasCliente.includes(e.id));
-  }, [catalogo, etiquetasCliente]);
-
+  // Modal open/close
   const abrirModal = useCallback(() => setShowModal(true), []);
   const cerrarModal = useCallback(() => setShowModal(false), []);
+
+  // Color helper
+  const resolveColor = (hex?: string | null) => {
+    if (!hex) return "#6c757d"; // fallback gris Bootstrap-ish
+    return hex;
+  };
+
+  // Estilos comunes badge
+  const makeStyle = (hex?: string | null): React.CSSProperties => {
+    const c = resolveColor(hex);
+    return {
+      backgroundColor: c + "20", // leve tint
+      color: c,
+      border: `1px solid ${c}`,
+      padding: "0.5rem 0.75rem",
+      cursor: disabled ? "default" : "pointer",
+      display: "inline-flex",
+      alignItems: "center",
+      gap: "0.25rem",
+    };
+  };
 
   // ---------------------------------------------------------------------------
   // Render
@@ -281,16 +604,18 @@ export const EtiquetasClienteGestion: React.FC<EtiquetasClienteProps> = ({
           variant="outline-primary"
           size="sm"
           onClick={abrirModal}
-          disabled={disabled || !cliente || loadingCatalogo || loadingCliente}
+          disabled={disabled || !cliente || loading}
         >
           <FontAwesomeIcon icon={faTag} className="me-1" /> Gestionar etiquetas
         </Button>
       </div>
 
-      {/* Badges */}
+      {/* Badges asignadas */}
       <div className="d-flex flex-wrap gap-2 mt-2">
-        {loadingCliente ? (
-          <span>Cargando...</span>
+        {loading ? (
+          <span className="d-inline-flex align-items-center gap-2">
+            <Spinner animation="border" size="sm" /> Cargando...
+          </span>
         ) : etiquetasAsignadas.length === 0 ? (
           <span className="text-muted" style={{ fontStyle: "italic" }}>
             Sin etiquetas.
@@ -299,60 +624,71 @@ export const EtiquetasClienteGestion: React.FC<EtiquetasClienteProps> = ({
           etiquetasAsignadas.map((etiqueta) => (
             <Badge
               key={etiqueta.id}
-              // bg="light"
               className="d-flex align-items-center"
-              style={{
-                backgroundColor: etiqueta.color + "20",
-                color: etiqueta.color,
-                border: `1px solid ${etiqueta.color}`,
-                padding: "0.5rem 0.75rem",
-                cursor: disabled ? "default" : "pointer",
-              }}
-              onClick={() => !disabled && handleQuitar(etiqueta.id)}
+              style={makeStyle(etiqueta.color)}
+              onClick={() => !disabled && toggleEtiqueta(etiqueta.id)}
             >
               {etiqueta.nombre}
               {!disabled && (
-                <FontAwesomeIcon icon={faTimes} className="ms-2" />
+                <FontAwesomeIcon
+                  icon={faTimes}
+                  className="ms-2"
+                  style={{ pointerEvents: "none" }}
+                />
               )}
             </Badge>
           ))
         )}
       </div>
 
-      {/* Modal de selección */}
+      {/* Modal de selección / gestión */}
       <Modal show={showModal} onHide={cerrarModal} centered>
-        <Modal.Header closeButton={true} {...({} as any)} >
+        <Modal.Header {...({ closeButton: true } as any)}>
           <Modal.Title>Gestionar etiquetas</Modal.Title>
         </Modal.Header>
         <Modal.Body>
-          {loadingCatalogo ? (
-            <p>Cargando catálogo...</p>
-          ) : etiquetasDisponibles.length === 0 ? (
-            <p className="text-muted">No hay etiquetas disponibles para agregar.</p>
+          {loading ? (
+            <p className="d-flex align-items-center gap-2 mb-0">
+              <Spinner animation="border" size="sm" className="me-2" /> Cargando...
+            </p>
           ) : (
-            <div className="d-flex flex-wrap gap-2">
-              {etiquetasDisponibles.map((etiqueta) => (
-                <div
-                  key={etiqueta.id}
-                  className="d-flex align-items-center"
-                  style={{
-                    backgroundColor: etiqueta.color + "20",
-                    color: etiqueta.color,
-                    border: `1px solid ${etiqueta.color}`,
-                    padding: "0.5rem 0.75rem",
-                    cursor: updating ? "wait" : "pointer",
-                    borderRadius: "4px",
-                  }}
-                  onClick={() => !updating && handleAsignar(etiqueta.id)}
-                >
-                  {etiqueta.nombre}
+            <>
+              {/* SOLO DISPONIBLES (no asignadas) */}
+              {etiquetasNoAsignadas.length === 0 ? (
+                <p className="text-muted mb-0" style={{ fontStyle: "italic" }}>
+                  No hay etiquetas disponibles para agregar.
+                </p>
+              ) : (
+                <div className="d-flex flex-wrap gap-2">
+                  {etiquetasNoAsignadas.map((e) => (
+                    <Button
+                      key={e.id}
+                      variant="light"
+                      size="sm"
+                      disabled={updatingId === e.id}
+                      onClick={() => toggleEtiqueta(e.id)}
+                      style={{
+                        ...makeStyle(e.color),
+                        borderRadius: 4,
+                        padding: "0.25rem 0.5rem",
+                        cursor: updatingId === e.id ? "wait" : "pointer",
+                      }}
+                      title="Asignar etiqueta"
+                    >
+                      {updatingId === e.id ? (
+                        <Spinner animation="border" size="sm" />
+                      ) : (
+                        e.nombre
+                      )}
+                    </Button>
+                  ))}
                 </div>
-              ))}
-            </div>
+              )}
+            </>
           )}
         </Modal.Body>
         <Modal.Footer>
-          <Button variant="secondary" onClick={cerrarModal} disabled={updating}>
+          <Button variant="secondary" onClick={cerrarModal} disabled={updatingId !== null}>
             Cerrar
           </Button>
         </Modal.Footer>
@@ -360,32 +696,3 @@ export const EtiquetasClienteGestion: React.FC<EtiquetasClienteProps> = ({
     </div>
   );
 };
-
-// -----------------------------------------------------------------------------
-// Integración mínima en ConsultaCartera.tsx
-// -----------------------------------------------------------------------------
-// 1. IMPORTAR:
-//    import { EtiquetasCliente } from "../<ruta-correcta>/EtiquetasClienteComponent";
-//
-// 2. ELIMINAR / COMENTAR en ConsultaCartera.tsx:
-//    • const etiquetasMockup = [...]
-//    • const [etiquetasCliente, setEtiquetasCliente] = useState<number[]>([]);
-//    • const [showModalEtiquetas, setShowModalEtiquetas] = useState(false);
-//    • handleAsignarEtiqueta, handleQuitarEtiqueta funciones.
-//    • El bloque JSX dentro de la Col de 6 columnas (Información General) que
-//      muestra <h6>Etiquetas</h6> + botón + badges.
-//    • El modal manual (el que usa showModalEtiquetas) casi al final del return.
-//
-// 3. REEMPLAZA ESE BLOQUE POR:
-//    <EtiquetasCliente
-//       cliente={selectedValue}
-//       disabled={!registroSeleccionado}
-//    />
-//
-// 4. (Opcional) Si quieres reaccionar a cambios de etiquetas (por ejemplo para
-//    filtrar facturas), agrega:
-//    const handleCambioEtiquetas = (ids:number[]) => { /* TODO */ };
-//    <EtiquetasCliente cliente={selectedValue} disabled={!registroSeleccionado} onChangeIds={handleCambioEtiquetas} />
-//
-// 5. No cambies nada más. El resto de la lógica de ConsultaCartera permanece.
-// -----------------------------------------------------------------------------

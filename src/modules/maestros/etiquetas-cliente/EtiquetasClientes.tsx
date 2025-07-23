@@ -8,6 +8,8 @@ import {
   DynamicTablePagination,
   TableColumn,
 } from "@app/pages/ConsultaClientes/components/tablaReutilizablePaginacion";
+import { idID } from "@mui/material/locale";
+import { useAppSelector } from "@app/store/store";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -18,7 +20,7 @@ interface EtiquetaCliente {
   estado: boolean;
 }
 
-const URL_FOR_API = `${API_URL}/api/EtiquetaCliente`;
+
 
 const StyledCard = styled.div`
   margin-bottom: 1rem;
@@ -83,6 +85,7 @@ const StyledButton = styled(Button)`
 const EtiquetasClientes: React.FC = () => {
   const [etiquetas, setEtiquetas] = useState<EtiquetaCliente[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
+  const currentUser = useAppSelector((state) => state.auth.currentUser);
 const [formData, setFormData] = useState({
   nombre: "",
   color: "#2ecc71",
@@ -96,7 +99,7 @@ const [formData, setFormData] = useState({
 
   const fetchEtiquetas = async (filter: string = "") => {
     try {
-      const url = `${URL_FOR_API}?filter=${encodeURIComponent(filter)}`;
+      const url = `${API_URL}/api/v1/GetEtiqueta?filter=${encodeURIComponent(filter)}`;
       const res = await fetch(url);
       const result = await res.json();
       if (result.success) setEtiquetas(result.data);
@@ -140,15 +143,17 @@ const [formData, setFormData] = useState({
   const handleSubmit = async () => {
   try {
     setLoading(true);
+    console.log("Session:", currentUser);
 
     const payload = {
       id: selectedEtiqueta?.id || 0, // 0 para nuevo, id existente para editar
       nombre: formData.nombre,
       color: formData.color,
       estado: formData.estado,
+      iduser: currentUser?.id, // Asignar el ID del usuario actual
     };
 
-    const res = await fetch(URL_FOR_API, {
+    const res = await fetch(API_URL+"/api/v1/Post", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -178,7 +183,7 @@ const [formData, setFormData] = useState({
     if (!window.confirm("¿Está seguro de eliminar esta etiqueta?")) return;
     try {
       setLoading(true);
-      const res = await fetch(`${URL_FOR_API}/${id}`, {
+      const res = await fetch(`${API_URL}/api/v1/Post/${id}`, {
         method: "DELETE",
         headers: { Accept: "*/*" },
       });

@@ -17,7 +17,7 @@ export const insertarGestionFactura = async (
   data: GestionFacturaRequest
 ): Promise<ApiResponse<null>> => {
   try {
-    const response = await fetch(`${API_URL}/api/GestionFactura`, {
+    const response = await fetch(`${API_URL}/api/v1/InsertarGestionFactura`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

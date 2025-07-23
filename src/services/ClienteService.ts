@@ -1,4 +1,4 @@
-import { ApiResponse } from '@app/models/apiResponse';
+import { ApiResponse } from "@app/models/apiResponse";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -21,34 +21,38 @@ export interface ClienteInfo {
 }
 
 const getAuthHeaders = () => {
-  const token = localStorage.getItem('token');
+  const token = localStorage.getItem("token");
   return {
-    'accept': '*/*',
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${token}`
+    accept: "*/*",
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${token}`,
   };
 };
 
-export const obtenerCliente = async (cliente: string): Promise<ApiResponse<ClienteInfo>> => {
-  
+export const obtenerCliente = async (
+  cliente: string
+): Promise<ApiResponse<ClienteInfo>> => {
   try {
-    const response = await fetch(`${API_URL}/api/Cliente/${cliente}`, {
-      method: 'GET',
-      headers: getAuthHeaders()
-    });
-
+    //ARREGLAR ENVIAR COMO QUERY PARAMS
+    const response = await fetch(
+      `${API_URL}/api/v1/GetCliente?idCliente=${encodeURIComponent(cliente)}`,
+      {
+        method: "GET",
+        headers: getAuthHeaders(),
+      }
+    );
     if (!response.ok) {
-      throw new Error('Error al obtener el cliente');
+      throw new Error("Error al obtener el cliente");
     }
 
     return await response.json();
   } catch (error: any) {
     return {
       success: false,
-      message: 'Error al obtener el cliente',
+      message: "Error al obtener el cliente",
       data: {} as ClienteInfo,
       statusCode: 500,
-      errors: [error.message || 'Error desconocido']
+      errors: [error.message || "Error desconocido"],
     };
   }
-}; 
+};

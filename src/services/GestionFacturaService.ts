@@ -89,7 +89,7 @@ export const buscarGestiones = async (
 ): Promise<ApiResponse<GestionesEventosFacturaResulta>> => {
   try {
     const response = await fetch(
-      `${API_URL}/api/GestionFactura/gestiones-eventos?numefac=${factura}&cliente=${cliente}&cuenta=${cuenta}`,
+      `${API_URL}/api/v1/BuscarGestiones?numefac=${factura}&cliente=${cliente}&cuenta=${cuenta}`,
       {
         method: "GET",
         headers: getAuthHeaders(),
@@ -118,7 +118,7 @@ export const GestionarFactura = async (
 ): Promise<ApiResponse<null>> => {
   let responseData2: any;
   try {
-    const response = await fetch(`${API_URL}/api/GestionFactura`, {
+    const response = await fetch(`${API_URL}/api/v1/GestionFactura`, {
       method: "POST",
       headers: getAuthHeaders(),
       body: JSON.stringify(gestion),

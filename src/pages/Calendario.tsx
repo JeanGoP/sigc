@@ -59,7 +59,7 @@ const Calendario: React.FC = () => {
     const fetchUsuarios = async () => {
       try {
         const response = await fetch(
-          `${API_URL}/api/ListarUsuariosPorRol/PorRol`,
+          `${API_URL}/api/v1/PorRol`,
           {
             method: "POST",
             headers: {
@@ -101,7 +101,7 @@ const Calendario: React.FC = () => {
         queryParams.append("userId", usuarioFiltro.toString());
       }
 
-      const url = `${API_URL}/api/EventoCalendario?${queryParams.toString()}`;
+      const url = `${API_URL}/api/v1/ObtenerEventos?${queryParams.toString()}`;
 
       const response = await fetch(url);
       const result = await response.json();

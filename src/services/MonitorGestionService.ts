@@ -40,7 +40,7 @@ export interface MonitorGestionResponse {
 
 export const obtenerGestionesEventos = async (pageNumber: number, pageSize: number): Promise<MonitorGestionResponse> => {
   try {
-    const response = await fetch(`${API_URL}/api/MonitorGestion/gestiones-eventos?pageNumber=${pageNumber}&pageSize=${pageSize}`, {
+    const response = await fetch(`${API_URL}/api/v1/gestiones-eventos?pageNumber=${pageNumber}&pageSize=${pageSize}`, {
       method: 'GET',
       headers: {
         'accept': '*/*'
