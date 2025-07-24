@@ -4,7 +4,7 @@ import App from '@app/App';
 import store from '@store/store';
 
 import * as serviceWorker from './serviceWorker';
-import { BrowserRouter } from 'react-router-dom';
+import { HashRouter } from 'react-router-dom';
 import ReactGA from 'react-ga4';
 
 import './utils/i18n';
@@ -18,9 +18,9 @@ if (VITE_NODE_ENV === 'production' && VITE_GA_ID) {
 
 createRoot(document.getElementById('root') as HTMLDivElement).render(
   <Provider store={store}>
-    <BrowserRouter>
+    <HashRouter>
       <App />
-    </BrowserRouter>
+    </HashRouter>
   </Provider>
 );
 
