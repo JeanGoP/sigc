@@ -118,7 +118,7 @@ export const GestionarFactura = async (
 ): Promise<ApiResponse<null>> => {
   let responseData2: any;
   try {
-    const response = await fetch(`${API_URL}/api/v1/GestionFactura`, {
+    const response = await fetch(`${API_URL}/api/v1/InsertarGestionFactura`, {
       method: "POST",
       headers: getAuthHeaders(),
       body: JSON.stringify(gestion),

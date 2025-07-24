@@ -918,7 +918,7 @@ export const ConsultaCartera: React.FC = () => {
                               <Form.Label>Razón Social</Form.Label>
                               <Form.Control
                                 type="text"
-                                value={clienteInfo.nombre}
+                                value={clienteInfo.razonSocial}
                                 readOnly
                               />
                             </Form.Group>
