@@ -12,6 +12,7 @@ export default ({ mode }) => {
   return defineConfig({
     mode: VITE_NODE_ENV,
     plugins: [react()],
+    base: '/',
     // server: {
     //   port: 4000,
     //   strictPort: true, // opcional: falla si el puerto está ocupado
