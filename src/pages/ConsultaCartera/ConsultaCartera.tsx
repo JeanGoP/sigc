@@ -110,8 +110,7 @@ export const ConsultaCartera: React.FC = () => {
   const tablaFacturasRef = useRef<FetchFacturasRef>(null);
   const [checkIncluirSaldosCero, setCheckIncluirSaldosCero] = useState(false);
   const [fechaConsultaFacturas, setFechaConsultaFacturas] = useState(
-    // new Date().toISOString().split("T")[0]
-    "2025-04-30" // Cambia esto a la fecha que necesites
+    new Date().toISOString().split("T")[0]
   );
   const [filtroGenericoStringPorTipo, setFiltroGenericoStringPorTipo] =
     useState<string>("");
@@ -213,18 +212,15 @@ export const ConsultaCartera: React.FC = () => {
       };
 
       const token = localStorage.getItem("token");
-      const response = await fetch(
-        `${API_URL}/api/v1/GetFacturasList`,
-        {
-          method: "POST",
-          headers: {
-            accept: "*/*",
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(params),
-        }
-      );
+      const response = await fetch(`${API_URL}/api/v1/GetFacturasList`, {
+        method: "POST",
+        headers: {
+          accept: "*/*",
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(params),
+      });
       const data = await handleApiResponse(response);
       if (data.success && Array.isArray(data.data)) {
         setTablaRows(data.data);
@@ -313,16 +309,18 @@ export const ConsultaCartera: React.FC = () => {
     const fetchPlantillas = async () => {
       try {
         const token = localStorage.getItem("token");
-       const response = await fetch(
-  `${API_URL}/api/v1/GetListTemplate?tipo=${encodeURIComponent("email")}`,
-  {
-    method: "GET",
-    headers: {
-      accept: "*/*",
-      Authorization: `Bearer ${token}`,
-    },
-  }
-);
+        const response = await fetch(
+          `${API_URL}/api/v1/GetListTemplate?tipo=${encodeURIComponent(
+            "email"
+          )}`,
+          {
+            method: "GET",
+            headers: {
+              accept: "*/*",
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
         const data = await response.json();
         if (data.success && Array.isArray(data.data)) {
           setPlantillasApi(data.data);
@@ -541,18 +539,15 @@ export const ConsultaCartera: React.FC = () => {
         idUser: currentUser?.id || 0,
       };
 
-      const response = await fetch(
-        `${API_URL}/api/v1/SendWithTemplate`,
-        {
-          method: "POST",
-          headers: {
-            accept: "*/*",
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(body),
-        }
-      );
+      const response = await fetch(`${API_URL}/api/v1/SendWithTemplate`, {
+        method: "POST",
+        headers: {
+          accept: "*/*",
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(body),
+      });
 
       const result = await response.json();
       if (result.success) {
@@ -577,7 +572,9 @@ export const ConsultaCartera: React.FC = () => {
         <div className="container-fluid">
           <div className="row" style={{ height: "100vh" }}>
             <div
-              className={` side-panel ${collapsed ? "collapsed" : "col col-sm-4 col-md-5 col-lg-4"}`}
+              className={` side-panel ${
+                collapsed ? "collapsed" : "col col-sm-4 col-md-5 col-lg-4"
+              }`}
             >
               <div className="d-flex justify-content-between align-items-center p-2">
                 {collapsed == true ? "" : <strong>Clientes</strong>}
@@ -902,7 +899,10 @@ export const ConsultaCartera: React.FC = () => {
                         })}
                       </div> */}
 
-                      <EtiquetasClienteGestion cliente={selectedValue} idUser={currentUser?.id ?? 0} />
+                      <EtiquetasClienteGestion
+                        cliente={selectedValue}
+                        idUser={currentUser?.id ?? 0}
+                      />
                     </Col>
                   </Row>
 
