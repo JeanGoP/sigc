@@ -1,10 +1,10 @@
+// src/services/clienteService.ts
+import { useApi } from "@app/hooks/useApi";
 import { ApiResponse } from "@app/models/apiResponse";
-
-const API_URL = import.meta.env.VITE_API_URL;
 
 export interface ClienteInfo {
   cliente: string;
-  nombre: string;
+  razonSocial: string;
   direccion: string;
   telefono: string;
   email: string;
@@ -20,39 +20,19 @@ export interface ClienteInfo {
   usuarioBaja: string;
 }
 
-const getAuthHeaders = () => {
-  const token = localStorage.getItem("token");
-  return {
-    accept: "*/*",
-    "Content-Type": "application/json",
-    Authorization: `Bearer ${token}`,
+// Hook especializado
+export function useClienteService() {
+  const { loading, error, request } = useApi<ClienteInfo>("/api/v1");
+
+  const obtenerCliente = async (
+    idCliente: string
+  ): Promise<ApiResponse<ClienteInfo> | null> => {
+    return await request({
+      method: "GET",
+      url: `/GetCliente`,
+      params: { idCliente },
+    });
   };
-};
 
-export const obtenerCliente = async (
-  cliente: string
-): Promise<ApiResponse<ClienteInfo>> => {
-  try {
-    //ARREGLAR ENVIAR COMO QUERY PARAMS
-    const response = await fetch(
-      `${API_URL}/api/v1/GetCliente?idCliente=${encodeURIComponent(cliente)}`,
-      {
-        method: "GET",
-        headers: getAuthHeaders(),
-      }
-    );
-    if (!response.ok) {
-      throw new Error("Error al obtener el cliente");
-    }
-
-    return await response.json();
-  } catch (error: any) {
-    return {
-      success: false,
-      message: "Error al obtener el cliente",
-      data: {} as ClienteInfo,
-      statusCode: 500,
-      errors: [error.message || "Error desconocido"],
-    };
-  }
-};
+  return { loading, error, obtenerCliente };
+}

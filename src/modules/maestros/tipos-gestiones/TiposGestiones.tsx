@@ -1,4 +1,3 @@
-// EstadosEventos.tsx
 import React, { useEffect, useState } from "react";
 import { Button, Modal, Form, Col, Row } from "react-bootstrap";
 import styled from "styled-components";
@@ -8,7 +7,10 @@ import {
   DynamicTablePagination,
   TableColumn,
 } from "@app/pages/ConsultaClientes/components/tablaReutilizablePaginacion";
-const API_URL = import.meta.env.VITE_API_URL;
+import { useListarTiposContacto } from "@app/services/Maestros/TiposContactos/ListarTipoContactos";
+  import {useGuardarTipoContacto } from "@app/services/Maestros/TiposContactos/GuardarTipoContacto";
+  import {useEliminarTipoContacto } from "@app/services/Maestros/TiposContactos/EliminarTipoContacto";
+
 
 const StyledCard = styled.div`
   margin-bottom: 1rem;
@@ -24,29 +26,6 @@ const StyledModal = styled(Modal)`
     border-radius: 0.5rem;
     border: none;
     box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
-  }
-
-  .modal-header {
-    background-color: #f8f9fa;
-    border-bottom: 1px solid #e9ecef;
-    border-radius: 0.5rem 0.5rem 0 0;
-    padding: 1rem 1.5rem;
-
-    .modal-title {
-      font-weight: 600;
-      color: #2c3e50;
-    }
-  }
-
-  .modal-body {
-    padding: 1.5rem;
-  }
-
-  .modal-footer {
-    background-color: #f8f9fa;
-    border-top: 1px solid #e9ecef;
-    border-radius: 0 0 0.5rem 0.5rem;
-    padding: 1rem 1.5rem;
   }
 `;
 
@@ -85,46 +64,26 @@ const EstadosEventos: React.FC = () => {
     descripcion: "",
     estado: true,
   });
-  const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [searchText, setSearchText] = useState("");
   const [selected, setSelected] = useState<TipoContacto | null>(null);
-  const [error, setError] = useState<string | null>(null);
+
+  const { listarTiposContacto, loading: loadingList } = useListarTiposContacto();
+  const { guardarTipoContacto, loading: loadingSave } = useGuardarTipoContacto();
+  const { eliminarTipoContacto, loading: loadingDelete } = useEliminarTipoContacto();
 
   const fetchData = async () => {
-    try {
-      setLoading(true);
+    const result = await listarTiposContacto({
+      nombre: searchText,
+      page: page + 1,
+      pageSize: rowsPerPage,
+    });
 
-      const queryParams = new URLSearchParams({
-        nombre: searchText,
-        page: (page + 1).toString(),
-        pageSize: rowsPerPage.toString(),
-      });
-
-      const url = `${API_URL}/api/v1/ListarTiposContacto?${queryParams.toString()}`;
-      console.log("URL generada:", url); // Opcional: para debug
-
-      const response = await fetch(url, {
-        headers: {
-          accept: "*/*", // igual al curl
-        },
-      });
-
-      if (!response.ok)
-        throw new Error("Error al cargar los tipos de contacto");
-
-      const result = await response.json();
-
-      if (result.success) {
-        setTiposContacto(result.data);
-      } else {
-        throw new Error(result.message || "Error en la respuesta del servidor");
-      }
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Error");
-    } finally {
-      setLoading(false);
+    if (result && result.success) {
+      setTiposContacto(result.data);
+    } else {
+      toast.error(result?.message || "Error al cargar los tipos de contacto");
     }
   };
 
@@ -154,7 +113,6 @@ const EstadosEventos: React.FC = () => {
 
   const handleCloseModal = () => {
     setModalOpen(false);
-    setError(null);
     setSelected(null);
   };
 
@@ -170,71 +128,35 @@ const EstadosEventos: React.FC = () => {
   };
 
   const handleSubmit = async () => {
-    try {
-      setLoading(true);
+    const payload = {
+      id: selected?.id || 0,
+      nombre: formData.nombre,
+      descripcion: formData.descripcion,
+      estado: formData.estado,
+      idUser: 2, // Ajustar dinámicamente si es necesario
+    };
 
-      const payload = {
-        id: selected?.id || 0,
-        nombre: formData.nombre,
-        descripcion: formData.descripcion,
-        estado: formData.estado,
-        idUser: 2, // ⚠️ Ajusta esto dinámicamente si usas autenticación
-      };
+    const result = await guardarTipoContacto(payload);
 
-      const response = await fetch(API_URL + "/api/v1/Guardar", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          accept: "*/*", // igual que en el curl
-        },
-        body: JSON.stringify(payload),
-      });
-
-      const result = await response.json();
-
-      if (!response.ok || !result.success) {
-        throw new Error(
-          result.message || "Error al guardar el tipo de contacto"
-        );
-      }
-
+    if (result && result.success) {
       toast.success("Guardado exitosamente");
       fetchData();
       handleCloseModal();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Error al guardar");
-    } finally {
-      setLoading(false);
+    } else {
+      toast.error(result?.message || "Error al guardar el tipo de contacto");
     }
   };
 
   const handleDelete = async (id: number) => {
     if (!window.confirm("¿Eliminar este tipo de contacto?")) return;
 
-    try {
-      setLoading(true);
+    const result = await eliminarTipoContacto(id);
 
-      const response = await fetch(`${API_URL}/api/v1/id?id=${id}`, {
-        method: "DELETE",
-        headers: {
-          accept: "*/*",
-        },
-      });
-
-      const result = await response.json();
-
-      if (!response.ok || !result.success) {
-        throw new Error(
-          result.message || "Error al eliminar el tipo de contacto"
-        );
-      }
-
+    if (result && result.success) {
       toast.success("Eliminado correctamente");
       fetchData();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Error al eliminar");
-    } finally {
-      setLoading(false);
+    } else {
+      toast.error(result?.message || "Error al eliminar el tipo de contacto");
     }
   };
 
@@ -288,7 +210,6 @@ const EstadosEventos: React.FC = () => {
                   </Button>
                 </Col>
               </Row>
-              {/* <h3 className="card-title">Listado de Tipos de Contacto</h3> */}
             </div>
             <div className="card-body">
               <DynamicTablePagination
@@ -343,7 +264,6 @@ const EstadosEventos: React.FC = () => {
               <Form.Check
                 type="switch"
                 id="estado"
-                // label="Activo"
                 name="estado"
                 checked={formData.estado}
                 onChange={handleInputChange}
@@ -356,7 +276,7 @@ const EstadosEventos: React.FC = () => {
             Cancelar
           </StyledButton>
           <StyledButton variant="primary" onClick={handleSubmit}>
-            {loading ? "Guardando..." : selected ? "Actualizar" : "Guardar"}
+            {loadingSave ? "Guardando..." : selected ? "Actualizar" : "Guardar"}
           </StyledButton>
         </Modal.Footer>
       </StyledModal>

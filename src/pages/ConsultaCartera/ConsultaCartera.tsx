@@ -53,17 +53,25 @@ import {
   type Evento,
 } from "@app/modules/maestros/tipos-eventos/TimelineSeguimientos";
 import { convertirEventoAXml } from "./functions/convertEventoToXML";
+// import {
+//   GestionarFactura,
+//   GestionFacturaRequest,
+//   buscarGestiones,
+//   GestionesEventosFacturaResulta,
+// } from "@app/services/GestionFacturaService";
 import {
-  GestionarFactura,
+  useGestionFacturaService,
   GestionFacturaRequest,
-  buscarGestiones,
   GestionesEventosFacturaResulta,
 } from "@app/services/GestionFacturaService";
-import { obtenerCliente, ClienteInfo } from "@app/services/ClienteService";
+// import { obtenerCliente, ClienteInfo } from "@app/services/ClienteService";
+import { useClienteService, ClienteInfo } from "@app/services/ClienteService";
 import { TablaBitacoras } from "./components/TablaBitacoras";
 import { useAppSelector } from "@app/store/store";
 import { toast } from "react-toastify";
 import { EtiquetasClienteGestion } from "./components/EtiquetasClientesGestion";
+import { useConsultaCarteraService } from "@app/services/ConsultaCartera/ConsultaCarteraServices";
+import { useLocation, useNavigate } from "react-router-dom";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -110,7 +118,8 @@ export const ConsultaCartera: React.FC = () => {
   const tablaFacturasRef = useRef<FetchFacturasRef>(null);
   const [checkIncluirSaldosCero, setCheckIncluirSaldosCero] = useState(false);
   const [fechaConsultaFacturas, setFechaConsultaFacturas] = useState(
-    new Date().toISOString().split("T")[0]
+    // new Date().toISOString().split("T")[0]
+    "2025-08-31"
   );
   const [filtroGenericoStringPorTipo, setFiltroGenericoStringPorTipo] =
     useState<string>("");
@@ -125,6 +134,21 @@ export const ConsultaCartera: React.FC = () => {
     { label: "Evento B", value: "eventoB" },
     { label: "Evento C", value: "eventoC" },
   ]);
+
+  const { loading: loadingCliente, error: errorCliente, obtenerCliente } = useClienteService();
+
+    const {
+    buscarGestiones,
+    GestionarFactura,
+    loadingBuscar,
+    errorBuscar,
+    loadingInsertar,
+    errorInsertar,
+  } = useGestionFacturaService();
+
+  const { getFacturasList, getListTemplate, sendWithTemplate, loading, error } =
+    useConsultaCarteraService();
+
   const [eventosSeleccionados, setEventosSeleccionados] = useState<string[]>(
     []
   );
@@ -138,6 +162,61 @@ export const ConsultaCartera: React.FC = () => {
   const [etiquetasCliente, setEtiquetasCliente] = useState<number[]>([]);
   const [showModalEtiquetas, setShowModalEtiquetas] = useState(false);
   const currentUser = useAppSelector((state) => state.auth.currentUser);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState<string>("info");
+
+  // Leer query params para auto-seleccionar cliente/factura/cuenta
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const cuenta = params.get("cuenta") || "";
+    const factura = params.get("factura") || "";
+    const identificacionCliente = params.get("identificacionCliente") || "";
+
+    if (cuenta || factura || identificacionCliente) {
+      // Ajustar el texto de búsqueda según prioridad
+      if (identificacionCliente) {
+        setTablaSearch(identificacionCliente);
+      } else if (factura) {
+        setTablaSearch(factura);
+      } else if (cuenta) {
+        setTablaSearch(cuenta);
+      }
+
+      (async () => {
+        const rows = await fetchFacturas();
+        const row = rows.find((r: any) =>
+          factura ? String(r.numefac) === String(factura)
+          : cuenta ? String(r.cuenta) === String(cuenta)
+          : identificacionCliente ? String(r.cliente) === String(identificacionCliente)
+          : false
+        );
+
+        if (row) {
+          handleSeleccionarRegistro(row);
+          setActiveTab("seguimiento");
+          if (row.cliente) cargarInfoCliente(String(row.cliente));
+        } else if (identificacionCliente) {
+          // Forzar ejecución de EstadoClienteCompleto con el id, aunque no haya fila aún
+          setSelectedValue(identificacionCliente);
+          if (
+            tablaFacturasRef.current &&
+            typeof tablaFacturasRef.current.fetchFacturas === "function"
+          ) {
+            tablaFacturasRef.current.fetchFacturas();
+          }
+          cargarInfoCliente(identificacionCliente);
+          setActiveTab("seguimiento");
+          // Generar un registro provisional para habilitar 100% la UI
+          setRegistroSeleccionado({
+            cliente: identificacionCliente,
+            numefac: factura || "",
+            cuenta: cuenta || "",
+          });
+        }
+      })();
+    }
+  }, [location.search]);
   const [plantillasApi, setPlantillasApi] = useState<
     { nombre: string; key: string }[]
   >([]);
@@ -190,49 +269,41 @@ export const ConsultaCartera: React.FC = () => {
     setCheckSoloAsignadas(event.target.checked);
   };
 
-  const fetchFacturas = async () => {
+  const fetchFacturas = async (): Promise<any[]> => {
     setTablaLoading(true);
+    let resultRows: any[] = [];
     try {
       const params = {
         fecha: fechaConsultaFacturas,
         incluirCarterasSaldoCero: checkIncluirSaldosCero,
-        user: "usuario", // Ajusta según tu lógica de usuario
+        user: "usuario",
         forUser: checkSoloAsignadas,
-        cuenta: "", // Ajusta si tienes campo de cuenta
+        cuenta: "",
         sinGestionDias: checkSinGestionDias ? sinGestionDias : "",
         edad: seleccionEdades,
         filtroEventos: checkSoloEventosPendientes
           ? eventosSeleccionados.join(",")
           : "",
         filtroPorVencimiento: filtroGenericoStringPorTipo,
-        filtroPorEtiqueta: 0, // Ajusta si tienes etiquetas
+        filtroPorEtiqueta: 0,
         page: tablaPage === 0 ? 1 : tablaPage,
         numPage: tablaRowsPerPage,
         filter: tablaSearch,
       };
 
-      const token = localStorage.getItem("token");
-      const response = await fetch(`${API_URL}/api/v1/GetFacturasList`, {
-        method: "POST",
-        headers: {
-          accept: "*/*",
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(params),
-      });
-      const data = await handleApiResponse(response);
-      if (data.success && Array.isArray(data.data)) {
-        setTablaRows(data.data);
+      const data = await getFacturasList(params);
+      if (data?.success && Array.isArray(data.data)) {
+        resultRows = data.data;
+        setTablaRows(resultRows);
       } else {
         setTablaRows([]);
       }
-    } catch (e) {
+    } catch {
       setTablaRows([]);
     }
     setTablaLoading(false);
+    return resultRows;
   };
-
   // Función para cargar las gestiones
   const cargarGestiones = async () => {
     if (!registroSeleccionado) return;
@@ -246,14 +317,17 @@ export const ConsultaCartera: React.FC = () => {
 
       // console.log("Response de cargarGestiones: ", response);
 
-      const data: GestionesEventosFacturaResulta = response.data;
-
-      if (response.success) {
+      if (response && response.success && response.data) {
+        const data: GestionesEventosFacturaResulta = response.data;
         // Transformar las gestiones al formato que espera el Timeline
         const seguimientosTransformados: Seguimiento[] = data.gestiones.map(
           (gestion) => {
             // Filtrar los eventos asociados a esta gestión
-            const eventosGestion = (response.data.eventos || [])
+            const eventosGestion = (
+              response.data && response.data.eventos
+                ? response.data.eventos
+                : []
+            )
               .filter((evento) => evento.idGestion === gestion.id)
               .map((evento) => {
                 // if (evento.TipoEvento === undefined)
@@ -307,34 +381,14 @@ export const ConsultaCartera: React.FC = () => {
 
   useEffect(() => {
     const fetchPlantillas = async () => {
-      try {
-        const token = localStorage.getItem("token");
-        const response = await fetch(
-          `${API_URL}/api/v1/GetListTemplate?tipo=${encodeURIComponent(
-            "email"
-          )}`,
-          {
-            method: "GET",
-            headers: {
-              accept: "*/*",
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
-        const data = await response.json();
-        if (data.success && Array.isArray(data.data)) {
-          setPlantillasApi(data.data);
-          if (data.data.length > 0)
-            setPlantillaSeleccionadaKey(data.data[0].key);
-        } else {
-          toast.error("No se pudieron cargar las plantillas");
-        }
-      } catch (error) {
-        console.error(error);
-        toast.error("Error al cargar las plantillas");
+      const data = await getListTemplate("email");
+      if (data?.success && Array.isArray(data.data)) {
+        setPlantillasApi(data.data);
+        if (data.data.length > 0) setPlantillaSeleccionadaKey(data.data[0].key);
+      } else {
+        toast.error("No se pudieron cargar las plantillas");
       }
     };
-
     fetchPlantillas();
   }, []);
 
@@ -388,7 +442,7 @@ export const ConsultaCartera: React.FC = () => {
 
       const responseGuardado = await GestionarFactura(request);
 
-      if (responseGuardado.success) {
+      if (responseGuardado && responseGuardado.success) {
         toast.success("Proceso exitoso");
         await cargarGestiones();
         return true;
@@ -407,16 +461,21 @@ export const ConsultaCartera: React.FC = () => {
 
   // Función para cargar la información del cliente
   const cargarInfoCliente = async (idCliente: string) => {
-    try {
-      const response = await obtenerCliente(idCliente);
-      if (response.success) {
-        setClienteInfo(response.data);
-      }
-    } catch (error) {
-      console.error("Error al cargar información del cliente:", error);
+  try {
+    console.log("[ConsultaCartera] cargando info cliente:", idCliente);
+    const response = await obtenerCliente(idCliente);
+    console.log("[ConsultaCartera] respuesta obtenerCliente:", response);
+    if (response?.success) {
+      setClienteInfo(response.data ?? null);
+    } else {
       setClienteInfo(null);
     }
-  };
+  } catch (error) {
+    console.error("Error al cargar información del cliente:", error);
+    setClienteInfo(null);
+  }
+};
+
 
   // Actualizar la información del cliente cuando se selecciona un registro
   useEffect(() => {
@@ -433,9 +492,9 @@ export const ConsultaCartera: React.FC = () => {
     window.open(`https://wa.me/${numeroLimpio}`, "_blank");
   };
 
-  React.useEffect(() => {
-    fetchFacturas();
-  }, []);
+  // React.useEffect(() => {
+  //   fetchFacturas();
+  // }, []);
 
   React.useEffect(() => {
     fetchFacturas();
@@ -455,7 +514,7 @@ export const ConsultaCartera: React.FC = () => {
   };
 
   React.useEffect(() => {
-    if (tablaFacturasRef.current) {
+    if (selectedValue && tablaFacturasRef.current) {
       tablaFacturasRef.current.fetchFacturas();
     }
   }, [selectedValue, registroSeleccionado]);
@@ -529,7 +588,6 @@ export const ConsultaCartera: React.FC = () => {
 
     setEnviandoCorreo(true);
     try {
-      const token = localStorage.getItem("token");
       const body = {
         cliente: registroSeleccionado.cliente,
         factura: registroSeleccionado.numefac,
@@ -539,26 +597,15 @@ export const ConsultaCartera: React.FC = () => {
         idUser: currentUser?.id || 0,
       };
 
-      const response = await fetch(`${API_URL}/api/v1/SendWithTemplate`, {
-        method: "POST",
-        headers: {
-          accept: "*/*",
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(body),
-      });
+      const result = await sendWithTemplate(body);
 
-      const result = await response.json();
-      if (result.success) {
+      if (result?.success) {
         toast.success("Correo enviado correctamente");
         setShowModalCorreo(false);
       } else {
-        toast.error(`Error: ${result.message}`);
-        console.error(result.errors);
+        toast.error(`Error: ${result?.message}`);
       }
     } catch (error) {
-      console.error(error);
       toast.error("Error al enviar el correo");
     } finally {
       setEnviandoCorreo(false);
@@ -838,7 +885,7 @@ export const ConsultaCartera: React.FC = () => {
             </div>
 
             <div className="col main-panel">
-              <Tabs defaultActiveKey="info" id="tabs" className="mb-3">
+              <Tabs activeKey={activeTab} onSelect={(k) => setActiveTab(k || "info")} id="tabs" className="mb-3">
                 <Tab eventKey="info" title="Información General">
                   <Row className="mb-3">
                     <Col xs={12} md={3}>
@@ -1035,7 +1082,7 @@ export const ConsultaCartera: React.FC = () => {
                   title={
                     <span>
                       Seguimiento
-                      {!registroSeleccionado && (
+                      {!registroSeleccionado && !selectedValue && (
                         <OverlayTrigger
                           placement="top"
                           overlay={
@@ -1051,7 +1098,7 @@ export const ConsultaCartera: React.FC = () => {
                       )}
                     </span>
                   }
-                  disabled={!registroSeleccionado}
+                  disabled={!registroSeleccionado && !selectedValue}
                 >
                   <TimelineSeguimientos
                     seguimientos={seguimientos}

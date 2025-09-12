@@ -13,115 +13,69 @@ import {
 } from "react-bootstrap";
 import { SingleSelect } from "@app/components/singleSelect/singleSelect";
 import { StringToMoney } from "@app/utils/formattersFunctions";
-import { current } from "@reduxjs/toolkit";
 import { useAppSelector } from "@app/store/store";
+import { useEventosService, Evento } from "@app/services/Calendario/CalendarioService";
+import { useNavigate } from "react-router-dom";
 
-moment.locale("es"); // Configurar el locale a español
+moment.locale("es");
 const localizer = momentLocalizer(moment);
 
-const API_URL = import.meta.env.VITE_API_URL;
-
-interface Option {
-  label: string;
-  value: string | number;
-}
-
-interface Evento {
-  title: string;
-  start: string;
-  end: string;
-  monto: string;
-  descripcion: string;
-  usuario: string;
-  nombreCliente: string;
-  identificacionCliente: string;
-  icono: string;
-  color: string;
-  estado: string;
-}
-
 const Calendario: React.FC = () => {
-  const [usuarios, setUsuarios] = useState<Option[]>([]);
+  const [usuarios, setUsuarios] = useState<{ label: string; value: string | number }[]>([]);
   const [usuarioFiltro, setUsuarioFiltro] = useState<string | number>("");
   const [eventos, setEventos] = useState<Evento[]>([]);
   const [mostrarModalEvento, setMostrarModalEvento] = useState(false);
   const [mostrarModalDia, setMostrarModalDia] = useState(false);
   const [incluirAnteriores, setIncluirAnteriores] = useState(false);
   const [incluirCumplidos, setIncluirCumplidos] = useState(false);
-  const [eventoSeleccionado, setEventoSeleccionado] = useState<Evento | null>(
-    null
-  );
+  const [eventoSeleccionado, setEventoSeleccionado] = useState<Evento | null>(null);
   const [eventosDelDia, setEventosDelDia] = useState<Evento[]>([]);
   const [fechaSeleccionada, setFechaSeleccionada] = useState<Date | null>(null);
-    const currentUser = useAppSelector((state) => state.auth.currentUser);
+  const navigate = useNavigate();
 
+  const currentUser = useAppSelector((state) => state.auth.currentUser);
+  const { loading, error, obtenerUsuariosPorRol, obtenerEventos } = useEventosService();
+
+  // Cargar usuarios
   useEffect(() => {
     const fetchUsuarios = async () => {
-      try {
-        const response = await fetch(
-          `${API_URL}/api/v1/PorRol`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Accept: "*/*",
-            },
-            body: JSON.stringify({ roleName: "Asesor", iduser: currentUser?.id}),
-          }
-        );
-
-        const result = await response.json();
-        if (result.success && Array.isArray(result.data)) {
-          const opciones = [
-            { label: "Todos", value: "" },
-            ...result.data.map((user: any) => ({
-              label: user.fullName,
-              value: user.userId, // Aquí usamos el ID
-            })),
-          ];
-          setUsuarios(opciones);
-        }
-      } catch (error) {
-        console.error("Error al obtener usuarios:", error);
+      const res = await obtenerUsuariosPorRol("Asesor", Number(currentUser?.id));
+      if (res?.success && Array.isArray(res.data)) {
+        const opciones = [
+          { label: "Todos", value: "" },
+          ...res.data.map((user: any) => ({
+            label: user.fullName,
+            value: user.userId,
+          })),
+        ];
+        setUsuarios(opciones);
       }
     };
+    if (currentUser?.id) {
+      fetchUsuarios();
+    }
+  }, [currentUser]);
 
-    fetchUsuarios();
-  }, []);
-
+  // Cargar eventos
   useEffect(() => {
-  const fetchEventos = async () => {
-    try {
-      const queryParams = new URLSearchParams({
-        eventosAnteriores: incluirAnteriores.toString(),
-        eventosCumplidos: incluirCumplidos.toString(),
+    const fetchEventos = async () => {
+      const res = await obtenerEventos({
+        eventosAnteriores: incluirAnteriores,
+        eventosCumplidos: incluirCumplidos,
+        ...(usuarioFiltro && { userId: usuarioFiltro }),
       });
 
-      if (usuarioFiltro) {
-        queryParams.append("userId", usuarioFiltro.toString());
-      }
-
-      const url = `${API_URL}/api/v1/ObtenerEventos?${queryParams.toString()}`;
-
-      const response = await fetch(url);
-      const result = await response.json();
-
-      if (result.success && Array.isArray(result.data)) {
-        const eventosConvertidos = result.data.map((ev: any) => ({
+      if (res?.success && Array.isArray(res.data)) {
+        const eventosConvertidos = res.data.map((ev: any) => ({
           ...ev,
           start: new Date(ev.start),
           end: new Date(ev.end),
         }));
         setEventos(eventosConvertidos);
       }
-    } catch (error) {
-      console.error("Error al obtener eventos:", error);
-    }
-  };
-
-  fetchEventos();
-}, [usuarioFiltro, incluirAnteriores, incluirCumplidos]);
-
+    };
+    fetchEventos();
+  }, [usuarioFiltro, incluirAnteriores, incluirCumplidos]);
 
   const handleSeleccionEvento = (evento: Evento) => {
     setEventoSeleccionado(evento);
@@ -133,7 +87,6 @@ const Calendario: React.FC = () => {
     const eventosEnEsaFecha = eventos.filter((ev) =>
       moment(ev.start).isSame(fecha, "day")
     );
-
     setEventosDelDia(eventosEnEsaFecha);
     setFechaSeleccionada(slotInfo.start);
     setMostrarModalDia(true);
@@ -177,7 +130,6 @@ const Calendario: React.FC = () => {
                 <Form.Label>Incluir eventos anteriores</Form.Label>
                 <Form.Check
                   type="switch"
-                  // label="Incluir eventos anteriores"
                   checked={incluirAnteriores}
                   onChange={(e) => setIncluirAnteriores(e.target.checked)}
                 />
@@ -189,7 +141,6 @@ const Calendario: React.FC = () => {
                 <Form.Label>Incluir cumplidos</Form.Label>
                 <Form.Check
                   type="switch"
-                  // label="Incluir cumplidos"
                   checked={incluirCumplidos}
                   onChange={(e) => setIncluirCumplidos(e.target.checked)}
                 />
@@ -229,7 +180,7 @@ const Calendario: React.FC = () => {
 
       {/* Modal evento */}
       <Modal show={mostrarModalEvento} onHide={cerrarModalEvento}>
-        <Modal.Header closeButton={true} {...({} as any)}>
+        <Modal.Header {...({ closeButton: true } as any)}>
           <Modal.Title>Detalle del evento</Modal.Title>
         </Modal.Header>
         <Modal.Body>
@@ -286,6 +237,22 @@ const Calendario: React.FC = () => {
           )}
         </Modal.Body>
         <Modal.Footer>
+          {eventoSeleccionado && (
+            <Button
+              variant="primary"
+              onClick={() => {
+                const qp = new URLSearchParams();
+                if ((eventoSeleccionado as any).cuenta) qp.set("cuenta", String((eventoSeleccionado as any).cuenta));
+                if ((eventoSeleccionado as any).factura) qp.set("factura", String((eventoSeleccionado as any).factura));
+                if ((eventoSeleccionado as any).identificacionCliente)
+                  qp.set("identificacionCliente", String((eventoSeleccionado as any).identificacionCliente));
+                // Abrir ConsultaCartera con query params
+                navigate(`/consulta_carteras?${qp.toString()}`);
+              }}
+            >
+              Ir a gestión en Cartera
+            </Button>
+          )}
           <Button variant="secondary" onClick={cerrarModalEvento}>
             Cerrar
           </Button>
@@ -294,7 +261,7 @@ const Calendario: React.FC = () => {
 
       {/* Modal día */}
       <Modal show={mostrarModalDia} onHide={cerrarModalDia}>
-        <Modal.Header closeButton={true} {...({} as any)}>
+        <Modal.Header {...({ closeButton: true } as any)}>
           <Modal.Title>Eventos del día</Modal.Title>
         </Modal.Header>
         <Modal.Body>

@@ -8,10 +8,12 @@ import {
   DynamicTablePagination,
   TableColumn,
 } from "@app/pages/ConsultaClientes/components/tablaReutilizablePaginacion";
-import { idID } from "@mui/material/locale";
 import { useAppSelector } from "@app/store/store";
-
-const API_URL = import.meta.env.VITE_API_URL;
+import {
+  useListarEtiquetasClientes,
+  useGuardarEtiquetaCliente,
+  useEliminarEtiquetaCliente,
+} from "@app/services/Maestros/EtiquetasClientes/EtiquetasClienteService";
 
 interface EtiquetaCliente {
   id: number;
@@ -19,8 +21,6 @@ interface EtiquetaCliente {
   color: string;
   estado: boolean;
 }
-
-
 
 const StyledCard = styled.div`
   margin-bottom: 1rem;
@@ -37,43 +37,10 @@ const StyledModal = styled(Modal)`
     border: none;
     box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
   }
-
-  .modal-header {
-    background-color: #f8f9fa;
-    border-bottom: 1px solid #e9ecef;
-    border-radius: 0.5rem 0.5rem 0 0;
-    padding: 1rem 1.5rem;
-
-    .modal-title {
-      font-weight: 600;
-      color: #2c3e50;
-    }
-  }
-
-  .modal-body {
-    padding: 1.5rem;
-  }
-
-  .modal-footer {
-    background-color: #f8f9fa;
-    border-top: 1px solid #e9ecef;
-    border-radius: 0 0 0.5rem 0.5rem;
-    padding: 1rem 1.5rem;
-  }
 `;
 
 const StyledFormGroup = styled(Form.Group)`
   margin-bottom: 1.5rem;
-  .form-label {
-    font-weight: 500;
-    color: #2c3e50;
-    margin-bottom: 0.5rem;
-  }
-  .form-control {
-    border-radius: 0.375rem;
-    border: 1px solid #ced4da;
-    padding: 0.5rem 0.75rem;
-  }
 `;
 
 const StyledButton = styled(Button)`
@@ -86,25 +53,27 @@ const EtiquetasClientes: React.FC = () => {
   const [etiquetas, setEtiquetas] = useState<EtiquetaCliente[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
   const currentUser = useAppSelector((state) => state.auth.currentUser);
-const [formData, setFormData] = useState({
-  nombre: "",
-  color: "#2ecc71",
-  estado: true,
-});
+
+  const [formData, setFormData] = useState({
+    nombre: "",
+    color: "#2ecc71",
+    estado: true,
+  });
   const [selectedEtiqueta, setSelectedEtiqueta] = useState<EtiquetaCliente | null>(null);
-  const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [searchText, setSearchText] = useState("");
 
+  const { listarEtiquetasClientes } = useListarEtiquetasClientes();
+  const { guardarEtiquetaCliente, loading: saving } = useGuardarEtiquetaCliente();
+  const { eliminarEtiquetaCliente, loading: deleting } = useEliminarEtiquetaCliente();
+
   const fetchEtiquetas = async (filter: string = "") => {
-    try {
-      const url = `${API_URL}/api/v1/GetEtiqueta?filter=${encodeURIComponent(filter)}`;
-      const res = await fetch(url);
-      const result = await res.json();
-      if (result.success) setEtiquetas(result.data);
-    } catch (e) {
-      toast.error("Error al cargar las etiquetas");
+    const result = await listarEtiquetasClientes(filter);
+    if (result && result.success) {
+      setEtiquetas(result.data);
+    } else {
+      toast.error(result?.message || "Error al cargar las etiquetas");
     }
   };
 
@@ -141,106 +110,55 @@ const [formData, setFormData] = useState({
   };
 
   const handleSubmit = async () => {
-  try {
-    setLoading(true);
-    console.log("Session:", currentUser);
-
+    if (!currentUser?.id) {
+      toast.error("Usuario no válido");
+      return;
+    }
     const payload = {
-      id: selectedEtiqueta?.id || 0, // 0 para nuevo, id existente para editar
+      id: selectedEtiqueta?.id || 0,
       nombre: formData.nombre,
       color: formData.color,
       estado: formData.estado,
-      iduser: currentUser?.id, // Asignar el ID del usuario actual
+      iduser: Number(currentUser.id),
     };
 
-    const res = await fetch(API_URL+"/api/v1/Post", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "*/*",
-      },
-      body: JSON.stringify(payload),
-    });
-
-    const result = await res.json();
-
-    if (result.success) {
+    const result = await guardarEtiquetaCliente(payload);
+    if (result && result.success) {
       toast.success(selectedEtiqueta ? "Etiqueta actualizada" : "Etiqueta creada");
       fetchEtiquetas(searchText);
       handleCloseModal();
     } else {
-      toast.error(result.message || "Error al guardar la etiqueta");
+      toast.error(result?.message || "Error al guardar la etiqueta");
     }
-  } catch (e) {
-    toast.error("Error al guardar la etiqueta");
-  } finally {
-    setLoading(false);
-  }
-};
-
+  };
 
   const handleDelete = async (id: number) => {
     if (!window.confirm("¿Está seguro de eliminar esta etiqueta?")) return;
-    try {
-      setLoading(true);
-      const res = await fetch(`${API_URL}/api/v1/Post/${id}`, {
-        method: "DELETE",
-        headers: { Accept: "*/*" },
-      });
-      const result = await res.json();
-      if (result.success) {
-        fetchEtiquetas(searchText);
-      } else {
-        toast.error(result.message || "Error al eliminar");
-      }
-    } catch (e) {
-      toast.error("Error al eliminar la etiqueta");
-    } finally {
-      setLoading(false);
+
+    const result = await eliminarEtiquetaCliente(id);
+    if (result && result.success) {
+      fetchEtiquetas(searchText);
+    } else {
+      toast.error(result?.message || "Error al eliminar");
     }
   };
 
   const columns: TableColumn[] = [
     { id: "id", label: "ID" },
-    {
-      id: "nombre",
-      label: "Nombre",
-      format: (_: any, row: EtiquetaCliente) => (
-        <span>{row.nombre}</span>
-      ),
-    },
-    {
-      id: "estado",
-      label: "Estado",
-      format: (estado: boolean) => (
-        <span className={`badge badge-${estado ? "success" : "secondary"}`}>
-          {estado ? "Activa" : "Inactiva"}
-        </span>
-      ),
-    },
-    {
-      id: "acciones",
-      label: "Acciones",
-      format: (_value: any, row: EtiquetaCliente) => (
-        <Box>
-          <Button
-            variant="info"
-            size="sm"
-            className="mr-2"
-            onClick={() => handleOpenModal(row)}
-          >
-            <i className="fas fa-edit"></i>
-          </Button>
-          <Button
-            variant="danger"
-            size="sm"
-            onClick={() => handleDelete(row.id)}
-          >
-            <i className="fas fa-trash"></i>
-          </Button>
-        </Box>
-      ),
-    },
+    { id: "nombre", label: "Nombre", format: (_: any, row: EtiquetaCliente) => <span>{row.nombre}</span> },
+    { id: "estado", label: "Estado", format: (estado: boolean) => (
+      <span className={`badge badge-${estado ? "success" : "secondary"}`}>{estado ? "Activa" : "Inactiva"}</span>
+    ) },
+    { id: "acciones", label: "Acciones", format: (_value: any, row: EtiquetaCliente) => (
+      <Box>
+        <Button variant="info" size="sm" className="mr-2" onClick={() => handleOpenModal(row)}>
+          <i className="fas fa-edit"></i>
+        </Button>
+        <Button variant="danger" size="sm" onClick={() => handleDelete(row.id)}>
+          <i className="fas fa-trash"></i>
+        </Button>
+      </Box>
+    ) },
   ];
 
   return (
@@ -256,11 +174,7 @@ const [formData, setFormData] = useState({
               <div className="card-header d-flex">
                 <Row>
                   <Col xs={12} lg={12} md={12}>
-                    <Button
-                      className="float-end"
-                      variant="primary"
-                      onClick={() => handleOpenModal()}
-                    >
+                    <Button className="float-end" variant="primary" onClick={() => handleOpenModal()}>
                       <i className="fas fa-plus mr-2"></i>Nueva etiqueta de cliente
                     </Button>
                   </Col>
@@ -283,10 +197,8 @@ const [formData, setFormData] = useState({
         </section>
 
         <StyledModal show={modalOpen} onHide={handleCloseModal} centered>
-          <Modal.Header closeButton={true} {...({} as any)}  >
-            <Modal.Title>
-              {selectedEtiqueta ? "Editar" : "Nueva"} Etiqueta
-            </Modal.Title>
+          <Modal.Header {...({ closeButton: true } as any)}>
+            <Modal.Title>{selectedEtiqueta ? "Editar" : "Nueva"} Etiqueta</Modal.Title>
           </Modal.Header>
           <Modal.Body>
             <Form>
@@ -297,7 +209,7 @@ const [formData, setFormData] = useState({
                   name="nombre"
                   value={formData.nombre}
                   onChange={handleInputChange}
-                  disabled={loading}
+                  disabled={saving}
                 />
               </StyledFormGroup>
 
@@ -305,9 +217,7 @@ const [formData, setFormData] = useState({
                 <Form.Label>Color</Form.Label>
                 <ColorPickerModal
                   value={formData.color}
-                  onChange={(color) =>
-                    setFormData((prev) => ({ ...prev, color }))
-                  }
+                  onChange={(color) => setFormData((prev) => ({ ...prev, color }))}
                 />
               </StyledFormGroup>
 
@@ -319,7 +229,7 @@ const [formData, setFormData] = useState({
                   name="estado"
                   checked={formData.estado}
                   onChange={handleInputChange}
-                  disabled={loading}
+                  disabled={saving}
                 />
               </StyledFormGroup>
             </Form>
@@ -328,11 +238,7 @@ const [formData, setFormData] = useState({
             <StyledButton variant="secondary" onClick={handleCloseModal}>
               Cancelar
             </StyledButton>
-            <StyledButton
-              variant="primary"
-              onClick={handleSubmit}
-              disabled={loading}
-            >
+            <StyledButton variant="primary" onClick={handleSubmit} disabled={saving}>
               {selectedEtiqueta ? "Actualizar" : "Guardar"}
             </StyledButton>
           </Modal.Footer>

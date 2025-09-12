@@ -1,0 +1,126 @@
+import React, { useEffect } from "react";
+// @ts-ignore
+import SpeechRecognition, { useSpeechRecognition } from "react-speech-recognition";
+import { Button, Card, Alert, Badge, Spinner, Row, Col } from "react-bootstrap";
+
+interface SpeechToTextProps {
+  onResult: (text: string) => void; // callback al padre
+}
+
+const SpeechToText: React.FC<SpeechToTextProps> = ({ onResult }) => {
+  const {
+    transcript,
+    listening,
+    resetTranscript,
+    browserSupportsSpeechRecognition,
+  } = useSpeechRecognition();
+
+  // cada vez que cambia la transcripción, se envía al padre
+  useEffect(() => {
+    if (transcript) {
+      onResult(transcript);
+    }
+  }, [transcript, onResult]);
+
+  if (!browserSupportsSpeechRecognition) {
+    return (
+      <Alert variant="danger" className="text-center">
+        <Alert.Heading>⚠️ Navegador no compatible</Alert.Heading>
+        <p className="mb-0">
+          Tu navegador no soporta Speech Recognition. 
+          Por favor, usa Chrome, Firefox o Safari para esta funcionalidad.
+        </p>
+      </Alert>
+    );
+  }
+
+  const startListening = () =>
+    SpeechRecognition.startListening({ language: "es-ES", continuous: false });
+
+  const stopListening = () => SpeechRecognition.stopListening();
+
+  return (
+    <Card className="shadow-sm">
+      <Card.Header className="bg-primary text-white">
+        <h5 className="mb-0">
+          <i className="fas fa-microphone me-2"></i>
+          Reconocimiento de Voz
+        </h5>
+      </Card.Header>
+      <Card.Body>
+        <Row className="mb-3">
+          <Col>
+            <div className="d-flex align-items-center justify-content-center">
+              {listening ? (
+                <div className="text-center">
+                  <Spinner animation="border" variant="danger" className="mb-2" />
+                  <p className="text-muted mb-0">
+                    <Badge variant="danger" className="me-2">
+                      <i className="fas fa-circle"></i>
+                    </Badge>
+                    Escuchando...
+                  </p>
+                </div>
+              ) : (
+                <div className="text-center">
+                  <i className="fas fa-microphone-slash text-muted" style={{ fontSize: '2rem' }}></i>
+                  <p className="text-muted mb-0">Presiona el botón para comenzar</p>
+                </div>
+              )}
+            </div>
+          </Col>
+        </Row>
+        
+        <Row>
+          <Col xs={12} sm={6} className="mb-2">
+            {!listening ? (
+              <Button
+                variant="success"
+                size="lg"
+                onClick={startListening}
+                className="w-100"
+              >
+                <i className="fas fa-microphone me-2"></i>
+                Comenzar Grabación
+              </Button>
+            ) : (
+              <Button
+                variant="danger"
+                size="lg"
+                onClick={stopListening}
+                className="w-100"
+              >
+                <i className="fas fa-stop me-2"></i>
+                Detener Grabación
+              </Button>
+            )}
+          </Col>
+          <Col xs={12} sm={6} className="mb-2">
+            <Button
+              variant="outline-secondary"
+              size="lg"
+              onClick={resetTranscript}
+              className="w-100"
+              disabled={!transcript}
+            >
+              <i className="fas fa-eraser me-2"></i>
+              Limpiar Texto
+            </Button>
+          </Col>
+        </Row>
+        
+        {transcript && (
+          <Alert variant="info" className="mt-3">
+            <Alert.Heading>
+              <i className="fas fa-file-text me-2"></i>
+              Texto Reconocido:
+            </Alert.Heading>
+            <p className="mb-0">{transcript}</p>
+          </Alert>
+        )}
+      </Card.Body>
+    </Card>
+  );
+};
+
+export default SpeechToText;

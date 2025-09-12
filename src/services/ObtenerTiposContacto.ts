@@ -1,28 +1,33 @@
+// src/services/tipoContactoService.ts
+import { useApi } from "@app/hooks/useApi";
+import { useCallback } from "react";
+
 export interface TipoContacto {
   id: string;
   descripcion: string;
 }
 
-const API_URL = import.meta.env.VITE_API_URL;
+// -----------------------------------------------------------------------------
+// Listar tipos de contacto
+// GET /api/v1/listarForNuevaGestion?filtro=...
+// -----------------------------------------------------------------------------
+export function useListarTiposContacto() {
+  const { loading, error, request } = useApi<TipoContacto[]>("/api/v1", {
+    timeout: 5000,
+    retries: 2,
+    retryDelay: 2000,
+  });
 
-export const obtenerTiposContacto = async (
-  filtro: string
-): Promise<TipoContacto[]> => {
-  filtro = "";
-  const response = await fetch(
-    `${API_URL}/api/v1/listarForNuevaGestion?filtro=${encodeURIComponent("w")}`,
-    {
-      method: "GET",
-      headers: {
-        accept: "*/*",
-      },
-    }
+  const listarTiposContacto = useCallback(
+    (filtro: string = "w") => {
+      return request({
+        url: "/listarForNuevaGestion",
+        method: "GET",
+        params: { filtro },
+      });
+    },
+    [request]
   );
 
-  if (!response.ok) {
-    throw new Error("Error al obtener los tipos de contacto");
-  }
-
-  const data = await response.json();
-  return data.data; // Asegúrate de que el JSON devuelto tenga `{ data: [...] }`
-};
+  return { loading, error, listarTiposContacto };
+}

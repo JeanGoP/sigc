@@ -1,61 +1,31 @@
-import { useState, useEffect, useRef ,useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import { ContentHeader } from "@components";
-import {
-  ClientesListRequest,
-  getClientesList,
-} from "@app/services/GetClientesListByFilter";
 import BuscadoClientes from "./components/BuscadoClientes";
 import ModalTablaClientes from "./components/ModalTablaClientes";
-import { Box, Checkbox } from "@mui/material";
+import { Checkbox } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faCircleCheck } from "@fortawesome/free-solid-svg-icons";
-import {
-  GridColDef,
-  GridPaginationModel,
-  GridRowParams,
-} from "@mui/x-data-grid";
-import DatePickerMui from "@app/components/DatePicker/DatePicker";
-import { TablaFacturas } from "./components/TablaFacturas";
-import { FormularioCliente } from "./components/FormularioCliente";
-import { Card, Form, FormControl, FormLabel } from "react-bootstrap";
-import EstadoClienteTable from "./components/prueba_tablaSaldos";
-import { FacturasTablePrueba } from "./components/prueba_facturas";
-import { TableColumn } from "./components/tablaReutilizables";
-import {
-  EstadoCuentaRequest,
-  FetchEstadoCuentaClienteFactura,
-} from "@app/services/GetEstadoCuentaClienteFactura";
-import { StringToMoney} from "@app/utils/formattersFunctions";
-import { RecibosCajaTable } from "./components/TablaRecibosCaja";
-import { handleApiResponse } from "@app/utils/handleApiResponse";
-import { FacturaListado } from "@app/models/facturaConsultaclienteModel";
-import { ObtenerRecibosCajaPorFactura } from "@app/services/GetRecibosCajaListService";
+import { GridColDef, GridPaginationModel, GridRowParams } from "@mui/x-data-grid";
 import { CustomDatePicker } from "@app/components/DatePicker/DatePickerv2";
 import { NumericField } from "@app/components/InputFields/NumericField";
-import { ClienteEstadoCuenta, FetchFacturasRef} from "./components/EstadoClienteCompleto";
-
-// import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import { ClienteEstadoCuenta, FetchFacturasRef } from "./components/EstadoClienteCompleto";
+import { useClientesService } from "@app/services/GestionCartera/ConsultaClientes/clientesService";
 
 const ConsultaClientes = () => {
   const [selectedValue, setSelectedValue] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [TableRowsClientes, setTableRowsClientes] = useState<any[]>([]);
-  // const [rowsFacturas, setRowsFacturas] = useState<FacturaListado[]>([]);
-  // const [clienteCuotasRows, setClienteCuotasRows] = useState<any[]>([]);
-  // const [TableRowsRecibosCaja, setTableRowsRecibosCaja] = useState<any[]>([]);
-  const [fechaConsultaFacturas, setFechaConsultaFacturas] = useState(
-    new Date().toISOString().split("T")[0]
-  );
+  const [fechaConsultaFacturas, setFechaConsultaFacturas] = useState(new Date().toISOString().split("T")[0]);
   const [selectedRows, setSelectedRows] = useState<string[]>([]);
-  const [FacturaSelected, setFacturaSelected] = useState<string>();
   const [intMora, setIntMora] = useState<string>("3.00");
   const tablaFacturasRef = useRef<FetchFacturasRef>(null);
   const [paginationModel, setPaginationModel] = useState<GridPaginationModel>({
-
     page: 0,
     pageSize: 20,
   });
+
+  const { loading, error, listarClientes } = useClientesService();
 
   const handleSelectRow = (id: string) => {
     setSelectedRows((prev) =>
@@ -79,35 +49,28 @@ const ConsultaClientes = () => {
 
   const handlePaginationChange = (model: GridPaginationModel) => {
     setPaginationModel(model);
-    // searchClientes();
   };
 
-  
   const manejarClick = () => {
-    console.log("Selected value: asdasdasdasd" );
-    tablaFacturasRef.current?.fetchFacturas(); // Llama la función del hijo
+    tablaFacturasRef.current?.fetchFacturas();
   };
+
   const searchClientes = async (filter = "") => {
-    const data: ClientesListRequest = {
+    const params = {
       page: paginationModel.page + 1,
       numpage: paginationModel.pageSize,
       filter,
-      intmora: intMora
+      intmora: intMora,
     };
-    if (data.filter.length > 2) {
-      const res: any = await getClientesList(data);
-      setTableRowsClientes(res.data || []);
+    if (params.filter.length > 2) {
+      const res: any = await listarClientes(params);
+      if (res?.success) {
+        setTableRowsClientes(res.data || []);
+      } else {
+        setTableRowsClientes([]);
+      }
     }
   };
-
-  const changeDate = (date: string | null) => {
-    console.log("Selected date:", date);
-    if (date) {
-      setFechaConsultaFacturas(date);
-    }
-  };
-
-  
 
   useEffect(() => {
     searchClientes(searchTerm);
@@ -132,12 +95,7 @@ const ConsultaClientes = () => {
         <Checkbox
           checked={params.row.selected || false}
           onChange={() => handleSelectRow(params.row.id)}
-          icon={
-            <FontAwesomeIcon
-              icon={faCircleCheck}
-              style={{ color: "#63E6BE" }}
-            />
-          }
+          icon={<FontAwesomeIcon icon={faCircleCheck} style={{ color: "#63E6BE" }} />}
         />
       ),
     },
@@ -147,7 +105,6 @@ const ConsultaClientes = () => {
     { field: "codIcta", headerName: "Código ICTA", width: 150 },
   ];
 
-  
   return (
     <div>
       <ContentHeader title="Consulta Clientes" />
@@ -158,7 +115,6 @@ const ConsultaClientes = () => {
               <h3 className="card-title">Consulta de Clientes</h3>
             </div>
             <div className="card-body">
-              {/* <div className="container"> */}
               <div className="row">
                 <div className="col-md-2">
                   <BuscadoClientes
@@ -168,76 +124,31 @@ const ConsultaClientes = () => {
                   />
                 </div>
                 <div className="col-md-2 text-start">
-                  {/* <DatePickerMui
-                    placeHolder="Fecha"
-                    onDateChange={(dateStr) =>
-                      setFechaConsultaFacturas(dateStr)
-                    }
-                  /> */}
-                  <CustomDatePicker label="Seleccione la fecha" selectedDate={fechaConsultaFacturas} onDateChange={(dateStr) =>
-                      setFechaConsultaFacturas(dateStr)
-                    } />
-                </div>
-                 <div className="col-sm-1 col-md-1 col-lg-1 text-start">
-                  <NumericField
-                    value={intMora}
-                    onChange={(int) => setIntMora(int) }
+                  <CustomDatePicker
+                    label="Seleccione la fecha"
+                    selectedDate={fechaConsultaFacturas}
+                    onDateChange={setFechaConsultaFacturas}
                   />
-                  </div>
+                </div>
+                <div className="col-sm-1 col-md-1 col-lg-1 text-start">
+                  <NumericField value={intMora} onChange={setIntMora} />
+                </div>
                 <div className="col-md-2 mt-2">
                   <br />
-                  <button
-                    type="button"
-                    className="btn btn-primary"
-                    onClick={manejarClick}
-                  >
+                  <button type="button" className="btn btn-primary" onClick={manejarClick}>
                     Buscar
                   </button>
                 </div>
               </div>
-              <div className="row">
-                <div className="col col-sm-12 col-md-6 col-lg-6 col-xl-6 mt-2 border border-2 border rounded">
-                  <FormularioCliente />
-                </div>
-                <div className="col col-sm-12 col-md-6 col-lg-6 col-xl-4 mt-2"></div>
-              </div>
-              <br />
-              <div className="row">
-                <div className="col-sm-12 col-md-12 col-lg-12 col-xl-12 mt-2 mx-auto shadow">
-                  {/* <Card className="">
-                        <Card.Header style={{backgroundColor: '#343A40', color:'#ffff'}}>Facturas</Card.Header>
-                        <div className="col-sm-12 col-md-12 col-lg-12 col-xl-12 mt-2 mx-auto"> */}
-                  {/* </div>
-                      </Card> */}
-                </div>
-              </div>
-              <div style={{ padding: 20 }}>
-                {/* <TablaFacturas
-                  rows={rowsFacturas}
-                  cliente={selectedValue}
-                  fecha={fechaConsultaFacturas}
-                  intmora={intMora}
-                  setFacturaFather={ReciboCajaHandler}
-                  setCuotas={setClienteCuotasRows}
-                />
-                <EstadoClienteTable
-                  rows={clienteCuotasRows}
-                  columns={columns_saldos}
-                />
-                <RecibosCajaTable rows={TableRowsRecibosCaja} /> */}
-                
-                <ClienteEstadoCuenta                  
-                  cliente={selectedValue}
-                  fecha={fechaConsultaFacturas}
-                  intmora={intMora}
-                  ref={tablaFacturasRef}               
-                  />
 
-                {/* <FacturasTablePrueba /> */}
+              <div style={{ padding: 20 }}>
+                <ClienteEstadoCuenta
+                  cliente={selectedValue}
+                  fecha={fechaConsultaFacturas}
+                  intmora={intMora}
+                  ref={tablaFacturasRef}
+                />
               </div>
-              {/* </div> */}
-              {/* <DatePicker label="Basic date picker" /> */}
-              {/* <DatePickerMui /> */}
 
               <ModalTablaClientes
                 show={showModal}

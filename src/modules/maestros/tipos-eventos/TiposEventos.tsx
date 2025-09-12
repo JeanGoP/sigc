@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Button, Modal, Form, Row, Col, Toast } from "react-bootstrap";
+import { Button, Modal, Form, Row, Col } from "react-bootstrap";
 import styled from "styled-components";
 import {
   DynamicTablePagination,
@@ -9,9 +9,10 @@ import { Box } from "@mui/material";
 import IconPickerModal from "./components/IconPicker";
 import ColorPickerModal from "./components/ColorPickerTipoEventos";
 import { toast } from "react-toastify";
-import { current } from "@reduxjs/toolkit";
 import { useAppSelector } from "@app/store/store";
-const API_URL = import.meta.env.VITE_API_URL;
+import { useGuardarTipoEvento } from "@app/services/Maestros/TiposEventos/CrearTipoEvento";
+import { useListarTiposEventos } from "@app/services/Maestros/TiposEventos/ListarTipoEventos";
+import { useEliminarTipoEvento } from "@app/services/Maestros/TiposEventos/EliminarTipoEvento";
 
 const StyledCard = styled.div`
   margin-bottom: 1rem;
@@ -28,93 +29,10 @@ const StyledModal = styled(Modal)`
     border: none;
     box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
   }
-
-  .modal-header {
-    background-color: #f8f9fa;
-    border-bottom: 1px solid #e9ecef;
-    border-radius: 0.5rem 0.5rem 0 0;
-    padding: 1rem 1.5rem;
-
-    .modal-title {
-      font-weight: 600;
-      color: #2c3e50;
-    }
-  }
-
-  .modal-body {
-    padding: 1.5rem;
-  }
-
-  .modal-footer {
-    background-color: #f8f9fa;
-    border-top: 1px solid #e9ecef;
-    border-radius: 0 0 0.5rem 0.5rem;
-    padding: 1rem 1.5rem;
-  }
 `;
 
 const StyledFormGroup = styled(Form.Group)`
   margin-bottom: 1.5rem;
-
-  .form-label {
-    font-weight: 500;
-    color: #2c3e50;
-    margin-bottom: 0.5rem;
-  }
-
-  .form-control {
-    border-radius: 0.375rem;
-    border: 1px solid #ced4da;
-    padding: 0.5rem 0.75rem;
-    transition:
-      border-color 0.15s ease-in-out,
-      box-shadow 0.15s ease-in-out;
-
-    &:focus {
-      border-color: #80bdff;
-      box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
-    }
-  }
-
-  .form-check {
-    margin-top: 0.5rem;
-
-    .form-check-input {
-      margin-top: 0.25rem;
-    }
-
-    .form-check-label {
-      color: #2c3e50;
-      font-weight: 500;
-    }
-  }
-`;
-
-const StyledButton = styled(Button)`
-  padding: 0.5rem 1.25rem;
-  font-weight: 500;
-  border-radius: 0.375rem;
-  transition: all 0.2s ease-in-out;
-
-  &.btn-primary {
-    background-color: #007bff;
-    border-color: #007bff;
-
-    &:hover {
-      background-color: #0069d9;
-      border-color: #0062cc;
-    }
-  }
-
-  &.btn-secondary {
-    background-color: #6c757d;
-    border-color: #6c757d;
-
-    &:hover {
-      background-color: #5a6268;
-      border-color: #545b62;
-    }
-  }
 `;
 
 interface TipoEvento {
@@ -128,16 +46,6 @@ interface TipoEvento {
   requiereFecha: boolean;
   requiereHora: boolean;
 }
-
-interface ApiResponse {
-  success: boolean;
-  message: string;
-  data: TipoEvento[];
-  statusCode: number;
-  errors: string[];
-}
-
-// const URL_API = `${API_URL}/api/v1/TipoEvento`;
 
 const TiposEventos: React.FC = () => {
   const [tiposEventos, setTiposEventos] = useState<TipoEvento[]>([]);
@@ -154,55 +62,37 @@ const TiposEventos: React.FC = () => {
     requiereFecha: false,
     requiereHora: false,
   });
-  const [loading, setLoading] = useState(false);
   const [totalItems, setTotalItems] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [icon, setIcon] = useState<string>("");
-  const [color, setColor] = useState<string>("black"); // Color por defecto
+  const [color, setColor] = useState<string>("black");
+
   const currentUser = useAppSelector((state) => state.auth.currentUser);
 
-  // Efecto para sincronizar el color cuando cambie
-  useEffect(() => {
-    console.log("TiposEventos - Color actualizado:", color);
-  }, [color]);
+  // Hooks API
+  const { loading: savingLoading, guardarTipoEvento } = useGuardarTipoEvento();
+  const { loading: loadingList, listarTiposEventos } = useListarTiposEventos();
+  const { loading: deletingLoading, eliminarTipoEvento } = useEliminarTipoEvento();
 
-  // Función para manejar el cambio de color
-  const handleColorChange = (newColor: string) => {
-    console.log("TiposEventos - handleColorChange llamado con:", newColor);
-    setColor(newColor);
-  };
-
-  // Estados para la paginación
+  // Paginación y búsqueda
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [searchText, setSearchText] = useState("");
 
   const fetchTiposEventos = async () => {
     try {
-      setLoading(true);
       setError(null);
-      const queryParams = new URLSearchParams({
-        page: (page + 1).toString(),
-        pageSize: rowsPerPage.toString(),
+      const result = await listarTiposEventos({
+        page: page + 1,
+        pageSize: rowsPerPage,
         nombre: searchText,
       });
 
-      const response = await fetch(`${API_URL}/api/v1/ListarTiposEvento?${queryParams}`);
-      if (!response.ok) {
-        throw new Error("Error al cargar los tipos de evento");
-      }
-      const result: ApiResponse = await response.json();
-
-      console.log("Result:", result);
-
-      if (result.success) {
+      if (result && result.success) {
         setTiposEventos(result.data);
         setTotalItems(result.data.length);
       } else {
-        // setError(result.message || "Error al cargar los tipos de evento");
-        throw new Error(
-          result.message || "Error al cargar los tipos de evento"
-        );
+        throw new Error(result?.message || "Error al cargar los tipos de evento");
       }
     } catch (error) {
       toast.error(
@@ -210,14 +100,6 @@ const TiposEventos: React.FC = () => {
           ? error.message
           : "Error al cargar los tipos de evento"
       );
-      // setError(
-      //   error instanceof Error
-      //     ? error.message
-      //     : "Error al cargar los tipos de evento"
-      // );
-      console.error("Error al cargar tipos de eventos:", error);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -225,7 +107,6 @@ const TiposEventos: React.FC = () => {
     const timeoutId = setTimeout(() => {
       fetchTiposEventos();
     }, 500);
-
     return () => clearTimeout(timeoutId);
   }, [searchText]);
 
@@ -235,19 +116,17 @@ const TiposEventos: React.FC = () => {
 
   const handleOpenModal = (tipoEvento?: TipoEvento) => {
     if (tipoEvento) {
-      console.log("Editando tipo de evento:", tipoEvento.minutos);
       setTipoEventoSeleccionado(tipoEvento);
       setFormData({
         nombre: tipoEvento.nombre,
         descripcion: tipoEvento.descripcion,
         color: tipoEvento.color || "#2ecc71",
         icono: tipoEvento.icono || "",
-        minutos: tipoEvento.minutos, // Asignar un valor por defecto o el que necesites
+        minutos: tipoEvento.minutos,
         requiereMonto: tipoEvento.requiereMonto,
         requiereFecha: tipoEvento.requiereFecha,
         requiereHora: tipoEvento.requiereHora,
       });
-      // Sincronizar los estados separados
       setColor(tipoEvento.color || "#2ecc71");
       setIcon(tipoEvento.icono || "");
     } else {
@@ -262,13 +141,10 @@ const TiposEventos: React.FC = () => {
         requiereFecha: false,
         requiereHora: false,
       });
-      // Resetear estados separados
       setColor("#2ecc71");
       setIcon("");
     }
     setModalOpen(true);
-    console.log("Color actual:", color);
-    console.log("Icono actual:", icon);
   };
 
   const handleCloseModal = () => {
@@ -279,34 +155,21 @@ const TiposEventos: React.FC = () => {
 
   const handleOnBlurMinutos = (e: React.FocusEvent<HTMLInputElement>) => {
     const value = parseInt(e.target.value, 10);
-
-    if (isNaN(value)) {
-      toast.warning("Advertencia: El tiempo promedio de duración debe ser un número.");
-      setFormData((prev) => ({ ...prev, minutos: 10 })); // Resetear a 0 o a un valor por defecto
+    if (isNaN(value) || value < 10) {
+      toast.warning("El tiempo no puede ser menor a 10 minutos.");
+      setFormData((prev) => ({ ...prev, minutos: 10 }));
       return;
     }
-    if (value < 10) {
-      toast.warning("Advertencia: El tiempo promedio de duración no puede ser menor a 10 minutos.");
-      setFormData((prev) => ({ ...prev, minutos: 10 })); // Resetear a 0 o a un valor por defecto
-      return;
-    } 
     if (value > 30) {
-      toast.warning("Advertencia: El tiempo promedio de duración no puede ser mayor a 30 minutos.");
+      toast.warning("El tiempo no puede ser mayor a 30 minutos.");
       setFormData((prev) => ({ ...prev, minutos: 30 }));
       return;
     }
     setFormData((prev) => ({ ...prev, minutos: value }));
-  }
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
-    // if ( name === "minutos") {
-    //   const numericValue = parseInt(value, 10);
-    //   if (isNaN(numericValue) || numericValue < 10 || numericValue > 30) {
-    //     toast.error("El tiempo promedio de duración debe ser un número entre 10 y 30.");
-    //     return;
-    //   }
-    // }
     setFormData((prev) => ({
       ...prev,
       [name]: type === "checkbox" ? checked : value,
@@ -315,37 +178,21 @@ const TiposEventos: React.FC = () => {
 
   const handleSubmit = async () => {
     try {
-      setLoading(true);
       setError(null);
-
       const payload = {
         id: tipoEventoSeleccionado?.id || 0,
-        idUser: currentUser?.id, // Asignar el ID del usuario actual
+        idUser: Number(currentUser?.id) || 0,
         ...formData,
       };
-
-      console.log("Payload enviado:", payload);
-
-      const response = await fetch(API_URL +"/api/v1/GuardarTipoEvento", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          accept: "*/*",
-        },
-        body: JSON.stringify(payload),
-      });
-      const result = await response.json();
-      if (!response.ok) {
-        console.log("Error en la respuesta:", payload);
-        throw new Error(result.message || "Error al guardar el tipo de evento");
-      }
-
-      console.log("Response:", result);
-      if (result.success) {
+      const response = await guardarTipoEvento(payload);
+      if (response && response.success) {
         await fetchTiposEventos();
         handleCloseModal();
+        toast.success("Tipo de evento guardado exitosamente");
       } else {
-        setError(result.message || "Error al guardar el tipo de evento");
+        const errorMessage = response?.message || "Error al guardar el tipo de evento";
+        setError(errorMessage);
+        toast.error(errorMessage);
       }
     } catch (error) {
       toast.error(
@@ -353,35 +200,18 @@ const TiposEventos: React.FC = () => {
           ? error.message
           : "Error al guardar el tipo de evento"
       );
-
-    } finally {
-      setLoading(false);
     }
   };
 
   const handleDelete = async (id: number) => {
     if (window.confirm("¿Está seguro de eliminar este tipo de evento?")) {
       try {
-        setLoading(true);
         setError(null);
-
-        const response = await fetch(`${API_URL}/${id}`, {
-          method: "DELETE",
-          headers: {
-            accept: "*/*",
-          },
-        });
-
-        const result = await response.json();
-
-        if (!response.ok) {
-          throw new Error("Error: " + result.message);
-        }
-        
-        if (result.success) {
+        const result = await eliminarTipoEvento(id);
+        if (result && result.success) {
           await fetchTiposEventos();
         } else {
-          setError(result.message || "Error al eliminar el tipo de evento");
+          throw new Error(result?.message || "Error al eliminar el tipo de evento");
         }
       } catch (error) {
         toast.error(
@@ -389,9 +219,6 @@ const TiposEventos: React.FC = () => {
             ? error.message
             : "Error al eliminar el tipo de evento"
         );
-        console.error("Error al eliminar tipo de evento:", error);
-      } finally {
-        setLoading(false);
       }
     }
   };
@@ -400,33 +227,6 @@ const TiposEventos: React.FC = () => {
     { id: "id", label: "ID" },
     { id: "nombre", label: "Nombre" },
     { id: "descripcion", label: "Descripción" },
-    {
-      id: "requiereMonto",
-      label: "Requiere Monto",
-      format: (value: boolean) => (
-        <span className={`badge badge-${value ? "success" : "secondary"}`}>
-          {value ? "Sí" : "No"}
-        </span>
-      ),
-    },
-    {
-      id: "requiereFecha",
-      label: "Requiere Fecha",
-      format: (value: boolean) => (
-        <span className={`badge badge-${value ? "success" : "secondary"}`}>
-          {value ? "Sí" : "No"}
-        </span>
-      ),
-    },
-    {
-      id: "requiereHora",
-      label: "Requiere Hora",
-      format: (value: boolean) => (
-        <span className={`badge badge-${value ? "success" : "secondary"}`}>
-          {value ? "Sí" : "No"}
-        </span>
-      ),
-    },
     {
       id: "acciones",
       label: "Acciones",
@@ -467,18 +267,16 @@ const TiposEventos: React.FC = () => {
       <section className="content">
         <div className="container-fluid">
           <StyledCard>
-            <div className="card-header">
-              <div className="d-flex justify-content-between align-items-center">
-                <h3 className="card-title">Lista de Tipos de Eventos</h3>
-                <Button
-                  variant="primary"
-                  onClick={() => handleOpenModal()}
-                  disabled={loading}
-                >
-                  <i className="fas fa-plus mr-2"></i>
-                  Nuevo Tipo de Evento
-                </Button>
-              </div>
+            <div className="card-header d-flex justify-content-between align-items-center">
+              <h3 className="card-title">Lista de Tipos de Eventos</h3>
+              <Button
+                variant="primary"
+                onClick={() => handleOpenModal()}
+                disabled={savingLoading || loadingList}
+              >
+                <i className="fas fa-plus mr-2"></i>
+                Nuevo Tipo de Evento
+              </Button>
             </div>
             <div className="card-body">
               {error && (
@@ -502,20 +300,14 @@ const TiposEventos: React.FC = () => {
       </section>
 
       <StyledModal show={modalOpen} onHide={handleCloseModal} centered>
-        <Modal.Header closeButton={true} {...({} as any)}>
+        <Modal.Header {...({ closeButton: true } as any)}>
           <Modal.Title>
-            {tipoEventoSeleccionado
-              ? "Editar Tipo de Evento"
-              : "Nuevo Tipo de Evento"}
+            {tipoEventoSeleccionado ? "Editar Tipo de Evento" : "Nuevo Tipo de Evento"}
           </Modal.Title>
         </Modal.Header>
         <Modal.Body>
-          {error && (
-            <div className="alert alert-danger" role="alert">
-              {error}
-            </div>
-          )}
           <Form>
+            {/* Nombre */}
             <StyledFormGroup>
               <Form.Label>Nombre</Form.Label>
               <Form.Control
@@ -525,13 +317,12 @@ const TiposEventos: React.FC = () => {
                 onChange={handleInputChange}
                 required
                 maxLength={100}
-                placeholder="Ingrese el nombre del tipo de evento"
-                disabled={loading}
+                placeholder="Ingrese el nombre"
+                disabled={savingLoading}
               />
-              <Form.Text className="text-muted">
-                Máximo 100 caracteres
-              </Form.Text>
             </StyledFormGroup>
+
+            {/* Descripción */}
             <StyledFormGroup>
               <Form.Label>Descripción</Form.Label>
               <Form.Control
@@ -541,140 +332,93 @@ const TiposEventos: React.FC = () => {
                 value={formData.descripcion}
                 onChange={handleInputChange}
                 maxLength={255}
-                placeholder="Ingrese una descripción detallada"
-                disabled={loading}
+                placeholder="Ingrese una descripción"
+                disabled={savingLoading}
               />
-              <Form.Text className="text-muted">
-                Máximo 255 caracteres
-              </Form.Text>
             </StyledFormGroup>
+
+            {/* Minutos */}
             <StyledFormGroup>
-              <Form.Label>Tiempo promedio de duración (Minutos)</Form.Label>
+              <Form.Label>Duración (min)</Form.Label>
               <Form.Control
                 type="number"
                 name="minutos"
                 value={formData.minutos}
                 onChange={handleInputChange}
                 onBlur={handleOnBlurMinutos}
-                // maxLength={255}
                 min={10}
                 max={30}
-                placeholder="Munitos promedio de duración"
-                disabled={loading}
+                placeholder="Minutos"
+                disabled={savingLoading}
               />
-              
-              <Form.Text className="text-muted">
-                Este campo solo será usado cuando el tipo de evento requiera de fecha y hora.
-                Debe ser un número entre 10 y 30 minutos.
-              </Form.Text>
-            </StyledFormGroup>
-            <StyledFormGroup>
-              <Row>
-                <Col xs={6} md={6}>
-                  <Form.Label>Color</Form.Label>
-                  <br />
-                  <ColorPickerModal
-                    value={formData.color}
-                    onChange={(newColor) => {
-                      setFormData(prev => ({ ...prev, color: newColor }));
-                      setColor(newColor);
-                    }}
-                  />
-                </Col>
-                <Col xs={6} md={6}>
-                  <Form.Label>Ícono</Form.Label>
-                  <br />
-                  <IconPickerModal
-                    value={formData.icono}
-                    onChange={(newIcon) => {
-                      setFormData(prev => ({ ...prev, icono: newIcon }));
-                      setIcon(newIcon);
-                    }}
-                    selectedColor={formData.color}
-                  />
-                </Col>
-              </Row>
             </StyledFormGroup>
 
-            <StyledFormGroup>
-              <Form.Check
-                type="switch"
-                id="requiereMonto"
-                label="Requiere Monto"
-                name="requiereMonto"
-                checked={formData.requiereMonto}
-                onChange={handleInputChange}
-                disabled={loading}
-              />
-              <Form.Text className="text-muted">
-                Active esta opción si el tipo de evento requiere un monto
-                asociado
-              </Form.Text>
-            </StyledFormGroup>
-            <StyledFormGroup>
-              <Form.Check
-                type="switch"
-                id="requiereFecha"
-                label="Requiere Fecha"
-                name="requiereFecha"
-                checked={formData.requiereFecha}
-                onChange={handleInputChange}
-                disabled={loading}
-              />
-              <Form.Text className="text-muted">
-                Active esta opción si el tipo de evento requiere una fecha
-                asociada
-              </Form.Text>
-            </StyledFormGroup>
-            <StyledFormGroup>
-              <Form.Check
-                type="switch"
-                id="requiereHora"
-                label="Requiere Hora"
-                name="requiereHora"
-                checked={formData.requiereHora}
-                onChange={handleInputChange}
-                disabled={loading}
-              />
-              <Form.Text className="text-muted">
-                Active esta opción si el tipo de evento requiere una hora
-                asociada
-              </Form.Text>
-            </StyledFormGroup>
+            {/* Color e icono */}
+            <Row>
+              <Col>
+                <Form.Label>Color</Form.Label>
+                <ColorPickerModal
+                  value={formData.color}
+                  onChange={(newColor) => {
+                    setFormData(prev => ({ ...prev, color: newColor }));
+                    setColor(newColor);
+                  }}
+                />
+              </Col>
+              <Col>
+                <Form.Label>Ícono</Form.Label>
+                <IconPickerModal
+                  value={formData.icono}
+                  onChange={(newIcon) => {
+                    setFormData(prev => ({ ...prev, icono: newIcon }));
+                    setIcon(newIcon);
+                  }}
+                  selectedColor={formData.color}
+                />
+              </Col>
+            </Row>
+
+            {/* Switches */}
+            <Form.Check
+              type="switch"
+              id="requiereMonto"
+              label="Requiere Monto"
+              name="requiereMonto"
+              checked={formData.requiereMonto}
+              onChange={handleInputChange}
+              disabled={savingLoading}
+            />
+            <Form.Check
+              type="switch"
+              id="requiereFecha"
+              label="Requiere Fecha"
+              name="requiereFecha"
+              checked={formData.requiereFecha}
+              onChange={handleInputChange}
+              disabled={savingLoading}
+            />
+            <Form.Check
+              type="switch"
+              id="requiereHora"
+              label="Requiere Hora"
+              name="requiereHora"
+              checked={formData.requiereHora}
+              onChange={handleInputChange}
+              disabled={savingLoading}
+            />
           </Form>
         </Modal.Body>
         <Modal.Footer>
-          <StyledButton
-            variant="secondary"
-            onClick={handleCloseModal}
-            disabled={loading}
-          >
-            <i className="fas fa-times mr-2"></i>
+          <Button variant="secondary" onClick={handleCloseModal}>
             Cancelar
-          </StyledButton>
-          <StyledButton
+          </Button>
+          <Button
             variant="primary"
             onClick={handleSubmit}
-            disabled={loading}
+            disabled={savingLoading}
           >
-            {loading ? (
-              <>
-                <span
-                  className="spinner-border spinner-border-sm mr-2"
-                  role="status"
-                  aria-hidden="true"
-                ></span>
-                Procesando...
-              </>
-            ) : (
-              <>
-                <i
-                  className={`fas fa-${tipoEventoSeleccionado ? "save" : "plus"} mr-2`}
-                ></i>
-                {tipoEventoSeleccionado ? "Actualizar" : "Guardar"}
-              </>
-            )}
-          </StyledButton>
+            {savingLoading ? "Procesando..." : tipoEventoSeleccionado ? "Actualizar" : "Guardar"}
+          </Button>
         </Modal.Footer>
       </StyledModal>
     </div>

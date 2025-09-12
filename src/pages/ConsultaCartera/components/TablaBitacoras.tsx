@@ -1,27 +1,27 @@
-import React, { useState, useEffect } from 'react';
-import { Table, Button, Modal, Form, Row, Col, Card, Spinner } from 'react-bootstrap';
-import { obtenerBitacoras, crearBitacora, Bitacora, obtenerResumenBitacora, ResumenBitacora } from '@app/services/BitacoraService';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faStar, faStarHalfAlt, faEye } from '@fortawesome/free-solid-svg-icons';
-import { useAppSelector } from '@app/store/store';
-import { toast } from 'react-toastify';
+import React, { useState, useEffect } from "react";
+import { Table, Button, Modal, Form, Row, Col, Card, Spinner } from "react-bootstrap";
+import { useBitacoraService, Bitacora, ResumenBitacora } from "@app/services/BitacoraService";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faStar, faEye } from "@fortawesome/free-solid-svg-icons";
+import { useAppSelector } from "@app/store/store";
+import { toast } from "react-toastify";
 
 interface Props {
   cliente: string;
 }
 
 export const TablaBitacoras: React.FC<Props> = ({ cliente }) => {
+  const { obtenerBitacoras, crearBitacora, obtenerResumenBitacora, loading, error } =
+    useBitacoraService();
+
   const [bitacoras, setBitacoras] = useState<Bitacora[]>([]);
   const [resumen, setResumen] = useState<ResumenBitacora | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [showComentarioModal, setShowComentarioModal] = useState(false);
   const [comentarioSeleccionado, setComentarioSeleccionado] = useState<Bitacora | null>(null);
-  const [nuevaBitacora, setNuevaBitacora] = useState({
-    comentario: '',
-    calificacion: 5
-  });
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [nuevaBitacora, setNuevaBitacora] = useState({ comentario: "", calificacion: 5 });
+  const [localError, setLocalError] = useState<string | null>(null);
+
   const currentUser = useAppSelector((state) => state.auth.currentUser);
 
   const cargarDatos = async () => {
@@ -31,27 +31,24 @@ export const TablaBitacoras: React.FC<Props> = ({ cliente }) => {
       return;
     }
 
-    setLoading(true);
-    setError(null);
+    setLocalError(null);
 
     try {
       const [bitacorasResponse, resumenResponse] = await Promise.all([
         obtenerBitacoras(cliente),
-        obtenerResumenBitacora(cliente)
+        obtenerResumenBitacora(cliente),
       ]);
 
-      if (bitacorasResponse.success) {
-        setBitacoras(bitacorasResponse.data);
+      if (bitacorasResponse?.success) {
+        setBitacoras(bitacorasResponse.data ?? []);
       }
 
-      if (resumenResponse.success) {
-        setResumen(resumenResponse.data);
+      if (resumenResponse?.success) {
+        setResumen(resumenResponse.data ?? null);
       }
-    } catch (error) {
-      console.error('Error al cargar datos:', error);
-      setError('Error al cargar los datos del cliente');
-    } finally {
-      setLoading(false);
+    } catch (err) {
+      console.error("Error al cargar datos:", err);
+      setLocalError("Error al cargar los datos del cliente");
     }
   };
 
@@ -61,10 +58,10 @@ export const TablaBitacoras: React.FC<Props> = ({ cliente }) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
+    setLocalError(null);
 
     if (!currentUser) {
-      toast.error('No hay usuario logueado. Por favor, inicie sesión nuevamente.');
+      toast.error("No hay usuario logueado. Por favor, inicie sesión nuevamente.");
       return;
     }
 
@@ -74,41 +71,38 @@ export const TablaBitacoras: React.FC<Props> = ({ cliente }) => {
         usuario: currentUser.id,
         fechaHora: new Date().toISOString(),
         comentario: nuevaBitacora.comentario,
-        calificacion: nuevaBitacora.calificacion
+        calificacion: nuevaBitacora.calificacion,
       });
 
-      if (response.success) {
+      if (response?.success) {
         setShowModal(false);
-        setNuevaBitacora({ comentario: '', calificacion: 5 });
-        toast.success('Bitácora creada exitosamente');
-        cargarDatos(); // Recargar todos los datos después de crear una nueva bitácora
+        setNuevaBitacora({ comentario: "", calificacion: 5 });
+        toast.success("Bitácora creada exitosamente");
+        cargarDatos();
       } else {
-        setError(response.errors[0] || 'Error al crear la bitácora');
-        toast.error(response.errors[0] || 'Error al crear la bitácora');
+        const msg = response?.errors?.[0] || "Error al crear la bitácora";
+        setLocalError(msg);
+        toast.error(msg);
       }
-    } catch (error) {
-      setError('Error al crear la bitácora');
-      toast.error('Error al crear la bitácora');
+    } catch {
+      setLocalError("Error al crear la bitácora");
+      toast.error("Error al crear la bitácora");
     }
-  };
-
-  const renderStars = (calificacion: number) => {
-    const stars = [];
-    for (let i = 1; i <= 5; i++) {
-      stars.push(
-        <FontAwesomeIcon
-          key={i}
-          icon={i <= calificacion ? faStar : faStarHalfAlt}
-          style={{ color: i <= calificacion ? '#ffc107' : '#e4e5e9' }}
-        />
-      );
-    }
-    return <div>{stars}</div>;
   };
 
   const handleVerComentario = (bitacora: Bitacora) => {
     setComentarioSeleccionado(bitacora);
     setShowComentarioModal(true);
+  };
+
+  const renderStars = (rating: number) => {
+    return (
+      <>
+        {[...Array(rating)].map((_, i) => (
+          <FontAwesomeIcon key={i} icon={faStar} className="text-warning" />
+        ))}
+      </>
+    );
   };
 
   return (
@@ -117,21 +111,23 @@ export const TablaBitacoras: React.FC<Props> = ({ cliente }) => {
         <div className="text-center py-3">
           <Spinner animation="border" variant="primary" />
         </div>
-      ) : error ? (
+      ) : error || localError ? (
         <div className="alert alert-danger" role="alert">
-          {error}
+          {error || localError}
         </div>
       ) : (
         <>
           {resumen && (
-            <Card className="mb-3" style={{ backgroundColor: '#f8f9fa' }}>
+            <Card className="mb-3" style={{ backgroundColor: "#f8f9fa" }}>
               <Card.Body className="py-2">
                 <Row className="align-items-center">
                   <Col md={4} className="border-end">
                     <div className="text-center">
                       <div className="h4 mb-0">{resumen.promedioCalificacion.toFixed(1)}</div>
                       {renderStars(Math.round(resumen.promedioCalificacion))}
-                      <small className="text-muted d-block">{resumen.totalCalificaciones} calificaciones</small>
+                      <small className="text-muted d-block">
+                        {resumen.totalCalificaciones} calificaciones
+                      </small>
                     </div>
                   </Col>
                   <Col md={8}>
@@ -165,7 +161,7 @@ export const TablaBitacoras: React.FC<Props> = ({ cliente }) => {
                 <th>Usuario</th>
                 <th>Comentario</th>
                 <th>Calificación</th>
-                <th style={{ width: '60px' }}>Ver</th>
+                <th style={{ width: "60px" }}>Ver</th>
               </tr>
             </thead>
             <tbody>
@@ -174,12 +170,14 @@ export const TablaBitacoras: React.FC<Props> = ({ cliente }) => {
                   <td>{new Date(bitacora.fechaHora).toLocaleString()}</td>
                   <td>{bitacora.usuario}</td>
                   <td>
-                    <div style={{ 
-                      maxWidth: '300px', 
-                      whiteSpace: 'nowrap', 
-                      overflow: 'hidden', 
-                      textOverflow: 'ellipsis' 
-                    }}>
+                    <div
+                      style={{
+                        maxWidth: "300px",
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                      }}
+                    >
                       {bitacora.comentario}
                     </div>
                   </td>
@@ -190,7 +188,7 @@ export const TablaBitacoras: React.FC<Props> = ({ cliente }) => {
                       size="sm"
                       onClick={() => handleVerComentario(bitacora)}
                       title="Ver comentario completo"
-                      style={{ padding: '0.25rem 0.5rem' }}
+                      style={{ padding: "0.25rem 0.5rem" }}
                     >
                       <FontAwesomeIcon icon={faEye} />
                     </Button>
@@ -200,8 +198,9 @@ export const TablaBitacoras: React.FC<Props> = ({ cliente }) => {
             </tbody>
           </Table>
 
+          {/* Modal Nueva Bitácora */}
           <Modal show={showModal} onHide={() => setShowModal(false)}>
-            <Modal.Header closeButton={true} {...({} as any)}>
+          <Modal.Header {...({ closeButton: true } as any)}>
               <Modal.Title>Nueva Bitácora</Modal.Title>
             </Modal.Header>
             <Modal.Body>
@@ -212,7 +211,9 @@ export const TablaBitacoras: React.FC<Props> = ({ cliente }) => {
                     as="textarea"
                     rows={3}
                     value={nuevaBitacora.comentario}
-                    onChange={(e) => setNuevaBitacora({ ...nuevaBitacora, comentario: e.target.value })}
+                    onChange={(e) =>
+                      setNuevaBitacora({ ...nuevaBitacora, comentario: e.target.value })
+                    }
                     required
                   />
                 </Form.Group>
@@ -223,9 +224,13 @@ export const TablaBitacoras: React.FC<Props> = ({ cliente }) => {
                     {[1, 2, 3, 4, 5].map((rating) => (
                       <Button
                         key={rating}
-                        variant={nuevaBitacora.calificacion === rating ? 'warning' : 'outline-warning'}
+                        variant={
+                          nuevaBitacora.calificacion === rating ? "warning" : "outline-warning"
+                        }
                         className="me-2"
-                        onClick={() => setNuevaBitacora({ ...nuevaBitacora, calificacion: rating })}
+                        onClick={() =>
+                          setNuevaBitacora({ ...nuevaBitacora, calificacion: rating })
+                        }
                       >
                         {renderStars(rating)}
                       </Button>
@@ -233,9 +238,9 @@ export const TablaBitacoras: React.FC<Props> = ({ cliente }) => {
                   </div>
                 </Form.Group>
 
-                {error && (
+                {localError && (
                   <div className="alert alert-danger" role="alert">
-                    {error}
+                    {localError}
                   </div>
                 )}
 
@@ -251,8 +256,9 @@ export const TablaBitacoras: React.FC<Props> = ({ cliente }) => {
             </Modal.Body>
           </Modal>
 
+          {/* Modal Ver Comentario */}
           <Modal show={showComentarioModal} onHide={() => setShowComentarioModal(false)}>
-            <Modal.Header closeButton={true} {...({} as any)} style={{ backgroundColor: '#f8f9fa', borderBottom: '1px solid #dee2e6' }}>
+          <Modal.Header {...({ closeButton: true } as any)}>
               <Modal.Title>
                 <FontAwesomeIcon icon={faStar} className="text-warning me-2" />
                 Detalle del Comentario
@@ -264,7 +270,9 @@ export const TablaBitacoras: React.FC<Props> = ({ cliente }) => {
                   <div className="d-flex justify-content-between align-items-center mb-4">
                     <div>
                       <div className="text-muted small">Fecha y Hora</div>
-                      <div className="fw-bold">{new Date(comentarioSeleccionado.fechaHora).toLocaleString()}</div>
+                      <div className="fw-bold">
+                        {new Date(comentarioSeleccionado.fechaHora).toLocaleString()}
+                      </div>
                     </div>
                     <div className="text-end">
                       <div className="text-muted small">Usuario</div>
@@ -284,12 +292,12 @@ export const TablaBitacoras: React.FC<Props> = ({ cliente }) => {
 
                   <div>
                     <div className="text-muted small mb-2">Comentario</div>
-                    <div 
-                      className="p-3 bg-light rounded" 
-                      style={{ 
-                        whiteSpace: 'pre-wrap',
-                        maxHeight: '300px',
-                        overflowY: 'auto'
+                    <div
+                      className="p-3 bg-light rounded"
+                      style={{
+                        whiteSpace: "pre-wrap",
+                        maxHeight: "300px",
+                        overflowY: "auto",
                       }}
                     >
                       {comentarioSeleccionado.comentario}
@@ -298,12 +306,8 @@ export const TablaBitacoras: React.FC<Props> = ({ cliente }) => {
                 </div>
               )}
             </Modal.Body>
-            <Modal.Footer style={{ backgroundColor: '#f8f9fa', borderTop: '1px solid #dee2e6' }}>
-              <Button 
-                variant="secondary" 
-                onClick={() => setShowComentarioModal(false)}
-                className="px-4"
-              >
+            <Modal.Footer>
+              <Button variant="secondary" onClick={() => setShowComentarioModal(false)}>
                 Cerrar
               </Button>
             </Modal.Footer>
@@ -312,4 +316,4 @@ export const TablaBitacoras: React.FC<Props> = ({ cliente }) => {
       )}
     </div>
   );
-}; 
+};

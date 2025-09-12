@@ -10,8 +10,6 @@ import { useWindowSize } from '@app/hooks/useWindowSize';
 import { calculateWindowSize } from '@app/utils/helpers';
 import { setWindowSize } from '@app/store/reducers/ui';
 import ReactGA from 'react-ga4';
-// Use Vite's import.meta.env directly for API_URL
-const API_URL = import.meta.env.VITE_API_URL;
 
 import Dashboard from '@pages/Dashboard';
 import Blank from '@pages/Blank';
@@ -38,6 +36,9 @@ import { RendimientoDeAsesores } from '@app/pages/MonitorGestion/RendimientoDeAs
 import Campaigns from './pages/Campaigns/Campaigns';
 import TiposGestiones from './modules/maestros/tipos-gestiones/TiposGestiones';
 import EtiquetasClientes from './modules/maestros/etiquetas-cliente/EtiquetasClientes';
+import { parse } from 'path';
+// Use Vite's import.meta.env directly for API_URL
+const API_URL = import.meta.env.VITE_API_URL;
 
 const { VITE_NODE_ENV } = import.meta.env;
 
@@ -62,16 +63,19 @@ const App = () => {
 
         const parsedData = JSON.parse(userData);
         
+        console.log(parsedData);
         // Crear instancia de User
         const userNew = new User(
           parsedData.id,
           parsedData.username,
           '', // No necesitamos el password
+          parsedData.fullName,
           parsedData.email,
           parsedData.role,
           parsedData.token // Incluimos el token
         );
 
+        console.log(userNew);
         // Validar el token con el backend
         const response = await fetch(`${API_URL}/api/v1/validate-token`, {
           method: 'GET',

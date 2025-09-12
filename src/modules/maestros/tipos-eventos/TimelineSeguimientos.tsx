@@ -14,10 +14,17 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import OverlayTrigger from "react-bootstrap/OverlayTrigger";
 import Tooltip from "react-bootstrap/Tooltip";
+// import {
+//   obtenerTiposEvento,
+//   TipoEvento,
+// } from "@app/services/TipoEventoService";
+
 import {
-  obtenerTiposEvento,
+  useListarTiposEvento,
   TipoEvento,
-} from "@app/services/TipoEventoService";
+} from "@app/services/ConsultaCartera/TipoEventoService";
+import { useValidarEvento } from "@app/services/ConsultaCartera/ValidarEventoNuevoService";
+
 import { convertirEventoAXml } from "@app/pages/ConsultaCartera/functions/convertEventoToXML";
 import { IconMap } from "@app/services/IconMap";
 import { RenderTooltip } from "./components/RenderTooltip";
@@ -25,10 +32,11 @@ import { StringToMoney } from "@app/utils/formattersFunctions";
 import ModalSeguimientoDetalle from "./components/VerMasComponent";
 import { SingleSelect } from "@app/components/singleSelect/singleSelect";
 import {
-  obtenerTiposContacto,
+  useListarTiposContacto,
   TipoContacto,
 } from "@app/services/ObtenerTiposContacto";
 import { toast } from "react-toastify";
+import SpeechToText from "@app/components/SpeechToText/SpeechToText";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -94,6 +102,12 @@ export const TimelineSeguimientos: React.FC<TimelineSeguimientosProps> = ({
   const [nuevoTipoContacto, setNuevoTipoContacto] = React.useState<
     string | number
   >(0);
+
+  const { loading: loadingEventos, listarTiposEvento } = useListarTiposEvento();
+  const { loading: loadingTipoCont, listarTiposContacto } =
+    useListarTiposContacto();
+  const { validarEvento, loading } = useValidarEvento();
+
   const emptyFormEvento: Evento = {
     id: 0,
     tipo: "",
@@ -108,68 +122,77 @@ export const TimelineSeguimientos: React.FC<TimelineSeguimientosProps> = ({
   );
 
   React.useEffect(() => {
-    const cargarTiposEvento = async () => {
+    const cargarTipos = async () => {
       try {
-        const tipos = await obtenerTiposEvento();
-        setTiposEvento(tipos);
-
-        if (tipos.length > 0) {
-          setFormEvento((prev) => ({
-            ...prev,
-            tipo: tipos[0].nombre,
-            id: tipos[0].id,
-          }));
+        const resEventos = await listarTiposEvento();
+        if (resEventos?.success && resEventos.data) {
+          setTiposEvento(resEventos.data);
+          if (resEventos.data.length > 0) {
+            setFormEvento((prev) => ({
+              ...prev,
+              tipo:
+                resEventos.data && resEventos.data[0]
+                  ? resEventos.data[0].nombre
+                  : "",
+              id:
+                resEventos.data && resEventos.data[0]
+                  ? resEventos.data[0].id
+                  : 0,
+            }));
+          }
         }
 
-        const tiposCon = await obtenerTiposContacto("");
-        // console.log("Tipos de evento cargados: ", tiposCon);
-        setTiposContacto(tiposCon);
+        // contactos
+        const resContactos = await listarTiposContacto("w");
+        if (resContactos?.success && resContactos.data) {
+          setTiposContacto(resContactos.data);
+        }
       } catch (error) {
-        console.error("Error al cargar tipos de evento: ", error);
+        console.error("Error cargando tipos:", error);
       }
     };
-    cargarTiposEvento();
-  }, []);
+    cargarTipos();
+  }, [listarTiposEvento, listarTiposContacto]);
 
   function setFormCampo<K extends keyof Evento>(campo: K, valor: Evento[K]) {
     setFormEvento((prev) => ({ ...prev, [campo]: valor }));
   }
 
-  async function validarEventoBackend(
-    e: Evento
-  ): Promise<{ ok: boolean; message?: string }> {
-    const url = `${API_URL}/api/v1/validar-evento`;
-    const tipoObj = tiposEvento.find(
-      (t) => t.nombre === e.tipo || t.id === e.id
-    );
-    // normalizar fecha a YYYY/MM/DD
-    const fechaApi = e.fecha //? e.fecha.replace(/-/g, "/") : "";
-    const payload = {
-      tipo: tipoObj?.id ?? e.id ?? 0,
-      fecha: fechaApi || null,
-      hora: e.hora ?? null,
-      monto: typeof e.valor === "number" ? e.valor : 0,
-      idUsuario: contextoEvento?.idUsuario ?? null,
-      cliente: contextoEvento?.cliente ?? null,
-      factura: contextoEvento?.factura ?? null,
-      cuenta: contextoEvento?.cuenta ?? null,
-    };
+  // async function validarEventoBackend(
+  //   e: Evento
+  // ): Promise<{ ok: boolean; message?: string }> {
+  //   const url = `${API_URL}/api/v1/validar-evento`;
+  //   const tipoObj = tiposEvento.find(
+  //     (t) => t.nombre === e.tipo || t.id === e.id
+  //   );
+  //   // normalizar fecha a YYYY/MM/DD
+  //   const fechaApi = e.fecha; //? e.fecha.replace(/-/g, "/") : "";
+  //   const payload = {
+  //     tipo: tipoObj?.id ?? e.id ?? 0,
+  //     fecha: fechaApi || null,
+  //     hora: e.hora ?? null,
+  //     monto: typeof e.valor === "number" ? e.valor : 0,
+  //     idUsuario: contextoEvento?.idUsuario ?? null,
+  //     cliente: contextoEvento?.cliente ?? null,
+  //     factura: contextoEvento?.factura ?? null,
+  //     cuenta: contextoEvento?.cuenta ?? null,
+  //   };
 
-    try {
-      const resp = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const json = await resp.json();
-      if (json?.success) return { ok: true };
-      toast.error(json.message || "Error, valide los campos.");
-      return { ok: false, message: json?.message || "Validación fallida." };
-    } catch (err: any) {
-      toast.error(err?.message || "Error, valide los campos.");
-      return { ok: false, message: err?.message || "Error de red al validar." };
-    }
-  }
+  //   try {
+  //     const resp = await fetch(url, {
+  //       method: "POST",
+  //       headers: { "Content-Type": "application/json" },
+  //       body: JSON.stringify(payload),
+  //     });
+  //     const json = await resp.json();
+  //     if (json?.success) return { ok: true };
+  //     toast.error(json.message || "Error, valide los campos.");
+  //     return { ok: false, message: json?.message || "Validación fallida." };
+  //   } catch (err: any) {
+  //     toast.error(err?.message || "Error, valide los campos.");
+  //     return { ok: false, message: err?.message || "Error de red al validar." };
+  //   }
+  // }
 
   const handleVerMas = (seguimiento: Seguimiento) => {
     setSeguimientoActivo(seguimiento);
@@ -224,11 +247,33 @@ export const TimelineSeguimientos: React.FC<TimelineSeguimientosProps> = ({
       eventoEnviar.tipo = tiposEvento[0].nombre;
     }
 
-    const { ok, message } = await validarEventoBackend(eventoEnviar);
-    if (!ok) {
-      setErrorValidacion(message || "No se pudo validar el evento.");
+    try {
+      const resp = await validarEvento({
+        tipo: eventoEnviar.id,
+        fecha: eventoEnviar.fecha || null,
+        hora: eventoEnviar.hora ?? null,
+        monto: typeof eventoEnviar.valor === "number" ? eventoEnviar.valor : 0,
+        idUsuario: contextoEvento?.idUsuario ?? null,
+        cliente: contextoEvento?.cliente ?? null,
+        factura: contextoEvento?.factura ?? null,
+        cuenta: contextoEvento?.cuenta ?? null,
+      });
+
+      if (!resp || !resp.success) {
+        setErrorValidacion(resp?.message || "No se pudo validar el evento.");
+        toast.error(resp?.message || "Error, valide los campos.");
+        return;
+      }
+    } catch (err: any) {
+      setErrorValidacion(err?.message || "Error al validar.");
+      toast.error(err?.message || "Error al validar.");
       return;
     }
+
+    // if (!ok) {
+    //   setErrorValidacion(message || "No se pudo validar el evento.");
+    //   return;
+    // }
 
     // Validado: agregamos
     setNuevoEventos((evts) => [...evts, eventoEnviar]);
@@ -241,11 +286,34 @@ export const TimelineSeguimientos: React.FC<TimelineSeguimientosProps> = ({
 
     const eventoEnviar = { ...formEvento };
 
-    const { ok, message } = await validarEventoBackend(eventoEnviar);
-    if (!ok) {
-      setErrorValidacion(message || "No se pudo validar el evento.");
+    try {
+      const resp = await validarEvento({
+        tipo: eventoEnviar.id,
+        fecha: eventoEnviar.fecha || null,
+        hora: eventoEnviar.hora ?? null,
+        monto: typeof eventoEnviar.valor === "number" ? eventoEnviar.valor : 0,
+        idUsuario: contextoEvento?.idUsuario ?? null,
+        cliente: contextoEvento?.cliente ?? null,
+        factura: contextoEvento?.factura ?? null,
+        cuenta: contextoEvento?.cuenta ?? null,
+      });
+
+      if (!resp || !resp.success) {
+        setErrorValidacion(resp?.message || "No se pudo validar el evento.");
+        toast.error(resp?.message || "Error, valide los campos.");
+        return;
+      }
+    } catch (err: any) {
+      setErrorValidacion(err?.message || "Error al validar.");
+      toast.error(err?.message || "Error al validar.");
       return;
     }
+
+
+    // if (!ok) {
+    //   setErrorValidacion(message || "No se pudo validar el evento.");
+    //   return;
+    // }
 
     setNuevoEventos((evts) =>
       evts.map((evt, i) => (i === editIndex ? eventoEnviar : evt))
@@ -447,7 +515,30 @@ export const TimelineSeguimientos: React.FC<TimelineSeguimientosProps> = ({
             <label style={{ fontWeight: 500, marginBottom: 8 }}>
               Texto del seguimiento
             </label>
+            {/* <div className="p-4"> */}
+            <Row>
+              <Col xs={12} sm={12} md={12} lg={12} xl={1}>
+                <SpeechToText
+                  value={nuevoTexto}
+                  onResult={(nuevoTexto) => setNuevoTexto(nuevoTexto)}
+                />
+              </Col>
+              <Col xs={12} sm={12} md={12} lg={12} xl={1}>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => setNuevoTexto("")}
+                >
+                  Limpiar
+                </Button>
+              </Col>
+            </Row>
+            <br />
+
+            {/* <p className="mt-4 border p-2 rounded">📝 {nuevoTexto}</p> */}
+            {/*</div>*/}
             <textarea
+              id="textoSeguimiento"
               className="form-control"
               rows={3}
               value={nuevoTexto}
