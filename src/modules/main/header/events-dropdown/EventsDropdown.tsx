@@ -603,7 +603,6 @@ const DEFAULT_ACTIVE_WINDOW_MINUTES = 3;
 const EventsDropdown: React.FC = () => {
   const [t] = useTranslation();
   const currentUser = useAppSelector((state) => state.auth.currentUser);
-
   /* Tiempo "ahora" */
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
