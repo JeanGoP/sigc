@@ -118,8 +118,7 @@ export const ConsultaCartera: React.FC = () => {
   const tablaFacturasRef = useRef<FetchFacturasRef>(null);
   const [checkIncluirSaldosCero, setCheckIncluirSaldosCero] = useState(false);
   const [fechaConsultaFacturas, setFechaConsultaFacturas] = useState(
-    // new Date().toISOString().split("T")[0]
-    "2025-08-31"
+    new Date().toISOString().split("T")[0]
   );
   const [filtroGenericoStringPorTipo, setFiltroGenericoStringPorTipo] =
     useState<string>("");
