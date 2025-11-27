@@ -72,6 +72,17 @@ import { toast } from "react-toastify";
 import { EtiquetasClienteGestion } from "./components/EtiquetasClientesGestion";
 import { useConsultaCarteraService } from "@app/services/ConsultaCartera/ConsultaCarteraServices";
 import { useLocation, useNavigate } from "react-router-dom";
+import { FiltrosCarteras } from "./components/FiltrosCarteras/FiltrosCarteras";
+import {
+  existsInLocalStorage,
+  getSessionValue,
+  loadFiltrosCarteras,
+  saveExpecificFiltroProperty,
+  saveFiltrosCarteras,
+} from "@app/utils/localStorageHandler";
+import { FiltrosFacturasCarteraModel } from "@app/models/otros/FiltrosFacturasCarteraModel";
+import { StickyNote } from "./components/StickyNote/StickyNote";
+// import { ScoringVisual } from "./components/score";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -118,8 +129,10 @@ export const ConsultaCartera: React.FC = () => {
   const tablaFacturasRef = useRef<FetchFacturasRef>(null);
   const [checkIncluirSaldosCero, setCheckIncluirSaldosCero] = useState(false);
   const [fechaConsultaFacturas, setFechaConsultaFacturas] = useState(
-    new Date().toISOString().split("T")[0]
+    new Date("2025-04-30").toISOString().split("T")[0]
   );
+  const [MenuFiltrosState, setMenuFiltrosState] = useState(false);
+  const [unsavedFilttersChanges, useUnsavedFilttersChanges] = useState(false);
   const [filtroGenericoStringPorTipo, setFiltroGenericoStringPorTipo] =
     useState<string>("");
   const [checkSinGestionDias, setCheckSinGestionDias] = useState(false);
@@ -134,9 +147,18 @@ export const ConsultaCartera: React.FC = () => {
     { label: "Evento C", value: "eventoC" },
   ]);
 
-  const { loading: loadingCliente, error: errorCliente, obtenerCliente } = useClienteService();
+  if (!existsInLocalStorage("filtros_carteras")) {
+    const obj = new FiltrosFacturasCarteraModel();
+    saveFiltrosCarteras(obj);
+  }
 
-    const {
+  const {
+    loading: loadingCliente,
+    error: errorCliente,
+    obtenerCliente,
+  } = useClienteService();
+
+  const {
     buscarGestiones,
     GestionarFactura,
     loadingBuscar,
@@ -164,6 +186,19 @@ export const ConsultaCartera: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<string>("info");
+  const hasFullSelection = Boolean(
+    registroSeleccionado?.cliente &&
+      registroSeleccionado?.numefac &&
+      registroSeleccionado?.cuenta
+  );
+
+  const handlnChangeFechaFiltro = (date: string | null) => {
+    if (date) {
+      // const isoString = date.toISOString().split("T")[0];
+      saveExpecificFiltroProperty("fechaConsulta", date);
+      setFechaConsultaFacturas(date);
+    }
+  };
 
   // Leer query params para auto-seleccionar cliente/factura/cuenta
   useEffect(() => {
@@ -185,14 +220,17 @@ export const ConsultaCartera: React.FC = () => {
       (async () => {
         const rows = await fetchFacturas();
         const row = rows.find((r: any) =>
-          factura ? String(r.numefac) === String(factura)
-          : cuenta ? String(r.cuenta) === String(cuenta)
-          : identificacionCliente ? String(r.cliente) === String(identificacionCliente)
-          : false
+          factura
+            ? String(r.numefac) === String(factura)
+            : cuenta
+              ? String(r.cuenta) === String(cuenta)
+              : identificacionCliente
+                ? String(r.cliente) === String(identificacionCliente)
+                : false
         );
 
         if (row) {
-          handleSeleccionarRegistro(row);
+          handleSeleccionarFactura(row);
           setActiveTab("seguimiento");
           if (row.cliente) cargarInfoCliente(String(row.cliente));
         } else if (identificacionCliente) {
@@ -205,13 +243,14 @@ export const ConsultaCartera: React.FC = () => {
             tablaFacturasRef.current.fetchFacturas();
           }
           cargarInfoCliente(identificacionCliente);
-          setActiveTab("seguimiento");
-          // Generar un registro provisional para habilitar 100% la UI
-          setRegistroSeleccionado({
-            cliente: identificacionCliente,
-            numefac: factura || "",
-            cuenta: cuenta || "",
-          });
+          if (factura || cuenta) {
+            handleSeleccionarFactura({
+              cliente: identificacionCliente,
+              numefac: factura || "",
+              cuenta: cuenta || "",
+            });
+            setActiveTab("seguimiento");
+          }
         }
       })();
     }
@@ -272,19 +311,21 @@ export const ConsultaCartera: React.FC = () => {
     setTablaLoading(true);
     let resultRows: any[] = [];
     try {
+      const storedRaw =
+        loadFiltrosCarteras() as Partial<FiltrosFacturasCarteraModel> | null;
+      const filtros = new FiltrosFacturasCarteraModel(storedRaw ?? undefined);
+
       const params = {
         fecha: fechaConsultaFacturas,
-        incluirCarterasSaldoCero: checkIncluirSaldosCero,
-        user: "usuario",
-        forUser: checkSoloAsignadas,
-        cuenta: "",
-        sinGestionDias: checkSinGestionDias ? sinGestionDias : "",
-        edad: seleccionEdades,
-        filtroEventos: checkSoloEventosPendientes
-          ? eventosSeleccionados.join(",")
-          : "",
-        filtroPorVencimiento: filtroGenericoStringPorTipo,
-        filtroPorEtiqueta: 0,
+        incluirCarterasSaldoCero: filtros.checkIncluirSaldosCero,
+        user: currentUser?.id,
+        forUser: filtros.checkSoloAsignadas,
+        cuenta: filtros.cuenta ?? "",
+        sinGestionDias: filtros.sinGestionDias,
+        edad: filtros.filtroEdadMora,
+        filtroEventos: filtros.tipoEvento,
+        filtroPorVencimiento: filtros.filtroPorVencimiento ?? "",
+        filtroPorEtiqueta: filtros.etiqueta,
         page: tablaPage === 0 ? 1 : tablaPage,
         numPage: tablaRowsPerPage,
         filter: tablaSearch,
@@ -305,8 +346,9 @@ export const ConsultaCartera: React.FC = () => {
   };
   // Función para cargar las gestiones
   const cargarGestiones = async () => {
-    if (!registroSeleccionado) return;
+    if (!hasFullSelection) return;
 
+    console.log("Cargando gestiones para:", registroSeleccionado);
     try {
       const response = await buscarGestiones(
         registroSeleccionado.numefac,
@@ -393,15 +435,18 @@ export const ConsultaCartera: React.FC = () => {
 
   // Cargar gestiones cuando se selecciona un registro
   useEffect(() => {
-    if (registroSeleccionado) {
+    if (hasFullSelection) {
       cargarGestiones();
     }
-  }, [registroSeleccionado]);
+  }, [hasFullSelection, registroSeleccionado]);
 
   const handleNuevoSeguimiento = async (
     seguimiento: Omit<Seguimiento, "id" | "usuario" | "fecha" | "hora">
   ): Promise<boolean> => {
-    if (!registroSeleccionado) return false;
+    if (!hasFullSelection) {
+      toast.error("Debe seleccionar un cliente, factura y cuenta.");
+      return false;
+    }
 
     if (!currentUser) {
       toast.error(
@@ -460,21 +505,20 @@ export const ConsultaCartera: React.FC = () => {
 
   // Función para cargar la información del cliente
   const cargarInfoCliente = async (idCliente: string) => {
-  try {
-    console.log("[ConsultaCartera] cargando info cliente:", idCliente);
-    const response = await obtenerCliente(idCliente);
-    console.log("[ConsultaCartera] respuesta obtenerCliente:", response);
-    if (response?.success) {
-      setClienteInfo(response.data ?? null);
-    } else {
+    try {
+      console.log("[ConsultaCartera] cargando info cliente:", idCliente);
+      const response = await obtenerCliente(idCliente);
+      console.log("[ConsultaCartera] respuesta obtenerCliente:", response);
+      if (response?.success) {
+        setClienteInfo(response.data ?? null);
+      } else {
+        setClienteInfo(null);
+      }
+    } catch (error) {
+      console.error("Error al cargar información del cliente:", error);
       setClienteInfo(null);
     }
-  } catch (error) {
-    console.error("Error al cargar información del cliente:", error);
-    setClienteInfo(null);
-  }
-};
-
+  };
 
   // Actualizar la información del cliente cuando se selecciona un registro
   useEffect(() => {
@@ -504,12 +548,37 @@ export const ConsultaCartera: React.FC = () => {
   const limpiarSeleccion = () => {
     setRegistroSeleccionado(null);
     setSelectedValue("");
+    setActiveTab("info");
+  };
+
+  const handleSeleccionarFactura = (row: any) => {
+    const seleccionado = {
+      cliente:
+        row?.cliente ??
+        row?.CLIENTE ??
+        row?.IDCLIPRV ??
+        selectedValue ??
+        "",
+      numefac: row?.numefac ?? row?.NUMEFAC ?? row?.factura ?? "",
+      cuenta: row?.cuenta ?? row?.CUENTA ?? "",
+    };
+
+    setRegistroSeleccionado(seleccionado);
+    if (seleccionado.cliente) {
+      setSelectedValue(seleccionado.cliente);
+    }
+    console.log(
+      "[ConsultaCartera] registroSeleccionado desde Ver:",
+      seleccionado
+    );
   };
 
   // Función para manejar la selección de un registro
   const handleSeleccionarRegistro = (row: any) => {
-    setRegistroSeleccionado(row);
-    setSelectedValue(row.cliente || "");
+    const clienteId = row?.cliente || "";
+    setSelectedValue(clienteId);
+    setRegistroSeleccionado(null);
+    setActiveTab("info");
   };
 
   React.useEffect(() => {
@@ -530,18 +599,55 @@ export const ConsultaCartera: React.FC = () => {
             cursor: "pointer",
             padding: 0,
             color: "#1565c0",
+            // color: row.colorEstadoGestion,
             fontSize: 18,
           }}
           title="Buscar"
-          onClick={() => handleSeleccionarRegistro(row)}
+          onClick={() => {
+            try {
+              if (!row || typeof row !== "object") {
+                toast.error("Registro inválido");
+                console.error("Registro inválido:", row);
+                return;
+              }
+              // opcional: chequear claves importantes
+              if (!row.numefac && !row.cliente && !row.cuenta) {
+                toast.warn("Registro sin información esencial");
+                // aún puedes setearlo, o decidir no hacerlo
+              }
+              handleSeleccionarRegistro(row);
+            } catch (err) {
+              console.error("Error al seleccionar registro:", err);
+              toast.error("Error al seleccionar registro");
+            }
+          }}
         >
           <i className="fas fa-search" />
         </button>
       ),
     },
     { id: "cliente", label: "Cliente" },
-    { id: "RAZONCIAL", label: "Razón Social" },
-    { id: "numefac", label: "Factura" },
+    {
+      id: "estadoGestion",
+      label: "",
+      format: (value, row) => (
+        <span
+          style={{
+            background: row.colorEstadoGestion || "#eee",
+            display: "inline-block",
+            width: "14px",
+            height: "14px",
+            borderRadius: "50%",
+            margin: "auto",
+          }}
+        ></span>
+      ),
+    },
+    {
+      id: "RAZONCIAL",
+      label: "Razón Social",
+    },
+    // { id: "numefac", label: "Factura" },
     { id: "cuenta", label: "Cuenta" },
     {
       id: "EDAD",
@@ -580,8 +686,8 @@ export const ConsultaCartera: React.FC = () => {
   const handlePrevisualizarCorreo = () => setShowModalCorreo(true);
   const handleCerrarModalCorreo = () => setShowModalCorreo(false);
   const handleEnviarCorreo = async () => {
-    if (!registroSeleccionado) {
-      toast.error("Debe seleccionar un cliente y una factura");
+    if (!hasFullSelection) {
+      toast.error("Debe seleccionar un cliente, factura y cuenta");
       return;
     }
 
@@ -611,6 +717,11 @@ export const ConsultaCartera: React.FC = () => {
     }
   };
 
+  const handleMenuFiltrosStateChange = (): void => {
+    setMenuFiltrosState(!MenuFiltrosState);
+    fetchFacturas();
+  };
+
   return (
     <div>
       {/* <ContentHeader title="Consulta de Cartera" /> */}
@@ -623,275 +734,128 @@ export const ConsultaCartera: React.FC = () => {
               }`}
             >
               <div className="d-flex justify-content-between align-items-center p-2">
-                {collapsed == true ? "" : <strong>Clientes</strong>}
-                <button
-                  className="btn btn-sm btn-outline-primary"
-                  onClick={() => collapseHandler()}
-                >
-                  {collapsed ? (
-                    <FontAwesomeIcon icon={faArrowRight} />
-                  ) : (
-                    <FontAwesomeIcon icon={faArrowLeft} />
-                  )}
-                </button>
-              </div>
-              <div
-                className="xd"
-                style={{ display: collapsed ? "none" : "block" }}
-              >
-                <Accordion defaultActiveKey="0">
-                  <Accordion defaultActiveKey="0">
-                    <Card>
-                      <Accordion.Toggle as={Button} variant="link" eventKey="0">
-                        Filtros
-                      </Accordion.Toggle>
-                      <Accordion.Collapse eventKey="0">
-                        <Card.Body>
-                          <Form>
-                            {/* <Form.Group className="mb-3">
-                              <Form.Label>Nombre del Cliente</Form.Label>
-                              <Form.Control
-                                type="text"
-                                placeholder="Buscar por nombre"
-                              />
-                            </Form.Group>
-                            <Form.Group className="mb-3">
-                              <Form.Label>Identificación</Form.Label>
-                              <Form.Control
-                                type="text"
-                                placeholder="Número de identificación"
-                              />
-                            </Form.Group> */}
-
-                            <Form>
-                              <div className="filtro-relacionado mb-3">
-                                <div className="d-flex align-items-center mb-2 mt-2">
-                                  <Form.Check
-                                    type="switch"
-                                    id="custom-switch"
-                                    label={
-                                      <span className="ms-2">
-                                        Solo Carteras saldo cero
-                                      </span>
-                                    }
-                                    checked={checkIncluirSaldosCero}
-                                    onChange={handleCheckIncluirSaldosCero}
-                                  />
-                                </div>
-                                <div className="d-flex align-items-center mb-2 mt-2">
-                                  <Form.Check
-                                    type="switch"
-                                    id="switch-solo-asignadas"
-                                    label={
-                                      <span className="ms-2">
-                                        Mostrar solo carteras asignadas a mi
-                                        usuario
-                                      </span>
-                                    }
-                                    checked={checkSoloAsignadas}
-                                    onChange={handleCheckSoloAsignadas}
-                                  />
-                                </div>
-                                <div className="d-flex align-items-center mb-2 mt-2">
-                                  <Form.Check
-                                    type="switch"
-                                    id="switch-sin-gestion"
-                                    label={
-                                      <span className="ms-2">
-                                        Filtrar por sin gestión en X días
-                                      </span>
-                                    }
-                                    checked={checkSinGestionDias}
-                                    onChange={handleCheckSinGestionDias}
-                                  />
-                                </div>
-                                <div
-                                  style={{
-                                    width: 120,
-                                    display: checkSinGestionDias
-                                      ? "block"
-                                      : "none",
-                                    marginLeft: "2.2rem",
-                                    marginBottom: "1rem",
-                                  }}
-                                >
-                                  <NumericField
-                                    value={sinGestionDias}
-                                    onChange={setSinGestionDias}
-                                  />
-                                </div>
-                                <div className="d-flex align-items-center mb-2 mt-2">
-                                  <Form.Check
-                                    type="switch"
-                                    id="switch-solo-eventos-pendientes"
-                                    label={
-                                      <span className="ms-2">
-                                        Mostrar solo Carteras con eventos
-                                        pendientes
-                                      </span>
-                                    }
-                                    checked={checkSoloEventosPendientes}
-                                    onChange={(e) =>
-                                      setCheckSoloEventosPendientes(
-                                        e.target.checked
-                                      )
-                                    }
-                                  />
-                                </div>
-                                {checkSoloEventosPendientes &&
-                                  eventosOpciones.length > 1 && (
-                                    <div
-                                      style={{
-                                        marginLeft: "2.2rem",
-                                        marginBottom: "1rem",
-                                      }}
-                                    >
-                                      <Form.Label>
-                                        Opciones de eventos a incluir
-                                      </Form.Label>
-                                      <Select
-                                        isMulti
-                                        options={eventosOpciones}
-                                        value={
-                                          isAllSelected
-                                            ? eventosOpciones
-                                            : eventosOpciones.filter((opt) =>
-                                                opt.value === "todas"
-                                                  ? false
-                                                  : eventosSeleccionados.includes(
-                                                      opt.value
-                                                    )
-                                              )
-                                        }
-                                        onChange={handleSelectEventos}
-                                        placeholder="Selecciona eventos..."
-                                        closeMenuOnSelect={false}
-                                      />
-                                    </div>
-                                  )}
-                              </div>
-                              <div className="row">
-                                {/* <div className="row">
-                              <div className="col">
-                                <Button variant="primary" className="mb-2">
-                                  Consultar
-                                </Button>
-                              </div>
-                              <div className="col">
-                                <Button variant="secondary" className="mb-2">
-                                  Limpiar
-                                </Button>
-                              </div>
-                            </div> */}
-                                <div className="col">
-                                  <SingleSelect
-                                    options={opciones_edades}
-                                    selectedValue={seleccionEdades}
-                                    onChange={(val) =>
-                                      setSeleccionEdades(val as string)
-                                    }
-                                    label="Filtrar por edad"
-                                  />
-                                </div>
-                                <div className="col">
-                                  <SingleSelect
-                                    options={opciones_tipos_filtro}
-                                    selectedValue={seleccionTipoFiltro}
-                                    onChange={(val) =>
-                                      setSeleccionTipoFiltro(val as string)
-                                    }
-                                    label="Tipo de Filtro"
-                                  />
-                                </div>
-                              </div>
-                              {seleccionTipoFiltro === "campaña" && (
-                                <Row>
-                                  <Col md={6}>
-                                    <Form.Group controlId="nombre">
-                                      <Form.Label>Campaña</Form.Label>
-                                      <Form.Control
-                                        type="text"
-                                        placeholder="Ingrese nombre"
-                                      />
-                                    </Form.Group>
-                                  </Col>
-                                </Row>
-                              )}
-                              {seleccionTipoFiltro === "vencimiento" && (
-                                <Row>
-                                  <Col md={6}>
-                                    <Form.Group controlId="nombre">
-                                      <CustomDatePicker
-                                        selectedDate={
-                                          filtroGenericoStringPorTipo
-                                        }
-                                        label="Fecha de Vencimiento"
-                                        onDateChange={(dateStr) =>
-                                          setFiltroGenericoStringPorTipo(
-                                            dateStr
-                                          )
-                                        }
-                                      />
-                                    </Form.Group>
-                                  </Col>
-                                </Row>
-                              )}
-                            </Form>
-                          </Form>
-                        </Card.Body>
-                      </Accordion.Collapse>
-                    </Card>
-                  </Accordion>
-                </Accordion>
-                {/* <DynamicTable columns={columns} rows={rows} /> */}
-
-                <div className="d-flex align-items-center mb-2">
+                {/* {collapsed == true ? "" : <strong>Clientes</strong>} */}
+                <div className="d-flex align-items-center">
                   <Form.Control
                     type="text"
                     placeholder="Buscar"
                     value={tablaSearch}
                     onChange={(e) => setTablaSearch(e.target.value)}
-                    style={{ maxWidth: 200, marginRight: 8 }}
-                    // size="sm"
+                    style={{
+                      maxWidth: 200,
+                      marginRight: 8,
+                      display: collapsed || MenuFiltrosState ? "none" : "block",
+                    }}
                   />
                   <Button
                     variant="primary"
                     // size="sm"
                     onClick={fetchFacturas}
                     disabled={tablaLoading}
-                    style={{ minWidth: 40 }}
+                    style={{
+                      minWidth: 40,
+                      display: collapsed || MenuFiltrosState ? "none" : "block",
+                    }}
                     title="Consultar"
                   >
                     <i className="fas fa-search" />
                   </Button>
                 </div>
+                <div className="d-flex align-items-center">
+                  <Button
+                    variant={!MenuFiltrosState ? "outline-primary" : "primary"}
+                    // size="sm"
+                    onClick={handleMenuFiltrosStateChange}
+                    style={{
+                      minWidth: 40,
+                      margin: "0 10px",
+                      justifySelf: "center",
+                      display: collapsed ? "none" : "block",
+                    }}
+                    title="Consultar"
+                  >
+                    <i className="fas fa-filter" />
+                  </Button>
+                  <button
+                    className={
+                      "btn " +
+                      (collapsed ? "btn-sm" : "btn") +
+                      " btn-outline-primary"
+                    }
+                    onClick={() => collapseHandler()}
+                  >
+                    {collapsed ? (
+                      <FontAwesomeIcon icon={faArrowRight} />
+                    ) : (
+                      <FontAwesomeIcon icon={faArrowLeft} />
+                    )}
+                  </button>
+                </div>
+              </div>
+              <div
+                className="xd"
+                style={{ display: collapsed ? "none" : "block" }}
+              >
+                {/* <DynamicTable columns={columns} rows={rows} /> */}
 
-                <DynamicTablePagination
-                  columns={columns}
-                  rows={tablaRows}
-                  searchText={tablaSearch}
-                  onSearchChange={setTablaSearch}
-                  rowsPerPage={tablaRowsPerPage}
-                  onRowsPerPageChange={setTablaRowsPerPage}
-                  rowPageOptions={[50, 100, 150, 200]}
-                  withSearch={false}
-                  maxHeight={"80vh"}
-                  page={tablaPage}
-                  onPageChange={setTablaPage}
-                />
+                {/* Tabla donde esta ubicada la lupa de buscar en la que aparece el error de que se parte la ui */}
+                {MenuFiltrosState ? (
+                  <div>
+                    <FiltrosCarteras
+                      state={MenuFiltrosState}
+                      onApply={handleMenuFiltrosStateChange}
+                    />
+                  </div>
+                ) : (
+                  <DynamicTablePagination
+                    columns={columns}
+                    rows={tablaRows}
+                    searchText={tablaSearch}
+                    onSearchChange={setTablaSearch}
+                    rowsPerPage={tablaRowsPerPage}
+                    onRowsPerPageChange={setTablaRowsPerPage}
+                    rowPageOptions={[50, 100, 150, 200]}
+                    withSearch={false}
+                    maxHeight={"80vh"}
+                    page={tablaPage}
+                    onPageChange={setTablaPage}
+                    selectedPredicate={(row) =>
+                      Boolean(
+                        hasFullSelection &&
+                          row?.cliente &&
+                          registroSeleccionado &&
+                          String(row.cliente) === String(registroSeleccionado.cliente) &&
+                          String(row.cuenta ?? "") === String(registroSeleccionado.cuenta ?? "")
+                      )
+                    }
+                  />
+                )}
                 {/* {!collapsed && <DynamicTable columns={columns} rows={rows} />} */}
               </div>
             </div>
 
             <div className="col main-panel">
-              <Tabs activeKey={activeTab} onSelect={(k) => setActiveTab(k || "info")} id="tabs" className="mb-3">
+              <Tabs
+                activeKey={activeTab}
+                onSelect={(k) => setActiveTab(k || "info")}
+                id="tabs"
+                className="mb-3"
+              >
+                {/* {registroSeleccionado?.numefac && ( */}
+                  <Tab
+                    eventKey="facturaActual"
+                    title= {<strong>{registroSeleccionado?.numefac || "No seleccionado"}</strong>}
+                    // title={`${registroSeleccionado.numefac}`}
+                    disabled
+                  />
+                {/* )} */}
                 <Tab eventKey="info" title="Información General">
                   <Row className="mb-3">
                     <Col xs={12} md={3}>
                       <CustomDatePicker
                         label="Seleccione la fecha"
                         selectedDate={fechaConsultaFacturas}
-                        onDateChange={setFechaConsultaFacturas}
+                        onDateChange={handlnChangeFechaFiltro}
                       />
                     </Col>
                     <Col xs={12} md={3}>
@@ -949,9 +913,11 @@ export const ConsultaCartera: React.FC = () => {
                         cliente={selectedValue}
                         idUser={currentUser?.id ?? 0}
                       />
+
                     </Col>
                   </Row>
 
+                  {/* <StickyNote clientId={""} currentUser={""} /> */}
                   {clienteInfo && (
                     <Card className="mb-4">
                       <Card.Header style={{ backgroundColor: "#f8f9fa" }}>
@@ -964,7 +930,7 @@ export const ConsultaCartera: React.FC = () => {
                               <Form.Label>Razón Social</Form.Label>
                               <Form.Control
                                 type="text"
-                                value={clienteInfo.razonSocial}
+                                value={clienteInfo.razonSocial ?? ""}
                                 readOnly
                               />
                             </Form.Group>
@@ -972,7 +938,7 @@ export const ConsultaCartera: React.FC = () => {
                               <Form.Label>Dirección</Form.Label>
                               <Form.Control
                                 type="text"
-                                value={clienteInfo.direccion}
+                                value={clienteInfo.direccion ?? ""}
                                 readOnly
                               />
                             </Form.Group>
@@ -980,7 +946,7 @@ export const ConsultaCartera: React.FC = () => {
                               <Form.Label>Ciudad</Form.Label>
                               <Form.Control
                                 type="text"
-                                value={clienteInfo.ciudad}
+                                value={clienteInfo.ciudad ?? ""}
                                 readOnly
                               />
                             </Form.Group>
@@ -1068,12 +1034,16 @@ export const ConsultaCartera: React.FC = () => {
                       </Card.Body>
                     </Card>
                   )}
+                  {/* <ScoringVisual/> */}
 
                   <ClienteEstadoCuenta
                     cliente={selectedValue}
                     fecha={fechaConsultaFacturas}
                     intmora={intMora}
                     ref={tablaFacturasRef}
+                    onSelectFactura={handleSeleccionarFactura}
+                    // numCuotas={registroSeleccionado.CUOTAS}
+
                   />
                 </Tab>
                 <Tab
@@ -1081,12 +1051,12 @@ export const ConsultaCartera: React.FC = () => {
                   title={
                     <span>
                       Seguimiento
-                      {!registroSeleccionado && !selectedValue && (
+                      {!hasFullSelection && (
                         <OverlayTrigger
                           placement="top"
                           overlay={
                             <Tooltip id="tooltip-seguimiento">
-                              Seleccione un cliente para ver sus seguimientos
+                              Seleccione cliente, factura y cuenta para ver sus seguimientos
                             </Tooltip>
                           }
                         >
@@ -1097,7 +1067,7 @@ export const ConsultaCartera: React.FC = () => {
                       )}
                     </span>
                   }
-                  disabled={!registroSeleccionado && !selectedValue}
+                  disabled={!hasFullSelection}
                 >
                   <TimelineSeguimientos
                     seguimientos={seguimientos}
@@ -1110,12 +1080,12 @@ export const ConsultaCartera: React.FC = () => {
                     }}
                   />
                 </Tab>
-                <Tab eventKey="bitacora" title="Bitácora">
-                  {registroSeleccionado ? (
+                <Tab eventKey="bitacora" title="Bitácora" disabled={!hasFullSelection}>
+                  {hasFullSelection ? (
                     <TablaBitacoras cliente={registroSeleccionado.cliente} />
                   ) : (
                     <div className="text-center p-4">
-                      <p>Seleccione un cliente para ver su bitácora</p>
+                      <p>Seleccione cliente, factura y cuenta para ver su bitácora</p>
                     </div>
                   )}
                 </Tab>

@@ -44,6 +44,12 @@ const EstadoClienteTable = (props: any) => {
       ),
     },
     {
+      id: "DIAS",
+      label: "Dias vencidos",
+      align: "center",
+      // format: (value: any) => `$ ${StringToMoney(value)}`
+    },
+    {
       id: "MORA",
       label: "Int. Mora",
       align: "center",
@@ -55,15 +61,38 @@ const EstadoClienteTable = (props: any) => {
 
   return (
     <Box>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-        <Typography variant="h5" fontWeight="bold" display="flex" alignItems="center" gap={1}>
+      <div className="row" style={{ marginTop: '5px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingRight: '9px' }}>
+        {/* <Typography variant="h5" fontWeight="bold" display="flex" alignItems="center" gap={1}>
           📢 Estado de Cliente
-        </Typography>
+        </Typography> */}
+        <Typography
+                  variant="h5"
+                  fontWeight="bold"
+                  display="flex"
+                  alignItems="center"
+                  fontFamily="Roboto, Helvetica, Arial, sans-serif"
+                  gap={1}
+                  sx={{ color: "black", mb: 1 }}
+                >
+                  <Box
+                    component="i"
+                    className="<zdummy>"
+                    aria-hidden="true"
+                    sx={{
+                      fontSize: 28,
+                      color: "primary.main",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  />
+                  <span>Cuotas</span>
+                </Typography>
         <Typography variant="h6" fontWeight="bold">
-          #36
+          {"#" + props.numCuotas}
         </Typography>
-      </Box>
 
+        </div>
       <DynamicTable columns={columns_saldos} rows={props.rows.map((row: any) => {
         // Aquí pasas la fila completa a las funciones de formato sin necesidad de agregar el campo __row__
         return row;

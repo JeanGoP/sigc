@@ -1,0 +1,70 @@
+<svg width="200" height="200" viewBox="0 0 200 230" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Logo SIGC - Light Version -->
+  
+  <!-- Gradient Definition -->
+  <defs>
+    <linearGradient id="gradient-light" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1B365D;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#00C2CB;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <!-- Icon Symbol -->
+  <g transform="translate(50, 20)">
+    <!-- Outer ring -->
+    <path
+      d="M50 10 L70 22.5 L70 47.5 L50 60 L30 47.5 L30 22.5 Z"
+      stroke="#1B365D"
+      stroke-width="3"
+      fill="none"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+
+    <!-- Inner connections -->
+    <path
+      d="M50 30 L62 37.5 M50 30 L38 37.5 M50 30 L50 45"
+      stroke="#00C2CB"
+      stroke-width="3"
+      stroke-linecap="round"
+    />
+
+    <!-- Central node -->
+    <circle cx="50" cy="30" r="4" fill="#00C2CB" />
+
+    <!-- Connection nodes -->
+    <circle cx="62" cy="37.5" r="3" fill="#1B365D" />
+    <circle cx="38" cy="37.5" r="3" fill="#1B365D" />
+    <circle cx="50" cy="45" r="3" fill="#1B365D" />
+
+    <!-- Lower network structure -->
+    <path
+      d="M50 60 L70 72.5 L70 90 M50 60 L30 72.5 L30 90"
+      stroke="#00C2CB"
+      stroke-width="2.5"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+
+    <!-- Secondary nodes -->
+    <circle cx="70" cy="72.5" r="3" fill="url(#gradient-light)" />
+    <circle cx="30" cy="72.5" r="3" fill="url(#gradient-light)" />
+    <circle cx="50" cy="60" r="4" fill="url(#gradient-light)" />
+
+    <!-- Terminal points -->
+    <circle cx="70" cy="90" r="2.5" fill="#00C2CB" />
+    <circle cx="30" cy="90" r="2.5" fill="#00C2CB" />
+  </g>
+
+  <!-- SIGC Text -->
+  <text
+    x="100"
+    y="175"
+    font-family="'Inter', 'Helvetica Neue', Arial, sans-serif"
+    font-size="48"
+    font-weight="700"
+    letter-spacing="7.2"
+    text-anchor="middle"
+    fill="#2E2E2E"
+  >SIGC</text>
+</svg>

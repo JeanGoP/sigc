@@ -18,6 +18,8 @@ interface Props {
   cliente: string;
   fecha: string;
   intmora: string;
+  // numCuotas: number;
+  onSelectFactura?: (row: any) => void;
 }
 
 export interface FetchFacturasRef {
@@ -25,7 +27,7 @@ export interface FetchFacturasRef {
 }
 
 export const ClienteEstadoCuenta = forwardRef<FetchFacturasRef, Props>(
-  ({ cliente, fecha, intmora }: Props, ref: any) => {
+  ({ cliente, fecha, intmora, onSelectFactura }: Props, ref: any) => {
     const [rowsFacturas, setRowsFacturas] = useState<FacturaListado[]>([]);
     const [clienteCuotasRows, setClienteCuotasRows] = useState<any[]>([]);
     const [TableRowsRecibosCaja, setTableRowsRecibosCaja] = useState<any[]>([]);
@@ -62,6 +64,9 @@ export const ClienteEstadoCuenta = forwardRef<FetchFacturasRef, Props>(
         if (clienteCuotasRows.length > 0) {
           setClienteCuotasRows([]);
         }
+        if (TableRowsRecibosCaja.length > 0) {
+          setTableRowsRecibosCaja([]);
+        }
 
         const res = await listarFacturas({
           fecha: fecha.toString(),
@@ -85,7 +90,7 @@ export const ClienteEstadoCuenta = forwardRef<FetchFacturasRef, Props>(
     }));
 
     return (
-      <div style={{ padding: 20 }}>
+      <div >
         <TablaFacturas
           rows={rowsFacturas}
           cliente={cliente}
@@ -93,8 +98,9 @@ export const ClienteEstadoCuenta = forwardRef<FetchFacturasRef, Props>(
           intmora={intmora}
           setCuotas={setClienteCuotasRows}
           setFacturaFather={ReciboCajaHandler}
+          onSelectFactura={onSelectFactura}
         />
-        <EstadoClienteTable rows={clienteCuotasRows} />
+        <EstadoClienteTable rows={clienteCuotasRows} numCuotas={clienteCuotasRows.length} />
 
         {/* 👇 puedes mostrar loading o error */}
         {loadingRecibos && <p>Cargando recibos...</p>}

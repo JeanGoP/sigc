@@ -31,12 +31,9 @@ import { RenderTooltip } from "./components/RenderTooltip";
 import { StringToMoney } from "@app/utils/formattersFunctions";
 import ModalSeguimientoDetalle from "./components/VerMasComponent";
 import { SingleSelect } from "@app/components/singleSelect/singleSelect";
-import {
-  useListarTiposContacto,
-  TipoContacto,
-} from "@app/services/ObtenerTiposContacto";
 import { toast } from "react-toastify";
 import SpeechToText from "@app/components/SpeechToText/SpeechToText";
+import BuscadorTipoContacto from "@app/components/BuscadorGeneral/BuscadorTipoContacto";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -98,14 +95,11 @@ export const TimelineSeguimientos: React.FC<TimelineSeguimientosProps> = ({
   const [nuevoEventos, setNuevoEventos] = React.useState<Evento[]>([]);
   const [nuevoGrabacion, setNuevoGrabacion] = React.useState<File | null>(null);
   const [tiposEvento, setTiposEvento] = React.useState<TipoEvento[]>([]);
-  const [tiposContacto, setTiposContacto] = React.useState<TipoContacto[]>([]);
   const [nuevoTipoContacto, setNuevoTipoContacto] = React.useState<
     string | number
   >(0);
 
   const { loading: loadingEventos, listarTiposEvento } = useListarTiposEvento();
-  const { loading: loadingTipoCont, listarTiposContacto } =
-    useListarTiposContacto();
   const { validarEvento, loading } = useValidarEvento();
 
   const emptyFormEvento: Evento = {
@@ -141,18 +135,12 @@ export const TimelineSeguimientos: React.FC<TimelineSeguimientosProps> = ({
             }));
           }
         }
-
-        // contactos
-        const resContactos = await listarTiposContacto("w");
-        if (resContactos?.success && resContactos.data) {
-          setTiposContacto(resContactos.data);
-        }
       } catch (error) {
         console.error("Error cargando tipos:", error);
       }
     };
     cargarTipos();
-  }, [listarTiposEvento, listarTiposContacto]);
+  }, [listarTiposEvento]);
 
   function setFormCampo<K extends keyof Evento>(campo: K, valor: Evento[K]) {
     setFormEvento((prev) => ({ ...prev, [campo]: valor }));
@@ -246,6 +234,7 @@ export const TimelineSeguimientos: React.FC<TimelineSeguimientosProps> = ({
       eventoEnviar.id = tiposEvento[0].id;
       eventoEnviar.tipo = tiposEvento[0].nombre;
     }
+    console.log("Evento a validar:", contextoEvento);
 
     try {
       const resp = await validarEvento({
@@ -556,9 +545,9 @@ export const TimelineSeguimientos: React.FC<TimelineSeguimientosProps> = ({
             </label> */}
             <div
               style={{
-                display: "flex",
+                // display: "flex",
                 alignItems: "center",
-                gap: 12,
+                // gap: 12,
                 marginBottom: 12,
                 background: "#fff",
                 borderRadius: 8,
@@ -567,20 +556,13 @@ export const TimelineSeguimientos: React.FC<TimelineSeguimientosProps> = ({
               }}
             >
               <Row>
-                <Col xs={12} lg={4} md={4} xl={4}>
-                  <Form.Group style={{ width: "200px" }}>
-                    <Form.Label>Tipo de contacto</Form.Label>
-                    <SingleSelect
-                      options={tiposContacto.map((tipo) => ({
-                        label: tipo.descripcion,
-                        value: tipo.id, // Puedes usar `tipo.id` si prefieres usar el ID como valor único
-                      }))}
-                      selectedValue={nuevoTipoContacto}
-                      onChange={(id: string | number) =>
-                        setNuevoTipoContacto(id)
-                      }
-                    ></SingleSelect>
-                  </Form.Group>
+                <Col xs={12} lg={3} md={3} xl={3}>
+                  <BuscadorTipoContacto
+                    
+                    label="Tipo de contacto"
+                    value={nuevoTipoContacto}
+                    onChange={(val) => setNuevoTipoContacto(val ?? 0)}
+                  />
                 </Col>
               </Row>
             </div>

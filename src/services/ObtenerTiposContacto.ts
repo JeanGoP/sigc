@@ -3,8 +3,8 @@ import { useApi } from "@app/hooks/useApi";
 import { useCallback } from "react";
 
 export interface TipoContacto {
-  id: string;
-  descripcion: string;
+  id: number;
+  nombre: string;
 }
 
 // -----------------------------------------------------------------------------

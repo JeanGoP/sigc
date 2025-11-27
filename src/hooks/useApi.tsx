@@ -30,25 +30,63 @@ export function useApi<T>(
 
       // Obtener el token desde userAccess en localStorage
       let token = "";
+      let tenantId = "";
       try {
         const storedUser = localStorage.getItem("userAccess");
         if (storedUser) {
           const parsed = JSON.parse(storedUser);
-          token = parsed?.token || "";
+          // soportar distintos formatos de guardado
+          // 1) { token: string }
+          if (typeof parsed?.token === "string") {
+            token = parsed.token;
+          }
+          // 2) { token: { token: string, ... } }
+          else if (
+            parsed?.token && typeof parsed.token === "object" && typeof parsed.token.token === "string"
+          ) {
+            token = parsed.token.token;
+          }
+          // 3) { data: { token: { token: string } } }
+          else if (
+            parsed?.data?.token && typeof parsed.data.token === "object" && typeof parsed.data.token.token === "string"
+          ) {
+            token = parsed.data.token.token;
+          }
+
+          // Validando el TenantId -----------------------------------------------------------------------------------------------
+          // 1) { token: string }
+          if (typeof parsed?.tenantId === "string") {
+            tenantId = parsed.tenantId;
+          }
+          // 2) { token: { token: string, ... } }
+          else if (
+            parsed?.tenantId && typeof parsed.tenantId === "object" && typeof parsed.token.tenantId === "string"
+          ) {
+            tenantId = parsed.token.tenantId;
+          }
+          // 3) { data: { token: { token: string } } }
+          else if (
+            parsed?.data?.tenantId && typeof parsed.data.token === "object" && typeof parsed.data.token.tenantId === "string"
+          ) {
+            tenantId = parsed.data.token.tenantId;
+          }
         }
       } catch (e) {
         console.warn("No se pudo leer el token de localStorage", e);
       }
 
-      const instance = axios.create({
+      const obj =  {
         baseURL,
         timeout,
         headers: {
           "Content-Type": "application/json",
           Accept: "*/*",
+          "X-Tenant-Id": tenantId,
           ...(token && { Authorization: `Bearer ${token}` }),
         },
-      });
+      }
+
+      const instance = axios.create(obj);
 
       let attempt = 0;
 
@@ -58,6 +96,17 @@ export function useApi<T>(
           return res.data;
         } catch (err) {
           const axiosErr = err as AxiosError<ApiResponse<T>>;
+
+          // Manejo centralizado de 401 No Autorizado
+          if (axiosErr.response?.status === 401) {
+            try {
+              localStorage.removeItem("userAccess");
+            } catch {/* ignore */}
+            // recargar para forzar flujo a /login y limpiar estados en memoria
+            window.location.reload();
+            // retornar por contrato (no debería ejecutarse tras reload, pero por typing devolvemos null)
+            return null;
+          }
 
           if (attempt < retries) {
             attempt++;

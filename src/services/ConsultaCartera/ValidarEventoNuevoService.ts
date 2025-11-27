@@ -30,6 +30,7 @@ export function useValidarEvento() {
 
   const validarEvento = useCallback(
     (payload: EventoPayload) => {
+      console.log("Payload enviado al backend:", payload);
       return request({
         url: "/validar-evento",
         method: "POST",

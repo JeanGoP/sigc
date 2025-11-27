@@ -7,15 +7,29 @@ interface Props {
   onDateChange: (date: string) => void;
 }
 
-export const CustomDatePicker: React.FC<Props> = ({ label = 'Seleccione la fecha',selectedDate, onDateChange }) => {
-  // Convierte de "AAAA/MM/DD" a "AAAA-MM-DD" para que el input pueda mostrarla correctamente
-  const formatForInput = (date: string) => date ? date.replaceAll('/', '-') : '';
+export const CustomDatePicker: React.FC<Props> = ({
+  label = 'Seleccione la fecha',
+  selectedDate,
+  onDateChange,
+}) => {
+  
+  const formatForInput = (date: string) =>
+    date ? date.replaceAll('/', '-') : '';
 
   const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const rawValue = event.target.value; // "AAAA-MM-DD"
+    if (!rawValue) {
+      onDateChange('');
+      return;
+    }
+
     const [year, month, day] = rawValue.split('-');
     const formatted = `${year}/${month}/${day}`;
-    onDateChange(formatted); // ahora en formato AAAA/MM/DD
+    onDateChange(formatted);
+  };
+
+  const handleDoubleClick = () => {
+    onDateChange('');
   };
 
   return (
@@ -25,6 +39,7 @@ export const CustomDatePicker: React.FC<Props> = ({ label = 'Seleccione la fecha
         type="date"
         value={formatForInput(selectedDate)}
         onChange={handleChange}
+        onDoubleClick={handleDoubleClick}
       />
     </Form.Group>
   );

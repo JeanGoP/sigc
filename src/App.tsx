@@ -1,42 +1,44 @@
-import { useEffect, useState } from 'react';
-import { Routes, Route, useLocation } from 'react-router-dom';
-import { toast, ToastContainer } from 'react-toastify';
-import Main from '@modules/main/Main';
-import Login from '@modules/login/Login';
-import Register from '@modules/register/Register';
-import ForgetPassword from '@modules/forgot-password/ForgotPassword';
-import RecoverPassword from '@modules/recover-password/RecoverPassword';
-import { useWindowSize } from '@app/hooks/useWindowSize';
-import { calculateWindowSize } from '@app/utils/helpers';
-import { setWindowSize } from '@app/store/reducers/ui';
-import ReactGA from 'react-ga4';
+import { useEffect, useState } from "react";
+import { Routes, Route, useLocation } from "react-router-dom";
+import { toast, ToastContainer } from "react-toastify";
+import Main from "@modules/main/Main";
+import Login from "@modules/login/Login";
+import Register from "@modules/register/Register";
+import ForgetPassword from "@modules/forgot-password/ForgotPassword";
+import RecoverPassword from "@modules/recover-password/RecoverPassword";
+import { useWindowSize } from "@app/hooks/useWindowSize";
+import { calculateWindowSize } from "@app/utils/helpers";
+import { setWindowSize } from "@app/store/reducers/ui";
+import ReactGA from "react-ga4";
 
-import Dashboard from '@pages/Dashboard';
-import Blank from '@pages/Blank';
-import SubMenu from '@pages/SubMenu';
+import Dashboard from "@pages/Dashboard";
+import Blank from "@pages/Blank";
+import SubMenu from "@pages/SubMenu";
 // import Profile from '@pages/profile/Profile';
 
-import PublicRoute from './routes/PublicRoute';
-import PrivateRoute from './routes/PrivateRoute';
-import { setCurrentUser } from './store/reducers/auth';
-import {users } from './Data/users_example';
+import PublicRoute from "./routes/PublicRoute";
+import PrivateRoute from "./routes/PrivateRoute";
+import { setCurrentUser } from "./store/reducers/auth";
+import { users } from "./Data/users_example";
 
 // import { firebaseAuth } from './firebase';
 // import { onAuthStateChanged } from 'firebase/auth';
-import { useAppDispatch, useAppSelector } from './store/store';
-import { Loading } from './components/Loading';
-import { User } from './models/auth/User.model';
-import ConsultaClientes from '@app/pages/ConsultaClientes/ConsultaCLientes';
-import {ConsultaCartera} from '@app/pages/ConsultaCartera/ConsultaCartera';
-import ParametrosGenerales from '@app/pages/ParametrosGenerales';
-import TiposEventos from '@app/modules/maestros/tipos-eventos/TiposEventos';
-import MonitorSeguimientos from '@pages/MonitorSeguimientos';
-import Calendario from '@pages/Calendario';
-import { RendimientoDeAsesores } from '@app/pages/MonitorGestion/RendimientoDeAsesores';
-import Campaigns from './pages/Campaigns/Campaigns';
-import TiposGestiones from './modules/maestros/tipos-gestiones/TiposGestiones';
-import EtiquetasClientes from './modules/maestros/etiquetas-cliente/EtiquetasClientes';
-import { parse } from 'path';
+import { useAppDispatch, useAppSelector } from "./store/store";
+import { Loading } from "./components/Loading";
+import { User } from "./models/auth/User.model";
+import ConsultaClientes from "@app/pages/ConsultaClientes/ConsultaCLientes";
+import { ConsultaCartera } from "@app/pages/ConsultaCartera/ConsultaCartera";
+import ParametrosGenerales from "@app/pages/ParametrosGenerales";
+import TiposEventos from "@app/modules/maestros/tipos-eventos/TiposEventos";
+import MonitorSeguimientos from "@pages/MonitorSeguimientos";
+import Calendario from "@pages/Calendario";
+import { RendimientoDeAsesores } from "@app/pages/MonitorGestion/RendimientoDeAsesores";
+import Campaigns from "./pages/Campaigns/Campaigns";
+import TiposGestiones from "./modules/maestros/tipos-gestiones/TiposGestiones";
+import EtiquetasClientes from "./modules/maestros/etiquetas-cliente/EtiquetasClientes";
+import { parse } from "path";
+
+import { useSessionService } from "@app/services/Auth/ValidateToken";
 // Use Vite's import.meta.env directly for API_URL
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -48,75 +50,118 @@ const App = () => {
   const dispatch = useAppDispatch();
   const location = useLocation();
 
+  const { validateToken } = useSessionService();
+
   const [isAppLoading, setIsAppLoading] = useState(true);
 
+  const TARGETS = [
+    "/login",
+    "/register",
+    "/forgot-password",
+    "/recover-password",
+  ];
+
   useEffect(() => {
+  const obs = new MutationObserver((muts) => {
+    // Heurística: demasiados cambios de texto de golpe ⇒ posible traducción
+    const bigChange = muts.some(m => m.type === "characterData");
+    if (bigChange) {
+      // Mostrar toast: “Desactiva ‘Traducir esta página’ en este sitio para evitar errores.”
+    }
+  });
+  obs.observe(document.documentElement, { subtree: true, childList: true, characterData: true });
+  return () => obs.disconnect();
+}, []);
+
+  useEffect(() => {
+    
     const checkUserSession = async () => {
       try {
-        const userData = localStorage?.getItem('userAccess');
+        if (TARGETS.includes(location.pathname)) {
+          // en rutas públicas no validamos y liberamos el loader
+          setIsAppLoading(false);
+          return;
+        }
+        const userData = localStorage?.getItem("userAccess");
 
         if (!userData) {
           dispatch(setCurrentUser(null));
-          toast.info("No user session found, please log in.");
+          toast.info("No tienes una sesión activa, por favor inicia sesión.");
           return;
         }
 
-        const parsedData = JSON.parse(userData);
-        
+        let parsedData: any = null;
+        try {
+          parsedData = JSON.parse(userData);
+        } catch (e) {
+          parsedData = null;
+        }
+
+        if (
+          !parsedData ||
+          typeof parsedData !== "object" ||
+          !parsedData.id ||
+          !parsedData.username
+        ) {
+          // sesión malformada
+          localStorage.removeItem("userAccess");
+          dispatch(setCurrentUser(null));
+          setIsAppLoading(false);
+          return;
+        }
+
         console.log(parsedData);
-        // Crear instancia de User
-        const userNew = new User(
+
+         const resp = await validateToken({
+           id: parsedData.id,
+           username: parsedData.username,
+           fullName: parsedData.fullName,
+           email: parsedData.email,
+           role: parsedData.role,
+           token: parsedData.token ?? "",
+         });
+
+      if (resp.valid && resp.user) {
+        dispatch(setCurrentUser(resp.user));
+      } else {
+        // Fallback: si tenemos datos válidos en localStorage, continúa con ellos
+        const fallbackUser = new User(
           parsedData.id,
           parsedData.username,
-          '', // No necesitamos el password
-          parsedData.fullName,
-          parsedData.email,
+          "",
+          parsedData.fullName || "",
+          parsedData.email || parsedData.username,
           parsedData.role,
-          parsedData.token // Incluimos el token
+          parsedData.token ?? ""
         );
-
-        console.log(userNew);
-        // Validar el token con el backend
-        const response = await fetch(`${API_URL}/api/v1/validate-token`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${userNew.token}`
-          }
-        });
-
-        if (response.ok) {
-          dispatch(setCurrentUser(userNew));
-        } else {
-          // Si el token no es válido, limpiar el localStorage
-          localStorage.removeItem('userAccess');
-          dispatch(setCurrentUser(null));
-        }
-      } catch (error) {
-        console.error('Error validando sesión:', error);
-        localStorage.removeItem('userAccess');
-        dispatch(setCurrentUser(null));
-      } finally {
-        setIsAppLoading(false);
+        dispatch(setCurrentUser(fallbackUser));
       }
+    } catch (e) {
+      console.error("Error validando sesión:", e);
+      localStorage.removeItem("userAccess");
+      dispatch(setCurrentUser(null));
+    } finally {
+      setIsAppLoading(false);
+    }
     };
-  
+
     checkUserSession();
-  }, [location.pathname]);
-  
-  
-async function fetchUserFromToken(token: User) {
-  // Simulamos que el token es simplemente el ID del usuario
-  const usr = token; 
+  }, [location.pathname, dispatch, validateToken]);
 
-  const user = users.find(u => u.email === usr.email && u.password === usr.password);
+  async function fetchUserFromToken(token: User) {
+    // Simulamos que el token es simplemente el ID del usuario
+    const usr = token;
 
-  if (!user) {
-    throw new Error('Token inválido');
+    const user = users.find(
+      (u) => u.email === usr.email && u.password === usr.password
+    );
+
+    if (!user) {
+      throw new Error("Token inválido");
+    }
+
+    return user;
   }
-
-  return user;
-}
 
   useEffect(() => {
     const size = calculateWindowSize(windowSize.width);
@@ -126,9 +171,9 @@ async function fetchUserFromToken(token: User) {
   }, [windowSize]);
 
   useEffect(() => {
-    if (location && location.pathname && VITE_NODE_ENV === 'production') {
+    if (location && location.pathname && VITE_NODE_ENV === "production") {
       ReactGA.send({
-        hitType: 'pageview',
+        hitType: "pageview",
         page: location.pathname,
       });
     }
@@ -162,12 +207,21 @@ async function fetchUserFromToken(token: User) {
             <Route path="/consulta_carteras" element={<ConsultaCartera />} />
             {/* <Route path="/profile" element={<Profile />} /> */}
             <Route path="/profile" element={<Dashboard />} />
-            <Route path="/parametros_generales" element={<ParametrosGenerales />} />
+            <Route
+              path="/parametros_generales"
+              element={<ParametrosGenerales />}
+            />
             <Route path="/tipos_eventos" element={<TiposEventos />} />
             <Route path="/tipos_gestiones" element={<TiposGestiones />} />
             <Route path="/etiquetas_clientes" element={<EtiquetasClientes />} />
-            <Route path="/monitor_seguimientos" element={<MonitorSeguimientos />} />
-            <Route path="/rendimiento_asesores" element={<RendimientoDeAsesores />} />
+            <Route
+              path="/monitor_seguimientos"
+              element={<MonitorSeguimientos />}
+            />
+            <Route
+              path="/rendimiento_asesores"
+              element={<RendimientoDeAsesores />}
+            />
             <Route path="/calendario" element={<Calendario />} />
             <Route path="/campanas" element={<Campaigns />} />
             <Route path="/" element={<Dashboard />} />
@@ -181,8 +235,6 @@ async function fetchUserFromToken(token: User) {
         hideProgressBar={false}
         newestOnTop
         closeOnClick
-
-
         rtl={false}
         pauseOnHover
       />

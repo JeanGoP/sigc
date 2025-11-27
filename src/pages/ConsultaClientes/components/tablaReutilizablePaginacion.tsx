@@ -23,6 +23,7 @@ interface DynamicTableProps {
   maxHeight?: string;
   page: number;
   onPageChange: (value: number) => void;
+  selectedPredicate?: (row: any) => boolean;
 }
 
 export const DynamicTablePagination: React.FC<DynamicTableProps> = ({
@@ -36,7 +37,8 @@ export const DynamicTablePagination: React.FC<DynamicTableProps> = ({
   withSearch = true,
   maxHeight = '400px',
   page,
-  onPageChange
+  onPageChange,
+  selectedPredicate
 }) => {
   const handleChangePage = (_event: unknown, newPage: number) => onPageChange(newPage);
   const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -44,6 +46,7 @@ export const DynamicTablePagination: React.FC<DynamicTableProps> = ({
     onPageChange(0);
   };
 
+  
   const paginatedRows = rows.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
 
   return (
@@ -76,15 +79,27 @@ export const DynamicTablePagination: React.FC<DynamicTableProps> = ({
             </TableRow>
           </TableHead>
           <TableBody>
-            {paginatedRows.map((row, rowIndex) => (
-              <TableRow key={rowIndex}>
-                {columns.map((column) => (
-                  <TableCell key={column.id} align={column.align || 'left'}>
-                    {column.format ? column.format(row[column.id], row) : row[column.id]}
-                  </TableCell>
-                ))}
-              </TableRow>
-            ))}
+            {paginatedRows.map((row, rowIndex) => {
+              const isSelected = selectedPredicate ? selectedPredicate(row) : false;
+              return (
+                <TableRow
+                  key={rowIndex}
+                  selected={isSelected}
+                  sx={
+                    isSelected
+                      ? { backgroundColor: '#e3f2fd' }
+                      : undefined
+                  }
+                  hover
+                >
+                  {columns.map((column) => (
+                    <TableCell key={column.id} align={column.align || 'left'}>
+                      {column.format ? column.format(row[column.id], row) : row[column.id]}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
       </TableContainer>

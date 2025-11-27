@@ -8,7 +8,7 @@ export interface Evento {
   monto: string;
   descripcion: string;
   usuario: string;
-  nombreCliente: string;
+  tipoEvento: string;
   identificacionCliente: string;
   cuenta: string; // agregado
   factura: string; // agregado
@@ -36,6 +36,7 @@ export function useEventosService() {
     eventosAnteriores: boolean;
     eventosCumplidos: boolean;
     userId?: string | number;
+    cuentaFiltro?: string | null;
   }) => {
     return request({
       url: "/ObtenerEventos",

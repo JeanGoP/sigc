@@ -14,32 +14,94 @@ import {
 import { SingleSelect } from "@app/components/singleSelect/singleSelect";
 import { StringToMoney } from "@app/utils/formattersFunctions";
 import { useAppSelector } from "@app/store/store";
-import { useEventosService, Evento } from "@app/services/Calendario/CalendarioService";
+import {
+  useEventosService,
+  Evento,
+} from "@app/services/Calendario/CalendarioService";
 import { useNavigate } from "react-router-dom";
+import BuscadorCuentas from "@app/components/BuscadorGeneral/BuscadorCuentas";
 
 moment.locale("es");
 const localizer = momentLocalizer(moment);
 
+// Componente reutilizable para el botón de gestión en Cartera
+interface BotonGestionCarteraProps {
+  type: "A" | "B";
+  evento: Evento;
+}
+
+const BotonGestionCartera: React.FC<BotonGestionCarteraProps> = ({
+  type = "A",
+  evento,
+}) => {
+  const navigate = useNavigate();
+
+  const handleIrACartera = () => {
+    const qp = new URLSearchParams();
+    if ((evento as any).cuenta)
+      qp.set("cuenta", String((evento as any).cuenta));
+    if ((evento as any).factura)
+      qp.set("factura", String((evento as any).factura));
+    if ((evento as any).identificacionCliente)
+      qp.set(
+        "identificacionCliente",
+        String((evento as any).identificacionCliente)
+      );
+    // Abrir ConsultaCartera con query params
+    navigate(`/consulta_carteras?${qp.toString()}`);
+  };
+
+  return (
+    <div>
+      {type.toUpperCase() === "A" ? (
+        <Button variant="primary" onClick={handleIrACartera}>
+          Seguimiento
+        </Button>
+      ) : (
+        <i
+          className="fas fa-search"
+          onClick={handleIrACartera}
+          style={{
+            color: "#007bff",
+            fontSize: "20px",
+            cursor: "pointer",
+            paddingLeft: "10px",
+          }}
+        ></i>
+      )}
+    </div>
+  );
+};
+
 const Calendario: React.FC = () => {
-  const [usuarios, setUsuarios] = useState<{ label: string; value: string | number }[]>([]);
+  const [usuarios, setUsuarios] = useState<
+    { label: string; value: string | number }[]
+  >([]);
   const [usuarioFiltro, setUsuarioFiltro] = useState<string | number>("");
   const [eventos, setEventos] = useState<Evento[]>([]);
   const [mostrarModalEvento, setMostrarModalEvento] = useState(false);
   const [mostrarModalDia, setMostrarModalDia] = useState(false);
   const [incluirAnteriores, setIncluirAnteriores] = useState(false);
   const [incluirCumplidos, setIncluirCumplidos] = useState(false);
-  const [eventoSeleccionado, setEventoSeleccionado] = useState<Evento | null>(null);
+  const [eventoSeleccionado, setEventoSeleccionado] = useState<Evento | null>(
+    null
+  );
+  const [cuentaFiltro, setCuentaFiltro] = useState<string>("");
   const [eventosDelDia, setEventosDelDia] = useState<Evento[]>([]);
   const [fechaSeleccionada, setFechaSeleccionada] = useState<Date | null>(null);
   const navigate = useNavigate();
 
   const currentUser = useAppSelector((state) => state.auth.currentUser);
-  const { loading, error, obtenerUsuariosPorRol, obtenerEventos } = useEventosService();
+  const { loading, error, obtenerUsuariosPorRol, obtenerEventos } =
+    useEventosService();
 
   // Cargar usuarios
   useEffect(() => {
     const fetchUsuarios = async () => {
-      const res = await obtenerUsuariosPorRol("Asesor", Number(currentUser?.id));
+      const res = await obtenerUsuariosPorRol(
+        "Asesor",
+        Number(currentUser?.id)
+      );
       if (res?.success && Array.isArray(res.data)) {
         const opciones = [
           { label: "Todos", value: "" },
@@ -62,6 +124,7 @@ const Calendario: React.FC = () => {
       const res = await obtenerEventos({
         eventosAnteriores: incluirAnteriores,
         eventosCumplidos: incluirCumplidos,
+        cuentaFiltro: cuentaFiltro || null,
         ...(usuarioFiltro && { userId: usuarioFiltro }),
       });
 
@@ -75,12 +138,17 @@ const Calendario: React.FC = () => {
       }
     };
     fetchEventos();
-  }, [usuarioFiltro, incluirAnteriores, incluirCumplidos]);
+  }, [usuarioFiltro, incluirAnteriores, incluirCumplidos,cuentaFiltro]);
 
   const handleSeleccionEvento = (evento: Evento) => {
     setEventoSeleccionado(evento);
     setMostrarModalEvento(true);
   };
+
+  const handleSetCuentaFiltro = (cuenta: any) => {
+    console.log("Cuenta seleccionada en Calendario prueba:", cuenta);
+    setCuentaFiltro(cuenta);
+  }
 
   const handleSeleccionDia = (slotInfo: { start: Date }) => {
     const fecha = moment(slotInfo.start).startOf("day");
@@ -110,10 +178,10 @@ const Calendario: React.FC = () => {
   };
 
   return (
-    <div className="container mt-4">
+    <div className=" mt-5 col-sm-12 col-md-12 col-lg-10" style={{margin:"auto"}}>
       <h3>📅 Calendario de eventos</h3>
 
-      <Card className="shadow-sm border-0 mb-4">
+      <Card className="shadow-sm border-0 mb-4" >
         <Card.Body>
           <Row>
             <Col md={4}>
@@ -126,6 +194,17 @@ const Calendario: React.FC = () => {
               />
             </Col>
             <Col md={4}>
+              {/* <BuscadorGeneral opcion="CU" op="CLIENTE"/> */}
+              <BuscadorCuentas
+                opcion="CU"
+                op="CLIENTE"
+                placeholder="Buscar cuenta..."
+                label="Cuenta"
+                onChange={handleSetCuentaFiltro} // hacer la funcionalidad de guardar el valor seleccionado
+                onSelect={() => {}} // hacer la funcionalidad de guardar el valor seleccionado
+              />
+            </Col>
+            {/* <Col md={4}>
               <Form.Group controlId="switchEventosAnteriores">
                 <Form.Label>Incluir eventos anteriores</Form.Label>
                 <Form.Check
@@ -134,7 +213,7 @@ const Calendario: React.FC = () => {
                   onChange={(e) => setIncluirAnteriores(e.target.checked)}
                 />
               </Form.Group>
-            </Col>
+            </Col> */}
 
             <Col md={4}>
               <Form.Group controlId="switchCumplidos">
@@ -166,8 +245,8 @@ const Calendario: React.FC = () => {
               style: { backgroundColor: event.color },
             })}
             messages={{
-              next: "Sig.",
-              previous: "Ant.",
+              next: "Siguiente",
+              previous: "Anterior",
               today: "Hoy",
               month: "Mes",
               week: "Semana",
@@ -188,7 +267,7 @@ const Calendario: React.FC = () => {
             <div className="p-2">
               <h5 className="mb-3 text-primary">
                 <i className="fas fa-calendar-alt me-2"></i>
-                {eventoSeleccionado.title}
+                {" " + eventoSeleccionado.tipoEvento}
               </h5>
               <ListGroup variant="flush">
                 <ListGroup.Item>
@@ -198,7 +277,7 @@ const Calendario: React.FC = () => {
                   <strong>Usuario:</strong> {eventoSeleccionado.usuario}
                 </ListGroup.Item>
                 <ListGroup.Item>
-                  <strong>Cliente:</strong> {eventoSeleccionado.nombreCliente}
+                  <strong>Cliente:</strong> {eventoSeleccionado.title}
                 </ListGroup.Item>
                 <ListGroup.Item>
                   <strong>Identificación:</strong>{" "}
@@ -238,20 +317,7 @@ const Calendario: React.FC = () => {
         </Modal.Body>
         <Modal.Footer>
           {eventoSeleccionado && (
-            <Button
-              variant="primary"
-              onClick={() => {
-                const qp = new URLSearchParams();
-                if ((eventoSeleccionado as any).cuenta) qp.set("cuenta", String((eventoSeleccionado as any).cuenta));
-                if ((eventoSeleccionado as any).factura) qp.set("factura", String((eventoSeleccionado as any).factura));
-                if ((eventoSeleccionado as any).identificacionCliente)
-                  qp.set("identificacionCliente", String((eventoSeleccionado as any).identificacionCliente));
-                // Abrir ConsultaCartera con query params
-                navigate(`/consulta_carteras?${qp.toString()}`);
-              }}
-            >
-              Ir a gestión en Cartera
-            </Button>
+            <BotonGestionCartera type={"A"} evento={eventoSeleccionado} />
           )}
           <Button variant="secondary" onClick={cerrarModalEvento}>
             Cerrar
@@ -281,9 +347,11 @@ const Calendario: React.FC = () => {
                 <ListGroup.Item key={idx}>
                   <div className="d-flex justify-content-between align-items-center">
                     <div>
-                      <strong>{ev.title}</strong>{" "}
-                      <span className="text-muted">({ev.usuario})</span>
-                      <br />
+                      <div className="row">
+                        <strong>{ev.title}</strong>{" "}
+                        <span className="text-muted">({ev.usuario})</span>
+                        <BotonGestionCartera type="B" evento={ev} />
+                      </div>
                       <span className="text-muted">
                         {moment(ev.start).format("HH:mm")} -{" "}
                         {moment(ev.end).format("HH:mm")}
@@ -291,7 +359,7 @@ const Calendario: React.FC = () => {
                       <br />
                       <small className="text-secondary">{ev.descripcion}</small>
                     </div>
-                    <div>
+                    <div className="d-flex flex-column align-items-end gap-2">
                       <span
                         className="badge"
                         style={{

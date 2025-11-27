@@ -8,9 +8,12 @@ import {
   TableColumn,
 } from "@app/pages/ConsultaClientes/components/tablaReutilizablePaginacion";
 import { useListarTiposContacto } from "@app/services/Maestros/TiposContactos/ListarTipoContactos";
-  import {useGuardarTipoContacto } from "@app/services/Maestros/TiposContactos/GuardarTipoContacto";
-  import {useEliminarTipoContacto } from "@app/services/Maestros/TiposContactos/EliminarTipoContacto";
-
+import { useGuardarTipoContacto } from "@app/services/Maestros/TiposContactos/GuardarTipoContacto";
+import { useEliminarTipoContacto } from "@app/services/Maestros/TiposContactos/EliminarTipoContacto";
+import {
+  SelectFormaContacto,
+  TipoContactoValue,
+} from "./components/SelectFormaContacto";
 
 const StyledCard = styled.div`
   margin-bottom: 1rem;
@@ -68,10 +71,15 @@ const EstadosEventos: React.FC = () => {
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [searchText, setSearchText] = useState("");
   const [selected, setSelected] = useState<TipoContacto | null>(null);
+  const [tipoContacto, setTipoContacto] =
+    useState<TipoContactoValue>("directo");
 
-  const { listarTiposContacto, loading: loadingList } = useListarTiposContacto();
-  const { guardarTipoContacto, loading: loadingSave } = useGuardarTipoContacto();
-  const { eliminarTipoContacto, loading: loadingDelete } = useEliminarTipoContacto();
+  const { listarTiposContacto, loading: loadingList } =
+    useListarTiposContacto();
+  const { guardarTipoContacto, loading: loadingSave } =
+    useGuardarTipoContacto();
+  const { eliminarTipoContacto, loading: loadingDelete } =
+    useEliminarTipoContacto();
 
   const fetchData = async () => {
     const result = await listarTiposContacto({
@@ -133,6 +141,7 @@ const EstadosEventos: React.FC = () => {
       nombre: formData.nombre,
       descripcion: formData.descripcion,
       estado: formData.estado,
+      formaContacto: tipoContacto,
       idUser: 2, // Ajustar dinámicamente si es necesario
     };
 
@@ -164,6 +173,7 @@ const EstadosEventos: React.FC = () => {
     { id: "id", label: "ID" },
     { id: "nombre", label: "Nombre" },
     { id: "descripcion", label: "Descripción" },
+    { id: "formaContacto", label: "Tipo" },
     {
       id: "estado",
       label: "Estado",
@@ -261,12 +271,20 @@ const EstadosEventos: React.FC = () => {
             </StyledFormGroup>
 
             <StyledFormGroup>
+              <Form.Label>Estado</Form.Label>
               <Form.Check
                 type="switch"
                 id="estado"
                 name="estado"
                 checked={formData.estado}
                 onChange={handleInputChange}
+              />
+            </StyledFormGroup>
+
+            <StyledFormGroup>
+              <SelectFormaContacto
+                value={tipoContacto}
+                onChange={setTipoContacto}
               />
             </StyledFormGroup>
           </Form>

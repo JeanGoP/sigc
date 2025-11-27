@@ -1,9 +1,9 @@
-import React from 'react';
-import { Box, Button } from '@mui/material';
-import { StringToMoney } from '@app/utils/formattersFunctions';
-import { DynamicTable, TableColumn } from './tablaReutilizables';
+import React from "react";
+import { Box, Button, Typography } from "@mui/material";
+import { StringToMoney } from "@app/utils/formattersFunctions";
+import { DynamicTable, TableColumn } from "./tablaReutilizables";
 
-import { useEstadoCuentaService } from "@app/services/GetEstadoCuentaClienteFactura"; 
+import { useEstadoCuentaService } from "@app/services/GetEstadoCuentaClienteFactura";
 import { EstadoCuentaRequest } from "@app/services/GetEstadoCuentaClienteFactura";
 
 interface Props {
@@ -13,11 +13,13 @@ interface Props {
   intmora: string;
   setCuotas: any;
   setFacturaFather: any;
+  onSelectFactura?: (row: any) => void;
 }
 
 export const TablaFacturas = (props: Props) => {
   // 👇 el hook va aquí, en el nivel superior del componente
-  const { FetchEstadoCuentaClienteFactura, loading, error } = useEstadoCuentaService();
+  const { FetchEstadoCuentaClienteFactura, loading, error } =
+    useEstadoCuentaService();
 
   const GetCuotasFactura = async (
     cuenta: string,
@@ -39,7 +41,7 @@ export const TablaFacturas = (props: Props) => {
     const response: any = await FetchEstadoCuentaClienteFactura(request);
 
     // Log para validar la forma real del payload
-    console.log('GetEstadoCuenta response =>', response);
+    console.log("GetEstadoCuenta response =>", response);
 
     // Normalizar payload: aceptar array plano o ApiResponse con data
     let dataArray: any[] = [];
@@ -64,60 +66,86 @@ export const TablaFacturas = (props: Props) => {
 
   const columns: TableColumn[] = [
     {
-      id: 'VIEW',
-      label: 'Ver',
+      id: "VIEW",
+      label: "Ver",
       format: (_value, row) => (
-        <Button
-          variant="contained"
-          size="small"
-          onClick={() =>
+        <i
+          className="fas fa-eye"
+          style={{ cursor: "pointer", color: "#1976d2", fontSize: "18px" }}
+          onClick={() => {
+            props.onSelectFactura?.({
+              ...row,
+              cliente: row?.cliente ?? row?.CLIENTE ?? props.cliente,
+            });
             GetCuotasFactura(
               row.CUENTA,
               row.NUMEFAC,
               props.cliente,
               props.fecha,
               props.intmora
-            )
-          }
-        >
-          Ver
-        </Button>
+            );
+          }}
+        ></i>
       ),
     },
-    { id: 'CUENTA', label: 'Cuenta' },
-    { id: 'NUMEFAC', label: 'Factura' },
-    { id: 'IDCLIPRV', label: 'Cliente' },
+    { id: "CUENTA", label: "Cuenta" },
+    { id: "NUMEFAC", label: "Factura" },
+    // { id: "IDCLIPRV", label: "Cliente" },
     {
-      id: 'SACT',
-      label: 'Saldo Actual',
+      id: "SACT",
+      label: "Saldo Actual",
+      format: (value: any, row?: any) => <Box>$ {StringToMoney(value)}</Box>,
+    },
+    {
+      id: "SACTMORA",
+      label: "Saldo Mora",
       format: (value: any, row?: any) => (
         <Box
           sx={{
-            backgroundColor: row?.ColorCodigo || 'gray',
-            color: '#fff',
-            borderRadius: '4px',
-            width: '100%',
-            textAlign: 'center',
+            backgroundColor: row?.ColorCodigo || "gray",
+            color: "#fff",
+            borderRadius: "4px",
+            width: "100%",
+            textAlign: "center",
           }}
         >
           $ {StringToMoney(value)}
         </Box>
       ),
     },
-    { id: 'CUOTAS', label: 'Cuotas' },
-    { id: 'MIN_VENC', label: 'Vencido' },
-    { id: 'DIAS', label: 'Días' },
     {
-      id: 'EDAD',
-      label: 'Edad',
+      id: "VALMORA",
+      label: "Int. Mora",
       format: (value: any, row?: any) => (
         <Box
           sx={{
-            backgroundColor: row?.ColorCodigo || 'gray',
-            color: '#fff',
-            borderRadius: '4px',
-            width: '100%',
-            textAlign: 'center',
+            backgroundColor: row?.ColorCodigo || "gray",
+            color: "#fff",
+            borderRadius: "4px",
+            width: "100%",
+            textAlign: "center",
+          }}
+        >
+          $ {StringToMoney(value)}
+        </Box>
+      ),
+    },
+    { id: "CUOTAS", label: "Cuotas" },
+    { id: "CUOTASCAN", label: "Canceladas" },
+    { id: "CUOTASMORA", label: "En Mora" },
+    { id: "MIN_VENC", label: "Vencido" },
+    { id: "DIAS", label: "Días" },
+    {
+      id: "EDAD",
+      label: "Edad",
+      format: (value: any, row?: any) => (
+        <Box
+          sx={{
+            backgroundColor: row?.ColorCodigo || "gray",
+            color: "#fff",
+            borderRadius: "4px",
+            width: "100%",
+            textAlign: "center",
           }}
         >
           {value}
@@ -127,9 +155,8 @@ export const TablaFacturas = (props: Props) => {
   ];
 
   return (
-    <DynamicTable
-      columns={columns}
-      rows={props.rows.map((row) => row)}
-    />
+    <Box>
+      <DynamicTable columns={columns} rows={props.rows.map((row) => row)} showTittle={true} tittle={{tittleText: 'Facturas', iconClass:'fas fa-file-invoice-dollar'}} />
+    </Box>
   );
 };

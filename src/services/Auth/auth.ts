@@ -3,37 +3,14 @@ import { User } from "@app/models/auth/User.model";
 // import { firebaseAuth } from '@app/firebase';
 import { IUser } from "@app/types/user";
 import { saveObjectToLocalStorage } from "@app/utils/localStorageHandler";
+import { useApi } from "@app/hooks/useApi";
+import { useCallback } from "react";
 
 const API_URL = import.meta.env.VITE_API_URL;
-// import { createUserWithEmailAndPassword } from '@firebase/auth';
-// import { signInWithEmailAndPassword, signInWithPopup } from 'firebase/auth';
-// import { GoogleAuthProvider } from 'firebase/auth';
-
-// const provider = new GoogleAuthProvider();
-
-// export const loginByAuth = async (email: string, password: string) => {
-//   const token = 'I_AM_THE_TOKEN';
-//   localStorage.setItem('token', token);
-//   removeWindowClass('login-page');
-//   removeWindowClass('hold-transition');
-//   return token;
-// };
-
-// export const registerByAuth = async (email: string, password: string) => {
-//   const token = 'I_AM_THE_TOKEN';
-//   localStorage.setItem('token', token);
-//   removeWindowClass('register-page');
-//   removeWindowClass('hold-transition');
-//   return token;
-// };
 
 export const registerWithEmail = async (email: string, password: string) => {
   try {
-    // const result = await createUserWithEmailAndPassword(
-    //   firebaseAuth,
-    //   email,
-    //   password
-    // );
+
     const result = {
       user: {
         id: "1",
@@ -77,7 +54,7 @@ interface LoginResponse {
   errors: string[];
 }
 
-export const loginWithEmail = async (
+export const loginWithEmailx = async (
   Username: string,
   Password: string
 ): Promise<User | null> => {
@@ -137,3 +114,69 @@ export const loginWithEmail = async (
 //     throw error;
 //   }
 // };
+
+// ---------------------------
+// Hook de autenticación (useApi)
+// ---------------------------
+interface LoginData {
+  token: {
+    tenantId: null;
+    creado: string;
+    email: string;
+    expira: string;
+    fullName: string | null;
+    isActive: boolean;
+    role: string;
+    token: string;
+    userId: number;
+    username: string;
+  };
+}
+
+export function useAuth() {
+  const { loading, error, request } = useApi<LoginData>("/api/v1", {
+    timeout: 10000,
+    retries: 0,
+    retryDelay: 1000,
+  });
+
+  const loginWithEmailHook = useCallback(
+    async (Username: string, Password: string): Promise<User | null> => {
+      const res = await request({
+        url: "/login",
+        method: "POST",
+        data: { Username, Password },
+      });
+
+      if (res && res.success && res.data) {
+        const tk = res.data.token;
+        // Guardar sesión estándar para que App.tsx y useApi la lean correctamente
+        saveObjectToLocalStorage("userAccess", {
+          id: tk.userId.toString(),
+          username: tk.username,
+          fullName: tk.fullName || "",
+          email: tk.email || tk.username,
+          role: tk.role,
+          token: tk.token,
+          tenantId: tk.tenantId || "",
+        });
+
+        return new User(
+          tk.userId.toString(),
+          tk.username,
+          "",
+          tk.fullName || "",
+          tk.email,
+          tk.role,
+          tk.token,
+          tk.tenantId || ""
+        );
+      }
+
+      return null;
+    },
+    [request]
+  );
+
+  return { loading, error, loginWithEmail: loginWithEmailHook };
+}

@@ -1,0 +1,17 @@
+class Empresa {
+    name: string;
+    id: string;
+    constructor(name: string, id: string) {
+        this.name = name;
+        this.id = id;
+    }
+}
+
+export const listadoEmpresas: Empresa[] = [
+    new Empresa("MotosYMotocarros", "832A1999-4C52-475A-9A22-94718791B7EE"),
+    new Empresa("Nechimotos", "37D2E8FC-603E-47F9-93F2-A9281D253E4C"),
+    new Empresa("ZuperMoto", "690A601D-69CF-4596-8218-181EE35B8E99"),
+    new Empresa("Wigou", "6FE9CC4F-0AFB-4F42-9425-89BE9B845B76"),
+    new Empresa("Moteros de la Sabana", "25133c2e-7dee-4321-97f9-51e6edcdb980"),
+    new Empresa("EMPRESA DE PRUEBA", "7f4f0d5a-9b8a-4a33-bb56-5a2b1f8a9c3e"),
+];

@@ -10,7 +10,7 @@ import { Checkbox } from '@profabric/react-components';
 
 import { setCurrentUser } from '@app/store/reducers/auth';
 import { Button } from '@app/styles/common';
-import { registerWithEmail } from '@app/services/auth';
+import { registerWithEmail } from '@app/services/Auth/auth';
 import { useAppDispatch } from '@app/store/store';
 
 const Register = () => {

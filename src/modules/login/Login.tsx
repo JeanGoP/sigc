@@ -1,24 +1,34 @@
-import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { toast } from 'react-toastify';
-import { useFormik } from 'formik';
-import { useTranslation } from 'react-i18next';
-import { setCurrentUser } from '@store/reducers/auth';
-import { setWindowClass } from '@app/utils/helpers';
-import { Checkbox } from '@profabric/react-components';
-import * as Yup from 'yup';
+import { useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { toast } from "react-toastify";
+import { useFormik } from "formik";
+import { useTranslation } from "react-i18next";
+import { setCurrentUser } from "@store/reducers/auth";
+import { setWindowClass } from "@app/utils/helpers";
+import { Checkbox } from "@profabric/react-components";
+import * as Yup from "yup";
 
-import { Form, InputGroup } from 'react-bootstrap';
-import { Button } from '@app/styles/common';
-import { loginWithEmail } from '@app/services/auth';
-import { useAppDispatch } from '@app/store/store';
-import { saveObjectToLocalStorage } from '@app/utils/localStorageHandler';
+import { Form, InputGroup } from "react-bootstrap";
+import { Button } from "@app/styles/common";
+import { useAuth } from "@app/services/Auth/auth";
+import { useAppDispatch } from "@app/store/store";
+import { saveObjectToLocalStorage } from "@app/utils/localStorageHandler";
+import SeleccionarEmpresa from "./components/SeleccionarEmpresa";
+import { listadoEmpresas } from "./functions/listadoEmpresas";
 
 const Login = () => {
   const [isAuthLoading, setAuthLoading] = useState(false);
   const [isGoogleAuthLoading, setGoogleAuthLoading] = useState(false);
   const [isFacebookAuthLoading, setFacebookAuthLoading] = useState(false);
+  const [bussinessKey, setBussinessKey] = useState(listadoEmpresas[0]?.id || "");
   const dispatch = useAppDispatch();
+  const { loginWithEmail } = useAuth();
+
+  useEffect(() => {
+    saveObjectToLocalStorage("userAccess", {
+      tenantId: listadoEmpresas[0]?.id || "",
+    });
+  }, []);
 
   const navigate = useNavigate();
   const [t] = useTranslation();
@@ -26,22 +36,31 @@ const Login = () => {
   const login = async (username: string, password: string) => {
     try {
       setAuthLoading(true);
+
       const user = await loginWithEmail(username, password);
+      console.log("usuario logeado:", user);
       console.log(user);
       dispatch(setCurrentUser(user));
-      if (user != null) 
-        toast.success('Login is succeed!');
+      if (user != null) toast.success("Login is succeed!");
 
-      if (user == null)
-        toast.error('Login is Failure!');
+      if (user == null) toast.error("Login is Failure!");
 
-      saveObjectToLocalStorage('userAccess', user);
-        
+      saveObjectToLocalStorage("userAccess", user);
+
       setAuthLoading(false);
-      navigate('/');
+      navigate("/");
     } catch (error: any) {
       setAuthLoading(false);
-      toast.error(error.message || 'Failed');
+      toast.error(error.message || "Failed");
+    }
+  };
+
+  const bussinessKeyChange = (e: any) => {
+    if (e && e.target && e.target.value) {
+      setBussinessKey(e.target.value);
+      saveObjectToLocalStorage("userAccess", {
+        tenantId: e.target.value,
+      });
     }
   };
 
@@ -57,34 +76,36 @@ const Login = () => {
   //   }
   // };
 
+  console.log(listadoEmpresas);
+
   const loginByFacebook = async () => {
     try {
       setFacebookAuthLoading(true);
-      throw new Error('Not implemented');
+      throw new Error("Not implemented");
     } catch (error: any) {
       setFacebookAuthLoading(false);
-      toast.error(error.message || 'Failed');
+      toast.error(error.message || "Failed");
     }
   };
 
   const { handleChange, values, handleSubmit, touched, errors } = useFormik({
     initialValues: {
-      username: '',
-      password: '',
+      username: "",
+      password: "",
     },
     validationSchema: Yup.object({
-      username: Yup.string().required('Required'),
+      username: Yup.string().required("Required"),
       password: Yup.string()
-        .min(5, 'Must be 5 characters or more')
-        .max(30, 'Must be 30 characters or less')
-        .required('Required'),
+        .min(5, "Must be 5 characters or more")
+        .max(30, "Must be 30 characters or less")
+        .required("Required"),
     }),
     onSubmit: (values) => {
       login(values.username, values.password);
     },
   });
 
-  setWindowClass('hold-transition login-page');
+  setWindowClass("hold-transition login-page");
 
   return (
     <div className="login-box">
@@ -93,21 +114,55 @@ const Login = () => {
           <Link to="/" className="h1">
             {/* <b>Admin</b>
             <span>LTE</span> */}
-            <b>SIGC</b>
-            <span> Montelibano</span>
-            <img style={{width:"300px"}} id="img_logomym" src="/logoinversionesmotosycarros.png" alt=""/>
+            {/* <b>SIGC</b>
+            <span> Montelibano</span> */}
+            <img
+              style={{ width: "300px" }}
+              id="img_logomym"
+              src="/logoEmpresa.svg"
+              alt=""
+            />
           </Link>
         </div>
         <div className="card-body">
-          <p className="login-box-msg">{t('login.label.signIn')}</p>
+          <p className="login-box-msg">Inicio de Sesion</p>
           <form onSubmit={handleSubmit}>
+            <div className="mb-3">
+              <InputGroup className="mb-3">
+                <Form.Control
+                  as="select"
+                  aria-label="Default select example"
+                  onChange={(e) => bussinessKeyChange(e)}
+                  defaultValue={listadoEmpresas[0]?.id}
+                >
+                  {listadoEmpresas.map((empresa) => (
+                    <option key={empresa.id} value={empresa.id}>
+                      {empresa.name}
+                    </option>
+                  ))}
+                </Form.Control>
+                {touched.username && errors.username ? (
+                  <Form.Control.Feedback type="invalid">
+                    {errors.username}
+                  </Form.Control.Feedback>
+                ) : (
+                  <InputGroup.Append>
+                    <InputGroup.Text>
+                      <i className="fas fa-user" />
+                    </InputGroup.Text>
+                  </InputGroup.Append>
+                )}
+              </InputGroup>
+            </div>
+
+            {/* <SeleccionarEmpresa /> */}
             <div className="mb-3">
               <InputGroup className="mb-3">
                 <Form.Control
                   id="username"
                   name="username"
                   type="text"
-                  placeholder="Username"
+                  placeholder="Usuario"
                   onChange={handleChange}
                   value={values.username}
                   isValid={touched.username && !errors.username}
@@ -132,7 +187,7 @@ const Login = () => {
                   id="password"
                   name="password"
                   type="password"
-                  placeholder="Password"
+                  placeholder="Contraseña"
                   onChange={handleChange}
                   value={values.password}
                   isValid={touched.password && !errors.password}
@@ -161,13 +216,16 @@ const Login = () => {
                   </label>
                 </div>
               </div> */}
-              <div className="col-12" style={{ display: 'flex', alignItems: 'center' }} >
+              <div
+                className="col-12"
+                style={{ display: "flex", alignItems: "center" }}
+              >
                 <Button
                   loading={isAuthLoading}
                   disabled={isFacebookAuthLoading || isGoogleAuthLoading}
                   onClick={handleSubmit as any}
                 >
-                  {t('login.button.signIn.label')}
+                  {t("login.button.signIn.label")}
                 </Button>
               </div>
             </div>
@@ -195,11 +253,11 @@ const Login = () => {
             </Button> 
           </div>*/}
           <p className="mb-1">
-            <Link to="/forgot-password">{t('login.label.forgotPass')}</Link>
+            <Link to="/forgot-password">{t("login.label.forgotPass")}</Link>
           </p>
           <p className="mb-0">
             <Link to="/register" className="text-center">
-              {t('login.label.registerNew')}
+              {t("login.label.registerNew")}
             </Link>
           </p>
         </div>

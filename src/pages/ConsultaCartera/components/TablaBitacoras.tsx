@@ -5,6 +5,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faStar, faEye } from "@fortawesome/free-solid-svg-icons";
 import { useAppSelector } from "@app/store/store";
 import { toast } from "react-toastify";
+import { ScoringVisual } from "./score";
 
 interface Props {
   cliente: string;
