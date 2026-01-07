@@ -82,6 +82,7 @@ import {
 } from "@app/utils/localStorageHandler";
 import { FiltrosFacturasCarteraModel } from "@app/models/otros/FiltrosFacturasCarteraModel";
 import { StickyNote } from "./components/StickyNote/StickyNote";
+import { DynamicTablePaginationConsultaCartera } from "../ConsultaClientes/components/tablaReutilizablePaginacionConsultaCartera";
 // import { ScoringVisual } from "./components/score";
 
 const API_URL = import.meta.env.VITE_API_URL;
@@ -146,6 +147,8 @@ export const ConsultaCartera: React.FC = () => {
     { label: "Evento B", value: "eventoB" },
     { label: "Evento C", value: "eventoC" },
   ]);
+
+  const inputRef = useRef<HTMLInputElement>(null);
 
   if (!existsInLocalStorage("filtros_carteras")) {
     const obj = new FiltrosFacturasCarteraModel();
@@ -433,6 +436,16 @@ export const ConsultaCartera: React.FC = () => {
     fetchPlantillas();
   }, []);
 
+  useEffect(() => {
+    if (
+      !loading &&
+      inputRef.current &&
+      inputRef.current.offsetParent !== null
+    ) {
+      inputRef.current.focus();
+    }
+  }, [tablaLoading]);
+
   // Cargar gestiones cuando se selecciona un registro
   useEffect(() => {
     if (hasFullSelection) {
@@ -503,6 +516,26 @@ export const ConsultaCartera: React.FC = () => {
     }
   };
 
+  const handleClicLupaBuscar = async (row: any) => {
+    try {
+              if (!row || typeof row !== "object") {
+                toast.error("Registro inválido");
+                console.error("Registro inválido:", row);
+                return;
+              }
+              // opcional: chequear claves importantes
+              if (!row.numefac && !row.cliente && !row.cuenta) {
+                toast.warn("Registro sin información esencial");
+                // aún puedes setearlo, o decidir no hacerlo
+              }
+              handleSeleccionarRegistro(row);
+            } catch (err) {
+              console.error("Error al seleccionar registro:", err);
+              toast.error("Error al seleccionar registro");
+            }
+          }
+  
+
   // Función para cargar la información del cliente
   const cargarInfoCliente = async (idCliente: string) => {
     try {
@@ -554,11 +587,7 @@ export const ConsultaCartera: React.FC = () => {
   const handleSeleccionarFactura = (row: any) => {
     const seleccionado = {
       cliente:
-        row?.cliente ??
-        row?.CLIENTE ??
-        row?.IDCLIPRV ??
-        selectedValue ??
-        "",
+        row?.cliente ?? row?.CLIENTE ?? row?.IDCLIPRV ?? selectedValue ?? "",
       numefac: row?.numefac ?? row?.NUMEFAC ?? row?.factura ?? "",
       cuenta: row?.cuenta ?? row?.CUENTA ?? "",
     };
@@ -603,24 +632,7 @@ export const ConsultaCartera: React.FC = () => {
             fontSize: 18,
           }}
           title="Buscar"
-          onClick={() => {
-            try {
-              if (!row || typeof row !== "object") {
-                toast.error("Registro inválido");
-                console.error("Registro inválido:", row);
-                return;
-              }
-              // opcional: chequear claves importantes
-              if (!row.numefac && !row.cliente && !row.cuenta) {
-                toast.warn("Registro sin información esencial");
-                // aún puedes setearlo, o decidir no hacerlo
-              }
-              handleSeleccionarRegistro(row);
-            } catch (err) {
-              console.error("Error al seleccionar registro:", err);
-              toast.error("Error al seleccionar registro");
-            }
-          }}
+          onClick={handleClicLupaBuscar.bind(null, row)}
         >
           <i className="fas fa-search" />
         </button>
@@ -733,21 +745,29 @@ export const ConsultaCartera: React.FC = () => {
                 collapsed ? "collapsed" : "col col-sm-4 col-md-5 col-lg-4"
               }`}
             >
-              <div className="d-flex justify-content-between align-items-center p-2">
+              <div className="d-flex align-items-center p-2 gap-2">
                 {/* {collapsed == true ? "" : <strong>Clientes</strong>} */}
-                <div className="d-flex align-items-center">
+                <div className="d-flex align-items-center flex-grow-1">
                   <Form.Control
+                    ref={inputRef}
                     type="text"
                     placeholder="Buscar"
                     value={tablaSearch}
                     onChange={(e) => setTablaSearch(e.target.value)}
+                    disabled={tablaLoading}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault(); // evita que haga submit accidental
+                        fetchFacturas(); // <--- tu función a ejecutar
+                      }
+                    }}
                     style={{
-                      maxWidth: 200,
-                      marginRight: 8,
+                      // width: 200,
+                      // marginRight: 8,
                       display: collapsed || MenuFiltrosState ? "none" : "block",
                     }}
                   />
-                  <Button
+                  {/* <Button
                     variant="primary"
                     // size="sm"
                     onClick={fetchFacturas}
@@ -759,7 +779,7 @@ export const ConsultaCartera: React.FC = () => {
                     title="Consultar"
                   >
                     <i className="fas fa-search" />
-                  </Button>
+                  </Button> */}
                 </div>
                 <div className="d-flex align-items-center">
                   <Button
@@ -807,7 +827,7 @@ export const ConsultaCartera: React.FC = () => {
                     />
                   </div>
                 ) : (
-                  <DynamicTablePagination
+                  <DynamicTablePaginationConsultaCartera
                     columns={columns}
                     rows={tablaRows}
                     searchText={tablaSearch}
@@ -819,13 +839,20 @@ export const ConsultaCartera: React.FC = () => {
                     maxHeight={"80vh"}
                     page={tablaPage}
                     onPageChange={setTablaPage}
+                    enableKeyboardNavigation={true}
+                    onRowEnter={(row) => {
+                      console.log("ENTER pressed on row:", row);
+                      handleClicLupaBuscar(row);
+                    }}
                     selectedPredicate={(row) =>
                       Boolean(
                         hasFullSelection &&
                           row?.cliente &&
                           registroSeleccionado &&
-                          String(row.cliente) === String(registroSeleccionado.cliente) &&
-                          String(row.cuenta ?? "") === String(registroSeleccionado.cuenta ?? "")
+                          String(row.cliente) ===
+                            String(registroSeleccionado.cliente) &&
+                          String(row.cuenta ?? "") ===
+                            String(registroSeleccionado.cuenta ?? "")
                       )
                     }
                   />
@@ -842,12 +869,16 @@ export const ConsultaCartera: React.FC = () => {
                 className="mb-3"
               >
                 {/* {registroSeleccionado?.numefac && ( */}
-                  <Tab
-                    eventKey="facturaActual"
-                    title= {<strong>{registroSeleccionado?.numefac || "No seleccionado"}</strong>}
-                    // title={`${registroSeleccionado.numefac}`}
-                    disabled
-                  />
+                <Tab
+                  eventKey="facturaActual"
+                  title={
+                    <strong>
+                      {registroSeleccionado?.numefac || "No seleccionado"}
+                    </strong>
+                  }
+                  // title={`${registroSeleccionado.numefac}`}
+                  disabled
+                />
                 {/* )} */}
                 <Tab eventKey="info" title="Información General">
                   <Row className="mb-3">
@@ -913,7 +944,6 @@ export const ConsultaCartera: React.FC = () => {
                         cliente={selectedValue}
                         idUser={currentUser?.id ?? 0}
                       />
-
                     </Col>
                   </Row>
 
@@ -1043,7 +1073,6 @@ export const ConsultaCartera: React.FC = () => {
                     ref={tablaFacturasRef}
                     onSelectFactura={handleSeleccionarFactura}
                     // numCuotas={registroSeleccionado.CUOTAS}
-
                   />
                 </Tab>
                 <Tab
@@ -1056,7 +1085,8 @@ export const ConsultaCartera: React.FC = () => {
                           placement="top"
                           overlay={
                             <Tooltip id="tooltip-seguimiento">
-                              Seleccione cliente, factura y cuenta para ver sus seguimientos
+                              Seleccione cliente, factura y cuenta para ver sus
+                              seguimientos
                             </Tooltip>
                           }
                         >
@@ -1080,12 +1110,19 @@ export const ConsultaCartera: React.FC = () => {
                     }}
                   />
                 </Tab>
-                <Tab eventKey="bitacora" title="Bitácora" disabled={!hasFullSelection}>
+                <Tab
+                  eventKey="bitacora"
+                  title="Bitácora"
+                  disabled={!hasFullSelection}
+                >
                   {hasFullSelection ? (
                     <TablaBitacoras cliente={registroSeleccionado.cliente} />
                   ) : (
                     <div className="text-center p-4">
-                      <p>Seleccione cliente, factura y cuenta para ver su bitácora</p>
+                      <p>
+                        Seleccione cliente, factura y cuenta para ver su
+                        bitácora
+                      </p>
                     </div>
                   )}
                 </Tab>
