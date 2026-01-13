@@ -95,6 +95,9 @@ const Calendario: React.FC = () => {
   const { loading, error, obtenerUsuariosPorRol, obtenerEventos } =
     useEventosService();
 
+  const isValidUserFilter = (value: string | number) =>
+    value !== "" && value !== null && value !== undefined && value !== 0 && value !== "0";
+
   // Cargar usuarios
   useEffect(() => {
     const fetchUsuarios = async () => {
@@ -110,6 +113,13 @@ const Calendario: React.FC = () => {
           })),
         ];
         setUsuarios(opciones);
+        if (opciones.length > 0) {
+          setUsuarioFiltro((prev) => {
+            if (isValidUserFilter(prev)) return prev;
+            const firstValid = opciones.find((opt) => isValidUserFilter(opt.value));
+            return firstValid ? firstValid.value : prev;
+          });
+        }
       }
     };
     if (currentUser?.id) {
@@ -120,12 +130,14 @@ const Calendario: React.FC = () => {
   // Cargar eventos
   useEffect(() => {
     const fetchEventos = async () => {
-      const res = await obtenerEventos({
+      if (!isValidUserFilter(usuarioFiltro)) return;
+      const params = {
         eventosAnteriores: incluirAnteriores,
         eventosCumplidos: incluirCumplidos,
         cuentaFiltro: cuentaFiltro || null,
-        ...(usuarioFiltro && { userId: usuarioFiltro }),
-      });
+        ...(isValidUserFilter(usuarioFiltro) && { userId: usuarioFiltro }),
+      };
+      const res = await obtenerEventos(params);
 
       if (res?.success && Array.isArray(res.data)) {
         const eventosConvertidos = res.data.map((ev: any) => ({
