@@ -14,6 +14,7 @@ export interface TableColumn {
 interface DynamicTableProps {
   columns: TableColumn[];
   rows: any[];
+  totalRows?: number;
   searchText: string;
   onSearchChange: (value: string) => void;
   rowsPerPage: number;
@@ -33,6 +34,7 @@ interface DynamicTableProps {
 export const DynamicTablePaginationConsultaCartera: React.FC<DynamicTableProps> = ({
   columns,
   rows = [],
+  totalRows,
   searchText,
   onSearchChange,
   rowsPerPage,
@@ -50,7 +52,7 @@ export const DynamicTablePaginationConsultaCartera: React.FC<DynamicTableProps> 
   const [navMode, setNavMode] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
 
-  const paginatedRows = rows.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
+  const paginatedRows = rows;
   const rowRefs = React.useRef<(HTMLTableRowElement | null)[]>([]);
 
 
@@ -174,7 +176,7 @@ export const DynamicTablePaginationConsultaCartera: React.FC<DynamicTableProps> 
 
       <TablePagination
         component="div"
-        count={rows.length}
+        count={typeof totalRows === "number" ? totalRows : rows.length}
         page={page}
         onPageChange={(_, newPage) => onPageChange(newPage)}
         rowsPerPage={rowsPerPage}

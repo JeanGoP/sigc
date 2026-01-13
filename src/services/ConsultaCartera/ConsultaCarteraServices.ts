@@ -12,6 +12,13 @@ export interface FacturaListModel {
   ColorCodigo?: string;
 }
 
+export interface FacturaListResponse {
+  total: number;
+  page: number;
+  numPage: number;
+  items: FacturaListModel[];
+}
+
 export interface PlantillaCorreo {
   nombre: string;
   key: string;
@@ -24,7 +31,7 @@ export function useConsultaCarteraService() {
   // 🔹 Obtener lista de facturas
   const getFacturasList = async (
     params: Record<string, any>
-  ): Promise<ApiResponse<FacturaListModel[]> | null> => {
+  ): Promise<ApiResponse<FacturaListResponse> | null> => {
     return await request({
       url: "/GetFacturasList",
       method: "POST",

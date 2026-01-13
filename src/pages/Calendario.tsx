@@ -104,7 +104,6 @@ const Calendario: React.FC = () => {
       );
       if (res?.success && Array.isArray(res.data)) {
         const opciones = [
-          { label: "Todos", value: "" },
           ...res.data.map((user: any) => ({
             label: user.fullName,
             value: user.userId,

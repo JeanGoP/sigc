@@ -83,6 +83,7 @@ import {
 import { FiltrosFacturasCarteraModel } from "@app/models/otros/FiltrosFacturasCarteraModel";
 import { StickyNote } from "./components/StickyNote/StickyNote";
 import { DynamicTablePaginationConsultaCartera } from "../ConsultaClientes/components/tablaReutilizablePaginacionConsultaCartera";
+import { TablaEventosPorClave } from "./components/TablaEventosPorClave/TablaEventosPorClave";
 // import { ScoringVisual } from "./components/score";
 
 const API_URL = import.meta.env.VITE_API_URL;
@@ -177,6 +178,7 @@ export const ConsultaCartera: React.FC = () => {
     []
   );
   const [tablaRows, setTablaRows] = useState<any[]>([]);
+  const [tablaTotalRows, setTablaTotalRows] = useState(0);
   const [tablaLoading, setTablaLoading] = useState(false);
   const [tablaSearch, setTablaSearch] = useState("");
   const [tablaRowsPerPage, setTablaRowsPerPage] = useState(50);
@@ -329,20 +331,34 @@ export const ConsultaCartera: React.FC = () => {
         filtroEventos: filtros.tipoEvento,
         filtroPorVencimiento: filtros.filtroPorVencimiento ?? "",
         filtroPorEtiqueta: filtros.etiqueta,
-        page: tablaPage === 0 ? 1 : tablaPage,
+        page: Math.max(1, tablaPage + 1),
         numPage: tablaRowsPerPage,
         filter: tablaSearch,
       };
 
       const data = await getFacturasList(params);
-      if (data?.success && Array.isArray(data.data)) {
-        resultRows = data.data;
-        setTablaRows(resultRows);
+      if (data?.success && data.data) {
+        if (Array.isArray(data.data)) {
+          resultRows = data.data;
+          setTablaRows(resultRows);
+          setTablaTotalRows(resultRows.length);
+        } else if (Array.isArray(data.data.items)) {
+          resultRows = data.data.items;
+          setTablaRows(resultRows);
+          setTablaTotalRows(
+            typeof data.data.total === "number" ? data.data.total : resultRows.length
+          );
+        } else {
+          setTablaRows([]);
+          setTablaTotalRows(0);
+        }
       } else {
         setTablaRows([]);
+        setTablaTotalRows(0);
       }
     } catch {
       setTablaRows([]);
+      setTablaTotalRows(0);
     }
     setTablaLoading(false);
     return resultRows;
@@ -516,25 +532,28 @@ export const ConsultaCartera: React.FC = () => {
     }
   };
 
+  const handleBuscar = async (): Promise<void> => {
+    await fetchFacturas();
+  };
+
   const handleClicLupaBuscar = async (row: any) => {
     try {
-              if (!row || typeof row !== "object") {
-                toast.error("Registro inválido");
-                console.error("Registro inválido:", row);
-                return;
-              }
-              // opcional: chequear claves importantes
-              if (!row.numefac && !row.cliente && !row.cuenta) {
-                toast.warn("Registro sin información esencial");
-                // aún puedes setearlo, o decidir no hacerlo
-              }
-              handleSeleccionarRegistro(row);
-            } catch (err) {
-              console.error("Error al seleccionar registro:", err);
-              toast.error("Error al seleccionar registro");
-            }
-          }
-  
+      if (!row || typeof row !== "object") {
+        toast.error("Registro inválido");
+        console.error("Registro inválido:", row);
+        return;
+      }
+      // opcional: chequear claves importantes
+      if (!row.numefac && !row.cliente && !row.cuenta) {
+        toast.warn("Registro sin información esencial");
+        // aún puedes setearlo, o decidir no hacerlo
+      }
+      handleSeleccionarRegistro(row);
+    } catch (err) {
+      console.error("Error al seleccionar registro:", err);
+      toast.error("Error al seleccionar registro");
+    }
+  };
 
   // Función para cargar la información del cliente
   const cargarInfoCliente = async (idCliente: string) => {
@@ -830,6 +849,7 @@ export const ConsultaCartera: React.FC = () => {
                   <DynamicTablePaginationConsultaCartera
                     columns={columns}
                     rows={tablaRows}
+                    totalRows={tablaTotalRows}
                     searchText={tablaSearch}
                     onSearchChange={setTablaSearch}
                     rowsPerPage={tablaRowsPerPage}
@@ -1102,6 +1122,7 @@ export const ConsultaCartera: React.FC = () => {
                   <TimelineSeguimientos
                     seguimientos={seguimientos}
                     onNuevoSeguimiento={handleNuevoSeguimiento}
+                    onBuscar={handleBuscar}
                     contextoEvento={{
                       idUsuario: currentUser?.id || 0,
                       cliente: registroSeleccionado?.cliente || "",
@@ -1116,7 +1137,12 @@ export const ConsultaCartera: React.FC = () => {
                   disabled={!hasFullSelection}
                 >
                   {hasFullSelection ? (
-                    <TablaBitacoras cliente={registroSeleccionado.cliente} />
+                    // <TablaBitacoras cliente={registroSeleccionado.cliente} />
+                    <TablaEventosPorClave
+                      cliente= {registroSeleccionado?.cliente || ""}
+                      factura= {registroSeleccionado?.numefac || ""}
+                      cuenta= {registroSeleccionado?.cuenta || ""}
+                    />
                   ) : (
                     <div className="text-center p-4">
                       <p>

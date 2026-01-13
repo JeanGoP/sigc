@@ -73,6 +73,7 @@ interface TimelineSeguimientosProps {
   onNuevoSeguimiento: (
     seguimiento: Omit<Seguimiento, "id" | "usuario" | "fecha" | "hora">
   ) => Promise<boolean>;
+  onBuscar?: () => Promise<unknown> | void;
   contextoEvento?: {
     idUsuario?: string | number;
     cliente?: string;
@@ -84,6 +85,7 @@ interface TimelineSeguimientosProps {
 export const TimelineSeguimientos: React.FC<TimelineSeguimientosProps> = ({
   seguimientos,
   onNuevoSeguimiento,
+  onBuscar,
   contextoEvento,
 }) => {
   const [showModal, setShowModal] = React.useState(false);
@@ -114,6 +116,37 @@ export const TimelineSeguimientos: React.FC<TimelineSeguimientosProps> = ({
   const [errorValidacion, setErrorValidacion] = React.useState<string | null>(
     null
   );
+  const [isValidatingEvent, setIsValidatingEvent] = React.useState(false);
+  const isValidatingEventRef = React.useRef(false);
+  const getDefaultFormEvento = (preferNombre?: string): Evento => {
+    const preferred =
+      (preferNombre
+        ? tiposEvento.find((t) => t.nombre === preferNombre)
+        : undefined) ?? tiposEvento[0];
+    return {
+      ...emptyFormEvento,
+      tipo: preferred?.nombre ?? "",
+      id: preferred?.id ?? 0,
+    };
+  };
+
+  const buildEventoKey = (evento: Evento): string => {
+    const tipoKey = evento.id
+      ? String(evento.id)
+      : (evento.tipo || "").trim().toLowerCase();
+    const fechaKey = (evento.fecha || "").trim();
+    const horaKey = evento.hora ? String(evento.hora).trim() : "";
+    const valorKey = typeof evento.valor === "number" ? String(evento.valor) : "";
+    return `${tipoKey}|${fechaKey}|${horaKey}|${valorKey}`;
+  };
+
+  const isDuplicateEvento = (evento: Evento, excludeIndex?: number): boolean => {
+    const key = buildEventoKey(evento);
+    return nuevoEventos.some((evt, idx) => {
+      if (excludeIndex !== undefined && idx === excludeIndex) return false;
+      return buildEventoKey(evt) === key;
+    });
+  };
 
   React.useEffect(() => {
     const cargarTipos = async () => {
@@ -226,6 +259,9 @@ export const TimelineSeguimientos: React.FC<TimelineSeguimientosProps> = ({
   // };
 
   const handleAgregarEventoValidado = async () => {
+    if (isValidatingEventRef.current) return;
+    isValidatingEventRef.current = true;
+    setIsValidatingEvent(true);
     setErrorValidacion(null);
     const eventoEnviar = { ...formEvento };
 
@@ -237,6 +273,13 @@ export const TimelineSeguimientos: React.FC<TimelineSeguimientosProps> = ({
     console.log("Evento a validar:", contextoEvento);
 
     try {
+      const duplicateMessage = "Este evento ya fue agregado.";
+      if (isDuplicateEvento(eventoEnviar)) {
+        setErrorValidacion(duplicateMessage);
+        toast.warn(duplicateMessage);
+        return;
+      }
+
       const resp = await validarEvento({
         tipo: eventoEnviar.id,
         fecha: eventoEnviar.fecha || null,
@@ -257,6 +300,9 @@ export const TimelineSeguimientos: React.FC<TimelineSeguimientosProps> = ({
       setErrorValidacion(err?.message || "Error al validar.");
       toast.error(err?.message || "Error al validar.");
       return;
+    } finally {
+      isValidatingEventRef.current = false;
+      setIsValidatingEvent(false);
     }
 
     // if (!ok) {
@@ -266,16 +312,26 @@ export const TimelineSeguimientos: React.FC<TimelineSeguimientosProps> = ({
 
     // Validado: agregamos
     setNuevoEventos((evts) => [...evts, eventoEnviar]);
-    setFormEvento(emptyFormEvento);
+    setFormEvento(getDefaultFormEvento(eventoEnviar.tipo));
   };
 
   const handleActualizarEventoValidado = async () => {
     if (editIndex === null) return;
+    if (isValidatingEventRef.current) return;
+    isValidatingEventRef.current = true;
+    setIsValidatingEvent(true);
     setErrorValidacion(null);
 
     const eventoEnviar = { ...formEvento };
 
     try {
+      const duplicateMessage = "Este evento ya fue agregado.";
+      if (isDuplicateEvento(eventoEnviar, editIndex)) {
+        setErrorValidacion(duplicateMessage);
+        toast.warn(duplicateMessage);
+        return;
+      }
+
       const resp = await validarEvento({
         tipo: eventoEnviar.id,
         fecha: eventoEnviar.fecha || null,
@@ -296,6 +352,9 @@ export const TimelineSeguimientos: React.FC<TimelineSeguimientosProps> = ({
       setErrorValidacion(err?.message || "Error al validar.");
       toast.error(err?.message || "Error al validar.");
       return;
+    } finally {
+      isValidatingEventRef.current = false;
+      setIsValidatingEvent(false);
     }
 
 
@@ -308,12 +367,12 @@ export const TimelineSeguimientos: React.FC<TimelineSeguimientosProps> = ({
       evts.map((evt, i) => (i === editIndex ? eventoEnviar : evt))
     );
     setEditIndex(null);
-    setFormEvento(emptyFormEvento);
+    setFormEvento(getDefaultFormEvento(eventoEnviar.tipo));
   };
 
   const handleCancelarEdicionEvento = () => {
     setEditIndex(null);
-    setFormEvento(emptyFormEvento);
+    setFormEvento(getDefaultFormEvento(formEvento.tipo));
     setErrorValidacion(null);
   };
 
@@ -371,19 +430,30 @@ export const TimelineSeguimientos: React.FC<TimelineSeguimientosProps> = ({
       })
       .join("\n");
 
+    const grabacionUrl = nuevoGrabacion
+      ? URL.createObjectURL(nuevoGrabacion)
+      : null;
     const procesoGuardado = await onNuevoSeguimiento({
       texto: nuevoTexto,
       detalle: nuevoTexto,
       eventos: eventosConId,
       tipoContacto: nuevoTipoContacto,
-      grabacion: nuevoGrabacion ? URL.createObjectURL(nuevoGrabacion) : null,
+      grabacion: grabacionUrl,
     });
+    if (grabacionUrl) {
+      URL.revokeObjectURL(grabacionUrl);
+    }
 
     if (await procesoGuardado) {
       setNuevoAbierto(false);
       setNuevoTexto("");
       setNuevoEventos([]);
       setNuevoGrabacion(null);
+      setNuevoTipoContacto(0);
+      setEditIndex(null);
+      setErrorValidacion(null);
+      setFormEvento(getDefaultFormEvento(formEvento.tipo));
+      void onBuscar?.();
     }
   };
 
@@ -439,6 +509,10 @@ export const TimelineSeguimientos: React.FC<TimelineSeguimientosProps> = ({
     setNuevoTexto("");
     setNuevoEventos([]);
     setNuevoGrabacion(null);
+    setNuevoTipoContacto(0);
+    setEditIndex(null);
+    setErrorValidacion(null);
+    setFormEvento(getDefaultFormEvento(formEvento.tipo));
   }
 
   const parseEventos = (eventos: string | Evento[]): Evento[] => {
@@ -446,12 +520,44 @@ export const TimelineSeguimientos: React.FC<TimelineSeguimientosProps> = ({
       return eventos;
     }
     if (typeof eventos === "string") {
+      const raw = eventos.trim();
+      if (!raw) return [];
       try {
         // Intentar parsear como JSON primero
-        return JSON.parse(eventos);
+        return JSON.parse(raw);
       } catch (e) {
         // Si falla, intentar parsear como XML
-        return eventos
+        if (raw.startsWith("<")) {
+          try {
+            const parser = new DOMParser();
+            const xmlSource = raw.includes("<Eventos")
+              ? raw
+              : `<Eventos>${raw}</Eventos>`;
+            const xmlDoc = parser.parseFromString(xmlSource, "text/xml");
+            if (xmlDoc.getElementsByTagName("parsererror").length === 0) {
+              const nodes = Array.from(xmlDoc.getElementsByTagName("Evento"));
+              const parsedEventos = nodes.map((node) => {
+                const getText = (tag: string) =>
+                  node.getElementsByTagName(tag)[0]?.textContent ?? "";
+                const valorText = getText("Valor");
+                const valorNum = Number(valorText);
+                return {
+                  id: Number(getText("Id")) || 0,
+                  tipo: getText("Tipo"),
+                  fecha: getText("Fecha"),
+                  hora: getText("Hora") || null,
+                  valor: Number.isFinite(valorNum) ? valorNum : undefined,
+                } as Evento;
+              });
+              if (parsedEventos.length > 0) {
+                return parsedEventos;
+              }
+            }
+          } catch (err) {
+            console.error("Error al parsear XML de eventos:", err);
+          }
+        }
+        return raw
           .split("\n")
           .filter((evento) => evento.trim())
           .map((eventoStr) => {
@@ -598,10 +704,24 @@ export const TimelineSeguimientos: React.FC<TimelineSeguimientosProps> = ({
                   const selectedTipo = tiposEvento.find(
                     (t) => t.nombre === val
                   );
-                  setFormCampo("tipo", val as any);
-                  if (selectedTipo) {
-                    setFormCampo("id", selectedTipo.id as any);
-                  }
+                  setFormEvento((prev) => {
+                    const next = {
+                      ...prev,
+                      tipo: val as any,
+                      id: selectedTipo ? selectedTipo.id : prev.id,
+                    };
+                    if (!selectedTipo?.requiereFecha) {
+                      next.fecha = "";
+                    }
+                    if (!selectedTipo?.requiereHora) {
+                      next.hora = null;
+                    }
+                    if (!selectedTipo?.requiereMonto) {
+                      next.valor = undefined;
+                    }
+                    return next;
+                  });
+                  setErrorValidacion(null);
                 }}
               />
 
@@ -652,7 +772,12 @@ export const TimelineSeguimientos: React.FC<TimelineSeguimientosProps> = ({
                           placeholder="Valor"
                           value={formEvento.valor ?? ""}
                           onChange={(e) =>
-                            setFormCampo("valor", Number(e.target.value) as any)
+                            setFormCampo(
+                              "valor",
+                              e.target.value === ""
+                                ? undefined
+                                : (Number(e.target.value) as any)
+                            )
                           }
                         />
                       </Form.Group>
@@ -669,6 +794,7 @@ export const TimelineSeguimientos: React.FC<TimelineSeguimientosProps> = ({
                     variant="secondary"
                     onClick={handleAgregarEventoValidado}
                     style={{ borderRadius: 6 }}
+                    disabled={loading || isValidatingEvent}
                   >
                     + Agregar
                   </Button>
@@ -679,6 +805,7 @@ export const TimelineSeguimientos: React.FC<TimelineSeguimientosProps> = ({
                       variant="success"
                       onClick={handleActualizarEventoValidado}
                       style={{ borderRadius: 6, marginRight: 4 }}
+                      disabled={loading || isValidatingEvent}
                     >
                       Actualizar
                     </Button>
@@ -749,7 +876,7 @@ export const TimelineSeguimientos: React.FC<TimelineSeguimientosProps> = ({
                     </Button>
                     <Button
                       size="sm"
-                      variant="danger"
+                      // variant="danger"
                       onClick={() => handleEliminarEvento(idx)}
                       style={{ borderRadius: 6 }}
                       title="Eliminar evento"
@@ -761,7 +888,7 @@ export const TimelineSeguimientos: React.FC<TimelineSeguimientosProps> = ({
               );
             })}
           </div>
-          <div className="mb-3">
+          {/*<div className="mb-3">
             <label style={{ fontWeight: 500, marginBottom: 8 }}>
               Adjuntar grabación (opcional)
             </label>
@@ -776,7 +903,7 @@ export const TimelineSeguimientos: React.FC<TimelineSeguimientosProps> = ({
                 )
               }
             />
-          </div>
+          </div>*/}
           <div style={{ display: "flex", gap: 12 }}>
             <Button
               variant="success"
