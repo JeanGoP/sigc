@@ -37,6 +37,8 @@ export function useEventosService() {
     eventosCumplidos: boolean;
     userId?: string | number;
     cuentaFiltro?: string | null;
+    fechaInicio?: string;
+    fechaFin?: string;
   }) => {
     return request({
       url: "/ObtenerEventos",

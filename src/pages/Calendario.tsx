@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Calendar, momentLocalizer } from "react-big-calendar";
+import type { View } from "react-big-calendar";
 import moment from "moment";
 import "react-big-calendar/lib/css/react-big-calendar.css";
 import {
@@ -89,6 +90,10 @@ const Calendario: React.FC = () => {
   const [cuentaFiltro, setCuentaFiltro] = useState<string>("");
   const [eventosDelDia, setEventosDelDia] = useState<Evento[]>([]);
   const [fechaSeleccionada, setFechaSeleccionada] = useState<Date | null>(null);
+  const [rangoVisible, setRangoVisible] = useState<{
+    start: Date;
+    end: Date;
+  } | null>(null);
   const navigate = useNavigate();
 
   const currentUser = useAppSelector((state) => state.auth.currentUser);
@@ -97,6 +102,45 @@ const Calendario: React.FC = () => {
 
   const isValidUserFilter = (value: string | number) =>
     value !== "" && value !== null && value !== undefined && value !== 0 && value !== "0";
+
+  const normalizeRange = (
+    range: Date[] | { start: Date; end: Date }
+  ): { start: Date; end: Date } => {
+    if (Array.isArray(range)) {
+      if (range.length === 0) {
+        const today = moment();
+        return {
+          start: today.startOf("day").toDate(),
+          end: today.endOf("day").toDate(),
+        };
+      }
+      const times = range.map((date) => date.getTime());
+      const minTime = Math.min(...times);
+      const maxTime = Math.max(...times);
+      return {
+        start: moment(new Date(minTime)).startOf("day").toDate(),
+        end: moment(new Date(maxTime)).endOf("day").toDate(),
+      };
+    }
+
+    return {
+      start: moment(range.start).startOf("day").toDate(),
+      end: moment(range.end).endOf("day").toDate(),
+    };
+  };
+
+  const handleRangeChange = (
+    range: Date[] | { start: Date; end: Date },
+    view?: View
+  ) => {
+    const normalized = normalizeRange(range);
+    setRangoVisible(normalized);
+    console.log("Calendario rango visible actualizado:", {
+      view,
+      start: moment(normalized.start).format("YYYY-MM-DD"),
+      end: moment(normalized.end).format("YYYY-MM-DD"),
+    });
+  };
 
   // Cargar usuarios
   useEffect(() => {
@@ -127,16 +171,31 @@ const Calendario: React.FC = () => {
     }
   }, [currentUser]);
 
+  // Rango inicial para la vista por defecto (mes)
+  useEffect(() => {
+    const start = moment().startOf("month").startOf("week");
+    const end = moment().endOf("month").endOf("week");
+    const initialRange = { start: start.toDate(), end: end.toDate() };
+    setRangoVisible(initialRange);
+    console.log("Calendario rango inicial:", {
+      start: start.format("YYYY-MM-DD"),
+      end: end.format("YYYY-MM-DD"),
+    });
+  }, []);
+
   // Cargar eventos
   useEffect(() => {
     const fetchEventos = async () => {
-      if (!isValidUserFilter(usuarioFiltro)) return;
+      if (!isValidUserFilter(usuarioFiltro) || !rangoVisible) return;
       const params = {
         eventosAnteriores: incluirAnteriores,
         eventosCumplidos: incluirCumplidos,
         cuentaFiltro: cuentaFiltro || null,
+        fechaInicio: moment(rangoVisible.start).format("YYYY-MM-DD"),
+        fechaFin: moment(rangoVisible.end).format("YYYY-MM-DD"),
         ...(isValidUserFilter(usuarioFiltro) && { userId: usuarioFiltro }),
       };
+      console.log("Calendario obtenerEventos params:", params);
       const res = await obtenerEventos(params);
 
       if (res?.success && Array.isArray(res.data)) {
@@ -149,7 +208,13 @@ const Calendario: React.FC = () => {
       }
     };
     fetchEventos();
-  }, [usuarioFiltro, incluirAnteriores, incluirCumplidos,cuentaFiltro]);
+  }, [
+    usuarioFiltro,
+    incluirAnteriores,
+    incluirCumplidos,
+    cuentaFiltro,
+    rangoVisible,
+  ]);
 
   const handleSeleccionEvento = (evento: Evento) => {
     setEventoSeleccionado(evento);
@@ -250,6 +315,7 @@ const Calendario: React.FC = () => {
             selectable
             onSelectEvent={handleSeleccionEvento}
             onSelectSlot={handleSeleccionDia}
+            onRangeChange={handleRangeChange}
             style={{ height: 500 }}
             onShowMore={handleMostrarMas}
             eventPropGetter={(event: Evento) => ({

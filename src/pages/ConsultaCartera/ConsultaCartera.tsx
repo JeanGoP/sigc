@@ -786,19 +786,20 @@ export const ConsultaCartera: React.FC = () => {
                       display: collapsed || MenuFiltrosState ? "none" : "block",
                     }}
                   />
-                  {/* <Button
+                  <Button
                     variant="primary"
                     // size="sm"
                     onClick={fetchFacturas}
                     disabled={tablaLoading}
                     style={{
+                      marginLeft: 8,
                       minWidth: 40,
                       display: collapsed || MenuFiltrosState ? "none" : "block",
                     }}
                     title="Consultar"
                   >
                     <i className="fas fa-search" />
-                  </Button> */}
+                  </Button>
                 </div>
                 <div className="d-flex align-items-center">
                   <Button
