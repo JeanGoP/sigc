@@ -291,7 +291,7 @@ const Calendario: React.FC = () => {
               </Form.Group>
             </Col> */}
 
-            <Col md={4}>
+            {/*<Col md={4}>
               <Form.Group controlId="switchCumplidos">
                 <Form.Label>Incluir cumplidos</Form.Label>
                 <Form.Check
@@ -300,7 +300,7 @@ const Calendario: React.FC = () => {
                   onChange={(e) => setIncluirCumplidos(e.target.checked)}
                 />
               </Form.Group>
-            </Col>
+            </Col> */}
           </Row>
         </Card.Body>
       </Card>
