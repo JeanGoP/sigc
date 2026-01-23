@@ -1,4 +1,4 @@
-﻿import React from "react";
+﻿import React, { useState } from "react";
 import { Card, Row, Col, Form } from "react-bootstrap";
 
 // Tus componentes
@@ -19,6 +19,9 @@ import { FiltrosFacturasCarteraModel } from "@app/models/otros/FiltrosFacturasCa
 
 // Hook
 import { useUnsavedChanges } from "@app/hooks/useUnsavedChanges";
+import MultiSelectSimple, {
+  SelectOption,
+} from "@app/components/MultiSelectCheckBox/MultiselectNuevo";
 
 export interface FiltrosCarterasProps {
   state: boolean;
@@ -32,13 +35,53 @@ export type FiltrosCarterasRef = {
   tieneCambiosSinGuardar(): boolean;
 };
 
+const opciones: SelectOption[] = [
+  { label: "Por vencer", value: "PV" },
+  { label: "30", value: "30" },
+  { label: "60", value: "60" },
+  { label: "90", value: "90" },
+  { label: "+90", value: "+90" },
+];
 
-export const FiltrosCarteras: React.FC<FiltrosCarterasProps> = ({ onApply }: FiltrosCarterasProps) => {
+const normalizeEdadMora = (raw?: string | null): string => {
+  const trimmed = (raw ?? "").trim();
+  return trimmed.length > 0 ? trimmed : "todos";
+};
+
+const parseEdadMora = (raw?: string | null): SelectOption[] => {
+  const normalized = normalizeEdadMora(raw);
+  if (normalized === "todos") return [];
+  const values = normalized
+    .split(";")
+    .map((v) => v.trim())
+    .filter(Boolean);
+  return opciones.filter((opt) => values.includes(opt.value));
+};
+
+const serializeEdadMora = (items: SelectOption[]): string => {
+  if (!items || items.length === 0) return "todos";
+  return items.map((opt) => opt.value).join(";");
+};
+
+export const FiltrosCarteras: React.FC<FiltrosCarterasProps> = ({
+  onApply,
+}: FiltrosCarterasProps) => {
   // ------------------------------------------------------
   // VALOR INICIAL DESDE LOCAL STORAGE
   // ------------------------------------------------------
-  const storedRaw = loadFiltrosCarteras() as Partial<FiltrosFacturasCarteraModel> | null;
-  const initialFiltros = new FiltrosFacturasCarteraModel(storedRaw ?? undefined);
+  const storedRaw =
+    loadFiltrosCarteras() as Partial<FiltrosFacturasCarteraModel> | null;
+  const initialFiltros = new FiltrosFacturasCarteraModel(
+    storedRaw ?? undefined,
+  );
+
+  initialFiltros.filtroEdadMora = normalizeEdadMora(
+    initialFiltros.filtroEdadMora,
+  );
+
+  const [selected, setSelected] = useState<SelectOption[]>(() =>
+    parseEdadMora(initialFiltros.filtroEdadMora),
+  );
 
   // Hook que detecta cambios y bloquea cierre sin guardar
   const {
@@ -62,7 +105,10 @@ export const FiltrosCarteras: React.FC<FiltrosCarterasProps> = ({ onApply }: Fil
   };
 
   const limpiarFiltros = () => {
-    setFiltros(new FiltrosFacturasCarteraModel());
+    const clean = new FiltrosFacturasCarteraModel();
+    clean.filtroEdadMora = "todos";
+    setFiltros(clean);
+    setSelected([]);
     clearFiltrosCarteras();
   };
 
@@ -71,17 +117,17 @@ export const FiltrosCarteras: React.FC<FiltrosCarterasProps> = ({ onApply }: Fil
     // const value = e.target.value;
     // const numericValue = value === "" ? null : parseInt(value, 10);
     // update("sinGestionDias", numericValue);
-  }
+  };
 
   const handleChangeFiltroTipoEvento = (value: string | number | null) => {
     console.log("Tipo Evento cambiado:", value);
     update("tipoEvento", value);
-  }
+  };
 
   const handleChangeFiltroCuenta = (value: string | number | null) => {
     console.log("Cuenta cambiada:", value);
     update("cuenta", value);
-  }
+  };
 
   return (
     <div>
@@ -95,7 +141,9 @@ export const FiltrosCarteras: React.FC<FiltrosCarterasProps> = ({ onApply }: Fil
                   type="switch"
                   id="switch-incluir-saldos-cero"
                   checked={filtros.checkIncluirSaldosCero}
-                  onChange={(e) => update("checkIncluirSaldosCero", e.target.checked)}
+                  onChange={(e) =>
+                    update("checkIncluirSaldosCero", e.target.checked)
+                  }
                 />
               </div>
 
@@ -105,7 +153,20 @@ export const FiltrosCarteras: React.FC<FiltrosCarterasProps> = ({ onApply }: Fil
                   type="switch"
                   id="switch-solo-asignadas"
                   checked={filtros.checkSoloAsignadas}
-                  onChange={(e) => update("checkSoloAsignadas", e.target.checked)}
+                  onChange={(e) =>
+                    update("checkSoloAsignadas", e.target.checked)
+                  }
+                />
+              </div>
+              <div className="col mb-2 mt-2">
+                <Form.Label>Mostrar ya gestionados</Form.Label>
+                <Form.Check
+                  type="switch"
+                  id="switch-solo-sin-eventos-vigentes"
+                  checked={filtros.checkSoloEventosPendientes}
+                  onChange={(e) =>
+                    update("checkSoloEventosPendientes", e.target.checked)
+                  }
                 />
               </div>
             </div>
@@ -120,28 +181,44 @@ export const FiltrosCarteras: React.FC<FiltrosCarterasProps> = ({ onApply }: Fil
               // onSelect={(v) => handleChangeFiltroCuenta(v)}
             />
 
-            <BuscadorTiposEvento
-              label="Filtro por Tipo de Evento"
-              value={filtros.tipoEvento ?? undefined}
-              placeholder="Sin filtro"
-              onSelect={(v) => handleChangeFiltroTipoEvento(v)}
-            />
+            <Row>
+              <Col md={6}>
+                <BuscadorTiposEvento
+                  label="Filtro por Tipo de Evento"
+                  value={filtros.tipoEvento ?? undefined}
+                  placeholder="Sin filtro"
+                  onSelect={(v) => handleChangeFiltroTipoEvento(v)}
+                />
+              </Col>
 
-            <BuscadorEtiquetasCliente
-              label="Filtro por Etiquetas"
-              value={filtros.etiqueta ?? undefined}
-              placeholder="Sin filtro"
-              onSelect={(v) => update("etiqueta", v)}
-            />
+              <Col md={6}>
+                <BuscadorEtiquetasCliente
+                  label="Filtro por Etiquetas"
+                  value={filtros.etiqueta ?? undefined}
+                  placeholder="Sin filtro"
+                  onSelect={(v) => update("etiqueta", v)}
+                />
+              </Col>
 
-            <NumericFilter
-              tittle="Dias sin gestion"
-              value={filtros.sinGestionDias ?? ""}
-              onChange={(v) =>handleChangeSindGestionDias(v)}
-            />
+              <Col md={6}>
+                <NumericFilter
+                  tittle="Dias sin gestion"
+                  value={filtros.sinGestionDias ?? ""}
+                  onChange={(v) => handleChangeSindGestionDias(v)}
+                />
+              </Col>
+
+              <Col md={6}>
+                <CustomDatePicker
+                  selectedDate={filtros.filtroPorVencimiento ?? ""}
+                  label="Fecha de Vencimiento"
+                  onDateChange={(date) => update("filtroPorVencimiento", date)}
+                />
+              </Col>
+            </Row>
 
             <Row>
-              <div className="col">
+              {/* <div className="col">
                 <SingleSelect
                   options={[
                     { label: "Todos", value: "todos" },
@@ -155,47 +232,45 @@ export const FiltrosCarteras: React.FC<FiltrosCarterasProps> = ({ onApply }: Fil
                   onChange={(v) => update("filtroEdadMora", v)}
                   label="Filtrar por edad"
                 />
-              </div>
-
-              <Col md={6}>
-                <CustomDatePicker
-                  selectedDate={filtros.filtroPorVencimiento ?? ""}
-                  label="Fecha de Vencimiento"
-                  onDateChange={(date) => update("filtroPorVencimiento", date)}
-                />
-              </Col>
+              </div> */}
             </Row>
+            <Form.Label>Edad de mora</Form.Label>
+            <MultiSelectSimple
+              options={opciones}
+              value={selected}
+              onChange={(items) => {
+                const nextSelected = [...items];
+                setSelected(nextSelected);
+                update("filtroEdadMora", serializeEdadMora(nextSelected));
+              }}
+            />
 
             <div className="row">
+              <div className="col"></div>
               <div className="col">
-
+                <button
+                  className="btn btn-primary"
+                  type="button"
+                  style={{ margin: "auto" }}
+                  onClick={aplicarFiltros}
+                >
+                  Aplicar Filtros
+                </button>
+                <button
+                  className="btn btn-secondary ms-2"
+                  type="button"
+                  style={{ marginLeft: "10px" }}
+                  onClick={limpiarFiltros}
+                >
+                  Limpiar Filtros
+                </button>
               </div>
-              <div className="col">
-              <button
-                className="btn btn-primary"
-                type="button"
-                style={{ margin: "auto" }}
-                onClick={aplicarFiltros}
-              >
-                Aplicar Filtros
-              </button>
-              <button
-                className="btn btn-secondary ms-2"
-                type="button"
-                style={{ marginLeft: "10px" }}
-                onClick={limpiarFiltros}
-              >
-                Limpiar Filtros
-              </button>
-                
-              </div>
-
             </div>
-              {hasChanges && (
-                <span className="text-danger ms-2">
-                  Tienes cambios sin guardar
-                </span>
-              )}
+            {hasChanges && (
+              <span className="text-danger ms-2">
+                Tienes cambios sin guardar
+              </span>
+            )}
           </Form>
         </Card.Body>
       </Card>

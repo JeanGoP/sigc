@@ -1,6 +1,7 @@
 export class FiltrosFacturasCarteraModel {
   checkIncluirSaldosCero: boolean = false;
   checkSoloAsignadas: boolean = false;
+  checkSoloEventosPendientes: boolean = false;
   sinGestionDias: number | null = null;
   filtroEdadMora: string = "";
   filtroPorVencimiento: string | null = "";

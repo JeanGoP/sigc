@@ -325,6 +325,7 @@ export const ConsultaCartera: React.FC = () => {
         incluirCarterasSaldoCero: filtros.checkIncluirSaldosCero,
         user: currentUser?.id,
         forUser: filtros.checkSoloAsignadas,
+        mostrarYaGestionados: filtros.checkSoloEventosPendientes,
         cuenta: filtros.cuenta ?? "",
         sinGestionDias: filtros.sinGestionDias,
         edad: filtros.filtroEdadMora,
