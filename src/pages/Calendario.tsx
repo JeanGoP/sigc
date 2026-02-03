@@ -16,6 +16,12 @@ import { SingleSelect } from "@app/components/singleSelect/singleSelect";
 import { StringToMoney } from "@app/utils/formattersFunctions";
 import { useAppSelector } from "@app/store/store";
 import {
+  deleteSessionValue,
+  getSessionValue,
+  saveOrUpdateSessionValue,
+} from "@app/utils/localStorageHandler";
+import { buildConsultaCarteraUrl } from "@app/utils/consultaCarteraNavigation";
+import {
   useEventosService,
   Evento,
 } from "@app/services/Calendario/CalendarioService";
@@ -24,6 +30,7 @@ import BuscadorCuentas from "@app/components/BuscadorGeneral/BuscadorCuentas";
 
 moment.locale("es");
 const localizer = momentLocalizer(moment);
+const CUENTA_FILTRO_SESSION_KEY = "calendario_cuenta_filtro";
 
 // Componente reutilizable para el botón de gestión en Cartera
 interface BotonGestionCarteraProps {
@@ -38,18 +45,13 @@ const BotonGestionCartera: React.FC<BotonGestionCarteraProps> = ({
   const navigate = useNavigate();
 
   const handleIrACartera = () => {
-    const qp = new URLSearchParams();
-    if ((evento as any).cuenta)
-      qp.set("cuenta", String((evento as any).cuenta));
-    if ((evento as any).factura)
-      qp.set("factura", String((evento as any).factura));
-    if ((evento as any).identificacionCliente)
-      qp.set(
-        "identificacionCliente",
-        String((evento as any).identificacionCliente)
-      );
+    const targetUrl = buildConsultaCarteraUrl({
+      cuenta: (evento as any).cuenta,
+      factura: (evento as any).factura,
+      identificacionCliente: (evento as any).identificacionCliente,
+    });
     // Abrir ConsultaCartera con query params
-    navigate(`/consulta_carteras?${qp.toString()}`);
+    navigate(targetUrl);
   };
 
   return (
@@ -87,7 +89,9 @@ const Calendario: React.FC = () => {
   const [eventoSeleccionado, setEventoSeleccionado] = useState<Evento | null>(
     null
   );
-  const [cuentaFiltro, setCuentaFiltro] = useState<string>("");
+  const [cuentaFiltro, setCuentaFiltro] = useState<string>(() => {
+    return getSessionValue<string>(CUENTA_FILTRO_SESSION_KEY) ?? "";
+  });
   const [eventosDelDia, setEventosDelDia] = useState<Evento[]>([]);
   const [fechaSeleccionada, setFechaSeleccionada] = useState<Date | null>(null);
   const [rangoVisible, setRangoVisible] = useState<{
@@ -221,10 +225,16 @@ const Calendario: React.FC = () => {
     setMostrarModalEvento(true);
   };
 
-  const handleSetCuentaFiltro = (cuenta: any) => {
+  const handleSetCuentaFiltro = (cuenta: string | null) => {
     console.log("Cuenta seleccionada en Calendario prueba:", cuenta);
-    setCuentaFiltro(cuenta);
-  }
+    const nextValue = cuenta ?? "";
+    setCuentaFiltro(nextValue);
+    if (nextValue) {
+      saveOrUpdateSessionValue(CUENTA_FILTRO_SESSION_KEY, nextValue);
+    } else {
+      deleteSessionValue(CUENTA_FILTRO_SESSION_KEY);
+    }
+  };
 
   const handleSeleccionDia = (slotInfo: { start: Date }) => {
     const fecha = moment(slotInfo.start).startOf("day");
@@ -276,6 +286,7 @@ const Calendario: React.FC = () => {
                 op="CLIENTE"
                 placeholder="Buscar cuenta..."
                 label="Cuenta"
+                value={cuentaFiltro || undefined}
                 onChange={handleSetCuentaFiltro} // hacer la funcionalidad de guardar el valor seleccionado
                 onSelect={() => {}} // hacer la funcionalidad de guardar el valor seleccionado
               />

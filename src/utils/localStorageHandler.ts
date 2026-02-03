@@ -12,17 +12,17 @@ export const saveObjectToLocalStorage = (key: string, value: any): void => {
 const STORAGE_KEY = "filtros_carteras";
 
 export const saveFiltrosCarteras = (data: any) => {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  sessionStorage.setItem(STORAGE_KEY, JSON.stringify(data));
 };
 
 export const loadFiltrosCarteras = () => {
-  const raw = localStorage.getItem(STORAGE_KEY);
-  console.log("Cargando filtros desde localStorage:", raw);
+  const raw = sessionStorage.getItem(STORAGE_KEY);
+  console.log("Cargando filtros desde sessionStorage:", raw);
   return raw ? JSON.parse(raw) : null;
 };
 
 export const clearFiltrosCarteras = () => {
-  localStorage.removeItem(STORAGE_KEY);
+  sessionStorage.removeItem(STORAGE_KEY);
 };
 
 // Para usarlo en otros componentes
@@ -38,7 +38,7 @@ export const saveExpecificFiltroProperty = (key: string, value: any) => {
 }
 
 export const existsInLocalStorage = (key: string): boolean => {
-  return localStorage.getItem(STORAGE_KEY) !== null;
+  return sessionStorage.getItem(STORAGE_KEY) !== null;
 }
 
 

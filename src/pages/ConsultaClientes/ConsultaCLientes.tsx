@@ -10,6 +10,8 @@ import { CustomDatePicker } from "@app/components/DatePicker/DatePickerv2";
 import { NumericField } from "@app/components/InputFields/NumericField";
 import { ClienteEstadoCuenta, FetchFacturasRef } from "./components/EstadoClienteCompleto";
 import { useClientesService } from "@app/services/GestionCartera/ConsultaClientes/clientesService";
+import { useNavigate } from "react-router-dom";
+import { buildConsultaCarteraUrl } from "@app/utils/consultaCarteraNavigation";
 
 const ConsultaClientes = () => {
   const [selectedValue, setSelectedValue] = useState("");
@@ -20,10 +22,16 @@ const ConsultaClientes = () => {
   const [selectedRows, setSelectedRows] = useState<string[]>([]);
   const [intMora, setIntMora] = useState<string>("3.00");
   const tablaFacturasRef = useRef<FetchFacturasRef>(null);
+  const [facturaSeleccionada, setFacturaSeleccionada] = useState<{
+    cuenta: string;
+    factura: string;
+    identificacionCliente: string;
+  } | null>(null);
   const [paginationModel, setPaginationModel] = useState<GridPaginationModel>({
     page: 0,
     pageSize: 20,
   });
+  const navigate = useNavigate();
 
   const { loading, error, listarClientes } = useClientesService();
 
@@ -39,7 +47,10 @@ const ConsultaClientes = () => {
     setSelectedRows([]);
   };
 
-  const handleClearSelection = () => setSelectedValue("");
+  const handleClearSelection = () => {
+    setSelectedValue("");
+    setFacturaSeleccionada(null);
+  };
   const handleOpenModal = () => {
     setSearchTerm("");
     setShowModal(true);
@@ -52,7 +63,32 @@ const ConsultaClientes = () => {
   };
 
   const manejarClick = () => {
+    setFacturaSeleccionada(null);
     tablaFacturasRef.current?.fetchFacturas();
+  };
+
+  const handleSelectFactura = (row: any) => {
+    const cuenta = row?.CUENTA ?? row?.cuenta ?? "";
+    const factura = row?.NUMEFAC ?? row?.factura ?? "";
+    const identificacionCliente =
+      row?.cliente ?? row?.identificacionCliente ?? selectedValue ?? "";
+
+    if (!cuenta || !factura || !identificacionCliente) {
+      setFacturaSeleccionada(null);
+      return;
+    }
+
+    setFacturaSeleccionada({
+      cuenta: String(cuenta),
+      factura: String(factura),
+      identificacionCliente: String(identificacionCliente),
+    });
+  };
+
+  const handleIrConsultaCartera = () => {
+    if (!facturaSeleccionada) return;
+    const url = buildConsultaCarteraUrl(facturaSeleccionada);
+    navigate(url);
   };
 
   const searchClientes = async (filter = "") => {
@@ -75,6 +111,10 @@ const ConsultaClientes = () => {
   useEffect(() => {
     searchClientes(searchTerm);
   }, [paginationModel.page, paginationModel.pageSize]);
+
+  useEffect(() => {
+    setFacturaSeleccionada(null);
+  }, [selectedValue]);
 
   useEffect(() => {
     const timeout = setTimeout(() => {
@@ -138,6 +178,20 @@ const ConsultaClientes = () => {
                   <button type="button" className="btn btn-primary" onClick={manejarClick}>
                     Buscar
                   </button>
+                  <button
+                    type="button"
+                    className="btn btn-outline-primary ms-2"
+                    onClick={handleIrConsultaCartera}
+                    disabled={!facturaSeleccionada}
+                    style={{marginLeft:"15px"}}
+                    title={
+                      facturaSeleccionada
+                        ? "Ir a consulta de cartera"
+                        : "Seleccione una factura con el ícono del ojo"
+                    }
+                  >
+                    Seguimiento
+                  </button>
                 </div>
               </div>
 
@@ -147,6 +201,7 @@ const ConsultaClientes = () => {
                   fecha={fechaConsultaFacturas}
                   intmora={intMora}
                   ref={tablaFacturasRef}
+                  onSelectFactura={handleSelectFactura}
                 />
               </div>
 
