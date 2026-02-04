@@ -64,7 +64,7 @@ const ConsultaClientes = () => {
 
   const manejarClick = () => {
     setFacturaSeleccionada(null);
-    tablaFacturasRef.current?.fetchFacturas();
+    tablaFacturasRef.current?.fetchFacturas({ force: true });
   };
 
   const handleSelectFactura = (row: any) => {

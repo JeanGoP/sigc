@@ -3,16 +3,18 @@ import React, {
   useImperativeHandle,
   forwardRef,
   useRef,
+  useEffect,
+  useCallback,
+  useMemo,
 } from "react";
 import { TablaFacturas } from "./TablaFacturas";
 import EstadoClienteTable from "./prueba_tablaSaldos";
 import { RecibosCajaTable } from "./TablaRecibosCaja";
 import { FacturaListado } from "@app/models/facturaConsultaclienteModel";
-import { handleApiResponse } from "@app/utils/handleApiResponse";
 import { useRecibosCajaService } from "@app/services/GestionCartera/EstadoClienteCompletoService.ts/GetRecibosCajaListService";
 import { useFacturasService } from "@app/services/GestionCartera/EstadoClienteCompletoService.ts/EstadoClienteCompletoService";
 
-const API_URL = import.meta.env.VITE_API_URL;
+const normalizeValue = (value: string) => String(value ?? "").trim();
 
 interface Props {
   cliente: string;
@@ -23,7 +25,7 @@ interface Props {
 }
 
 export interface FetchFacturasRef {
-  fetchFacturas: () => void;
+  fetchFacturas: (options?: { force?: boolean }) => void;
 }
 
 export const ClienteEstadoCuenta = forwardRef<FetchFacturasRef, Props>(
@@ -32,15 +34,17 @@ export const ClienteEstadoCuenta = forwardRef<FetchFacturasRef, Props>(
     const [clienteCuotasRows, setClienteCuotasRows] = useState<any[]>([]);
     const [TableRowsRecibosCaja, setTableRowsRecibosCaja] = useState<any[]>([]);
 
-    const tablaFacturasRef = useRef<FetchFacturasRef | null>(null);
     const { listarFacturas } = useFacturasService();
+    const lastSuccessKeyRef = useRef<string | null>(null);
+    const inFlightKeyRef = useRef<string | null>(null);
+    const requestIdRef = useRef(0);
 
     const {
       ObtenerRecibosCajaPorFactura,
       loading: loadingRecibos,
       error: errorRecibos,
     } = useRecibosCajaService();
-    const ReciboCajaHandler = async (factura: string) => {
+    const ReciboCajaHandler = useCallback(async (factura: string) => {
       try {
         const recibosCaja = await ObtenerRecibosCajaPorFactura(
           fecha,
@@ -56,34 +60,77 @@ export const ClienteEstadoCuenta = forwardRef<FetchFacturasRef, Props>(
       } catch (error) {
         console.error("Error al obtener los recibos de caja:", error);
       }
-    };
+    }, [ObtenerRecibosCajaPorFactura, fecha, cliente]);
 
-    // Fetch de facturas (queda igual por ahora)
-    const fetchFacturas = async () => {
+    const clienteKey = useMemo(() => normalizeValue(cliente), [cliente]);
+    const fechaKey = useMemo(() => normalizeValue(fecha), [fecha]);
+    const requestKey = useMemo(
+      () => `${clienteKey}|${fechaKey}`,
+      [clienteKey, fechaKey]
+    );
+
+    useEffect(() => {
+      if (!clienteKey) {
+        // Invalida cualquier respuesta en vuelo
+        requestIdRef.current += 1;
+        if (rowsFacturas.length) setRowsFacturas([]);
+        if (clienteCuotasRows.length) setClienteCuotasRows([]);
+        if (TableRowsRecibosCaja.length) setTableRowsRecibosCaja([]);
+        lastSuccessKeyRef.current = null;
+        inFlightKeyRef.current = null;
+      }
+    }, [clienteKey, rowsFacturas.length, clienteCuotasRows.length, TableRowsRecibosCaja.length]);
+
+    // Fetch de facturas con dedupe + stale-guard
+    const fetchFacturas = useCallback(async (options?: { force?: boolean }) => {
+      if (!clienteKey) return;
+
+      const key = requestKey;
+
+      if (!options?.force) {
+        if (lastSuccessKeyRef.current === key) return;
+        if (inFlightKeyRef.current === key) return;
+      }
+
+      const requestId = ++requestIdRef.current;
+      inFlightKeyRef.current = key;
       try {
-        if (clienteCuotasRows.length > 0) {
-          setClienteCuotasRows([]);
-        }
-        if (TableRowsRecibosCaja.length > 0) {
-          setTableRowsRecibosCaja([]);
-        }
+        if (clienteCuotasRows.length) setClienteCuotasRows([]);
+        if (TableRowsRecibosCaja.length) setTableRowsRecibosCaja([]);
 
         const res = await listarFacturas({
-          fecha: fecha.toString(),
-          cliente: cliente.toString(),
+          fecha: fechaKey,
+          cliente: clienteKey,
         });
+
+        if (requestId !== requestIdRef.current) return;
 
         if (res?.success) {
           setRowsFacturas(res.data ?? []);
+          lastSuccessKeyRef.current = key;
         } else {
           setRowsFacturas([]);
           console.error("Error al listar facturas:", res?.message);
+          lastSuccessKeyRef.current = null;
         }
       } catch (error) {
+        if (requestId !== requestIdRef.current) return;
         console.error("Error al obtener las facturas", error);
         setRowsFacturas([]);
+        lastSuccessKeyRef.current = null;
+      } finally {
+        if (requestId === requestIdRef.current && inFlightKeyRef.current === key) {
+          inFlightKeyRef.current = null;
+        }
       }
-    };
+    }, [
+      clienteKey,
+      requestKey,
+      listarFacturas,
+      fechaKey,
+      clienteCuotasRows.length,
+      TableRowsRecibosCaja.length,
+    ]);
 
     useImperativeHandle(ref, () => ({
       fetchFacturas,

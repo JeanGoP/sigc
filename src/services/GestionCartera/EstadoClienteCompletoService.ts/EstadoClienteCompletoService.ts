@@ -10,10 +10,21 @@ export function useFacturasService() {
   });
 
   const listarFacturas = (params: { fecha: string; cliente: string }) => {
+    const cliente = String(params?.cliente ?? "").trim();
+    if (!cliente) {
+      return Promise.resolve({
+        success: false,
+        data: [],
+        message: "Cliente requerido",
+      } as any);
+    }
     return request({
       url: "/GetFacturas",
       method: "GET",
-      params,
+      params: {
+        ...params,
+        cliente,
+      },
     });
   };
 

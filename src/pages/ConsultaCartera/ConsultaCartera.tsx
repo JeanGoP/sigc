@@ -241,12 +241,6 @@ export const ConsultaCartera: React.FC = () => {
         } else if (identificacionCliente) {
           // Forzar ejecución de EstadoClienteCompleto con el id, aunque no haya fila aún
           setSelectedValue(identificacionCliente);
-          if (
-            tablaFacturasRef.current &&
-            typeof tablaFacturasRef.current.fetchFacturas === "function"
-          ) {
-            tablaFacturasRef.current.fetchFacturas();
-          }
           cargarInfoCliente(identificacionCliente);
           if (factura || cuenta) {
             handleSeleccionarFactura({
@@ -634,7 +628,7 @@ export const ConsultaCartera: React.FC = () => {
     if (selectedValue && tablaFacturasRef.current) {
       tablaFacturasRef.current.fetchFacturas();
     }
-  }, [selectedValue, registroSeleccionado]);
+  }, [selectedValue]);
 
   const columns: TableColumn[] = [
     {
