@@ -1,7 +1,7 @@
 import React from "react";
 import Form from "react-bootstrap/Form";
 
-export type TipoContactoValue = "directo" | "indirecto";
+export type TipoContactoValue = "CD" | "CI" | "NC";
 
 interface Props {
   value: TipoContactoValue;

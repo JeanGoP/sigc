@@ -72,7 +72,7 @@ const EstadosEventos: React.FC = () => {
   const [searchText, setSearchText] = useState("");
   const [selected, setSelected] = useState<TipoContacto | null>(null);
   const [tipoContacto, setTipoContacto] =
-    useState<TipoContactoValue>("directo");
+    useState<TipoContactoValue>("CD");
 
   const { listarTiposContacto, loading: loadingList } =
     useListarTiposContacto();
