@@ -1,5 +1,6 @@
 // src/services/eventosService.ts
 import { useApi } from "@app/hooks/useApi";
+import { useCallback } from "react";
 
 export interface Evento {
   title: string;
@@ -17,6 +18,25 @@ export interface Evento {
   estado: string;
 }
 
+export interface ListarModificacionEventosRequest {
+  fechaInicio: string;
+  fechaFin: string;
+  userId?: number | null;
+  cuenta?: string | null;
+  cliente?: string | null;
+  tipoEventoId?: number | null;
+  page: number;
+  pageSize: number;
+}
+
+export interface ActualizarModificacionEventoRequest {
+  idEvento: number;
+  idUsuarioAsignado?: number;
+  idTipoEvento?: number;
+  fechaHoraProgramada?: string;
+  montoCompromiso?: number | null;
+}
+
 export function useEventosService() {
   const { loading, error, request } = useApi<any>("/api/v1", {
     timeout: 5000,
@@ -24,15 +44,15 @@ export function useEventosService() {
     retryDelay: 3000,
   });
 
-  const obtenerUsuariosPorRol = (roleName: string, iduser: number) => {
+  const obtenerUsuariosPorRol = useCallback((roleName: string, iduser: number) => {
     return request({
       url: "/PorRol",
       method: "POST",
       data: { roleName, iduser },
     });
-  };
+  }, [request]);
 
-  const obtenerEventos = (params: {
+  const obtenerEventos = useCallback((params: {
     eventosAnteriores: boolean;
     eventosCumplidos: boolean;
     userId?: string | number;
@@ -45,7 +65,33 @@ export function useEventosService() {
       method: "GET",
       params,
     });
-  };
+  }, [request]);
 
-  return { loading, error, obtenerUsuariosPorRol, obtenerEventos };
+  const listarModificacionEventos = useCallback((data: ListarModificacionEventosRequest) => {
+    return request({
+      url: "/modificacion-eventos/listar",
+      method: "POST",
+      data,
+    });
+  }, [request]);
+
+  const actualizarModificacionEvento = useCallback(
+    (data: ActualizarModificacionEventoRequest) => {
+      return request({
+        url: "/modificacion-eventos/actualizar",
+        method: "POST",
+        data,
+      });
+    },
+    [request]
+  );
+
+  return {
+    loading,
+    error,
+    obtenerUsuariosPorRol,
+    obtenerEventos,
+    listarModificacionEventos,
+    actualizarModificacionEvento,
+  };
 }

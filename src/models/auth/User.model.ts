@@ -7,6 +7,7 @@ export class User {
     public email: string,
     public role: string,
     public token?: string,
-    public tenantId?: string
+    public tenantId?: string,
+    public mustChangePassword: boolean = false
   ) {}
 }

@@ -1,26 +1,35 @@
-// src/services/session.service.ts
 import { useCallback } from "react";
 import { useApi } from "@app/hooks/useApi";
 import { ApiResponse } from "@app/models/apiResponse";
 import { User } from "@app/models/auth/User.model";
 
-/** Debe calzar con lo que devuelva tu backend. */
 export type TokenPayload = {
   creado: string;
   email: string;
   expira: string;
   fullName: string | null;
   isActive: boolean;
+  mustChangePassword?: boolean;
   role: string;
+  tenantId?: string | null;
   token: string;
   userId: number;
   username: string;
 };
 
-/** Algunas APIs solo devuelven success, otras devuelven el token; cubrimos ambos casos. */
 type ValidateTokenData =
-  | { token: TokenPayload }            // tu API puede devolver el token
-  | { valid?: boolean }                // o solo un flag
+  | { token: TokenPayload }
+  | {
+      userId?: number;
+      username?: string;
+      fullName?: string;
+      email?: string;
+      role?: string;
+      tenantId?: string;
+      mustChangePassword?: boolean;
+      expira?: string;
+    }
+  | { valid?: boolean }
   | null;
 
 export const useSessionService = () => {
@@ -30,11 +39,6 @@ export const useSessionService = () => {
     retryDelay: 800,
   });
 
-  /**
-   * Valida el token usando Authorization que ya inyecta useApi desde localStorage.userAccess.token.
-   * Si recibes el user “actual” (por ejemplo, el que armaste desde localStorage),
-   * te regreso también la instancia `User` para usar en Redux.
-   */
   const validateToken = useCallback(
     async (currentUser?: {
       id: string;
@@ -43,6 +47,8 @@ export const useSessionService = () => {
       email: string;
       role: string;
       token: string;
+      tenantId?: string;
+      mustChangePassword?: boolean;
     }): Promise<{
       valid: boolean;
       api: ApiResponse<ValidateTokenData> | null;
@@ -53,64 +59,90 @@ export const useSessionService = () => {
         method: "GET",
       });
 
-      // Caso feliz: success true
-      if (res?.success) {
-        // Si la API devolvió el token, podemos preferir sus campos; si no, usamos el currentUser/localStorage.
-        const tk =
-          (res.data && "token" in res.data ? res.data.token : undefined) ??
-          undefined;
+      if (!res?.success) {
+        return { valid: false, api: res ?? null, user: null };
+      }
 
-        let finalUser: User | null = null;
+      let finalUser: User | null = null;
 
-        if (tk) {
-          finalUser = new User(
-            tk.userId.toString(),
-            tk.username,
-            "",
-            tk.fullName || "",
-            tk.email,
-            tk.role,
-            tk.token
-          );
-        } else if (currentUser) {
-          finalUser = new User(
-            currentUser.id,
-            currentUser.username,
-            "",
-            currentUser.fullName || "",
-            currentUser.email,
-            currentUser.role,
-            currentUser.token
-          );
-        } else {
-          // Último intento: leer de localStorage si no te pasaron currentUser
-          try {
-            const raw = localStorage.getItem("userAccess");
-            if (raw) {
-              const u = JSON.parse(raw);
-              finalUser = new User(
-                u.id,
-                u.username,
-                "",
-                u.fullName || "",
-                u.email || u.username,
-                u.role,
-                u.token
-              );
-            }
-          } catch {
-            /* ignore */
-          }
-        }
+      const tk = res.data && "token" in res.data ? res.data.token : undefined;
+      if (tk) {
+        finalUser = new User(
+          tk.userId.toString(),
+          tk.username,
+          "",
+          tk.fullName || "",
+          tk.email,
+          tk.role,
+          tk.token,
+          tk.tenantId || "",
+          Boolean(tk.mustChangePassword)
+        );
 
         return { valid: true, api: res, user: finalUser };
       }
 
-      // No válido
-      return { valid: false, api: res ?? null, user: null };
+      if (res.data && "userId" in res.data && "username" in res.data && res.data.userId && res.data.username) {
+        finalUser = new User(
+          String(res.data.userId),
+          String(res.data.username),
+          "",
+          String(res.data.fullName || currentUser?.fullName || ""),
+          String(res.data.email || currentUser?.email || res.data.username),
+          String(res.data.role || currentUser?.role || ""),
+          currentUser?.token,
+          String(res.data.tenantId || currentUser?.tenantId || ""),
+          Boolean(res.data.mustChangePassword)
+        );
+
+        return { valid: true, api: res, user: finalUser };
+      }
+
+      if (currentUser) {
+        finalUser = new User(
+          currentUser.id,
+          currentUser.username,
+          "",
+          currentUser.fullName || "",
+          currentUser.email,
+          currentUser.role,
+          currentUser.token,
+          currentUser.tenantId || "",
+          Boolean(currentUser.mustChangePassword)
+        );
+      } else {
+        try {
+          const raw = localStorage.getItem("userAccess");
+          if (raw) {
+            const u = JSON.parse(raw);
+            finalUser = new User(
+              u.id,
+              u.username,
+              "",
+              u.fullName || "",
+              u.email || u.username,
+              u.role,
+              u.token,
+              u.tenantId || "",
+              Boolean(u.mustChangePassword)
+            );
+          }
+        } catch {
+          // ignore
+        }
+      }
+
+      return { valid: true, api: res, user: finalUser };
     },
     [request]
   );
 
-  return { validateToken, loading, error };
+  const logout = useCallback(async () => {
+    return request({
+      url: "/logout",
+      method: "POST",
+    });
+  }, [request]);
+
+  return { validateToken, logout, loading, error };
 };

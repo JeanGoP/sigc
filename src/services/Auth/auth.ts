@@ -10,7 +10,6 @@ const API_URL = import.meta.env.VITE_API_URL;
 
 export const registerWithEmail = async (email: string, password: string) => {
   try {
-
     const result = {
       user: {
         id: "1",
@@ -39,11 +38,12 @@ interface LoginResponse {
   message: string;
   data: {
     token: {
-      creado: string; // ISO Date string
+      creado: string;
       email: string;
-      expira: string; // ISO Date string
+      expira: string;
       fullName: string | null;
       isActive: boolean;
+      mustChangePassword?: boolean;
       role: string;
       token: string;
       userId: number;
@@ -75,28 +75,29 @@ export const loginWithEmailx = async (
     console.log("Login exitoso:", data);
 
     if (data.success) {
-      // Guardar el token en localStorage con la clave correcta
       localStorage.setItem(
         "userAccess",
         JSON.stringify({
           id: data.data.token.userId.toString(),
           username: data.data.token.username,
-          fullName: data.data.token.fullName || "", // Usamos fullName si está disponible
+          fullName: data.data.token.fullName || "",
           email: data.data.token.username,
           role: data.data.token.role,
           token: data.data.token,
+          mustChangePassword: Boolean(data.data.token.mustChangePassword),
         })
       );
 
-      // Crear y retornar el objeto User
       return new User(
         data.data.token.userId.toString(),
         data.data.token.username,
-        "", // No guardamos el password
-        data.data.token.fullName || "", // Usamos fullName si está disponible 
-        data.data.token.email, // Usamos username como email
-        data.data.token.role, // Tomamos el primer rol
-        data.data.token.token // Incluimos el token
+        "",
+        data.data.token.fullName || "",
+        data.data.token.email,
+        data.data.token.role,
+        data.data.token.token,
+        "",
+        Boolean(data.data.token.mustChangePassword)
       );
     }
 
@@ -107,17 +108,6 @@ export const loginWithEmailx = async (
   }
 };
 
-// export const signInByGoogle = async () => {
-//   try {
-//     return await signInWithPopup(firebaseAuth, provider);
-//   } catch (error) {
-//     throw error;
-//   }
-// };
-
-// ---------------------------
-// Hook de autenticación (useApi)
-// ---------------------------
 interface LoginData {
   token: {
     tenantId: null;
@@ -126,6 +116,7 @@ interface LoginData {
     expira: string;
     fullName: string | null;
     isActive: boolean;
+    mustChangePassword?: boolean;
     role: string;
     token: string;
     userId: number;
@@ -150,7 +141,7 @@ export function useAuth() {
 
       if (res && res.success && res.data) {
         const tk = res.data.token;
-        // Guardar sesión estándar para que App.tsx y useApi la lean correctamente
+
         saveObjectToLocalStorage("userAccess", {
           id: tk.userId.toString(),
           username: tk.username,
@@ -159,6 +150,7 @@ export function useAuth() {
           role: tk.role,
           token: tk.token,
           tenantId: tk.tenantId || "",
+          mustChangePassword: Boolean(tk.mustChangePassword),
         });
 
         return new User(
@@ -169,7 +161,8 @@ export function useAuth() {
           tk.email,
           tk.role,
           tk.token,
-          tk.tenantId || ""
+          tk.tenantId || "",
+          Boolean(tk.mustChangePassword)
         );
       }
 

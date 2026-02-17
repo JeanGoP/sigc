@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Routes, Route, useLocation } from "react-router-dom";
 import { toast, ToastContainer } from "react-toastify";
+import ReactGA from "react-ga4";
 import Main from "@modules/main/Main";
 import Login from "@modules/login/Login";
 import Register from "@modules/register/Register";
@@ -9,20 +10,14 @@ import RecoverPassword from "@modules/recover-password/RecoverPassword";
 import { useWindowSize } from "@app/hooks/useWindowSize";
 import { calculateWindowSize } from "@app/utils/helpers";
 import { setWindowSize } from "@app/store/reducers/ui";
-import ReactGA from "react-ga4";
-
 import Dashboard from "@pages/Dashboard";
 import Blank from "@pages/Blank";
 import SubMenu from "@pages/SubMenu";
-// import Profile from '@pages/profile/Profile';
-
 import PublicRoute from "./routes/PublicRoute";
 import PrivateRoute from "./routes/PrivateRoute";
+import PermissionRoute from "./routes/PermissionRoute";
 import { setCurrentUser } from "./store/reducers/auth";
-import { users } from "./Data/users_example";
-
-// import { firebaseAuth } from './firebase';
-// import { onAuthStateChanged } from 'firebase/auth';
+import { clearSecurity, setSecurityData } from "./store/reducers/security";
 import { useAppDispatch, useAppSelector } from "./store/store";
 import { Loading } from "./components/Loading";
 import { User } from "./models/auth/User.model";
@@ -36,11 +31,14 @@ import { RendimientoDeAsesores } from "@app/pages/MonitorGestion/RendimientoDeAs
 import Campaigns from "./pages/Campaigns/Campaigns";
 import TiposGestiones from "./modules/maestros/tipos-gestiones/TiposGestiones";
 import EtiquetasClientes from "./modules/maestros/etiquetas-cliente/EtiquetasClientes";
-import { parse } from "path";
-
+import AsignacionCarterasPage from "@app/modules/asignacion-carteras/AsignacionCarterasPage";
+import UsuariosPage from "@app/modules/parametrizacion/usuarios/UsuariosPage";
+import RolesPermisosPage from "@app/modules/parametrizacion/roles-permisos/RolesPermisosPage";
 import { useSessionService } from "@app/services/Auth/ValidateToken";
-// Use Vite's import.meta.env directly for API_URL
-const API_URL = import.meta.env.VITE_API_URL;
+import { useSecurityService } from "@app/services/Security/securityService";
+import { ModificacionEventos } from "./pages/ModificacionEventos/ModificacionEventos";
+import Unauthorized from "./pages/Unauthorized";
+import CambiarContrasena from "./pages/CambiarContrasena";
 
 const { VITE_NODE_ENV } = import.meta.env;
 
@@ -49,9 +47,8 @@ const App = () => {
   const screenSize = useAppSelector((state) => state.ui.screenSize);
   const dispatch = useAppDispatch();
   const location = useLocation();
-
   const { validateToken } = useSessionService();
-
+  const { getSecurityMe } = useSecurityService();
   const [isAppLoading, setIsAppLoading] = useState(true);
 
   const TARGETS = [
@@ -62,38 +59,43 @@ const App = () => {
   ];
 
   useEffect(() => {
-  const obs = new MutationObserver((muts) => {
-    // Heurística: demasiados cambios de texto de golpe ⇒ posible traducción
-    const bigChange = muts.some(m => m.type === "characterData");
-    if (bigChange) {
-      // Mostrar toast: “Desactiva ‘Traducir esta página’ en este sitio para evitar errores.”
-    }
-  });
-  obs.observe(document.documentElement, { subtree: true, childList: true, characterData: true });
-  return () => obs.disconnect();
-}, []);
+    const observer = new MutationObserver((mutations) => {
+      const hasLargeTextMutation = mutations.some((item) => item.type === "characterData");
+      if (hasLargeTextMutation) {
+        // Reserved for browser-translation warnings if needed.
+      }
+    });
+
+    observer.observe(document.documentElement, {
+      subtree: true,
+      childList: true,
+      characterData: true,
+    });
+
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
-    
     const checkUserSession = async () => {
       try {
-        if (TARGETS.includes(location.pathname)) {
-          // en rutas públicas no validamos y liberamos el loader
-          setIsAppLoading(false);
+        const currentPath = location.pathname;
+        if (TARGETS.includes(currentPath)) {
+          dispatch(clearSecurity());
           return;
         }
-        const userData = localStorage?.getItem("userAccess");
 
+        const userData = localStorage.getItem("userAccess");
         if (!userData) {
           dispatch(setCurrentUser(null));
-          toast.info("No tienes una sesión activa, por favor inicia sesión.");
+          dispatch(clearSecurity());
+          toast.info("No tienes una sesion activa, por favor inicia sesion.");
           return;
         }
 
         let parsedData: any = null;
         try {
           parsedData = JSON.parse(userData);
-        } catch (e) {
+        } catch {
           parsedData = null;
         }
 
@@ -103,75 +105,105 @@ const App = () => {
           !parsedData.id ||
           !parsedData.username
         ) {
-          // sesión malformada
           localStorage.removeItem("userAccess");
           dispatch(setCurrentUser(null));
-          setIsAppLoading(false);
+          dispatch(clearSecurity());
           return;
         }
 
-        console.log(parsedData);
+        const tokenValidation = await validateToken({
+          id: parsedData.id,
+          username: parsedData.username,
+          fullName: parsedData.fullName,
+          email: parsedData.email,
+          role: parsedData.role,
+          token: parsedData.token ?? "",
+          mustChangePassword: Boolean(parsedData.mustChangePassword),
+        });
 
-         const resp = await validateToken({
-           id: parsedData.id,
-           username: parsedData.username,
-           fullName: parsedData.fullName,
-           email: parsedData.email,
-           role: parsedData.role,
-           token: parsedData.token ?? "",
-         });
+        if (tokenValidation.valid && tokenValidation.user) {
+          dispatch(setCurrentUser(tokenValidation.user));
+        } else {
+          const fallbackUser = new User(
+            parsedData.id,
+            parsedData.username,
+            "",
+            parsedData.fullName || "",
+            parsedData.email || parsedData.username,
+            parsedData.role,
+            parsedData.token ?? "",
+            parsedData.tenantId ?? "",
+            Boolean(parsedData.mustChangePassword)
+          );
+          dispatch(setCurrentUser(fallbackUser));
+        }
 
-      if (resp.valid && resp.user) {
-        dispatch(setCurrentUser(resp.user));
-      } else {
-        // Fallback: si tenemos datos válidos en localStorage, continúa con ellos
-        const fallbackUser = new User(
-          parsedData.id,
-          parsedData.username,
-          "",
-          parsedData.fullName || "",
-          parsedData.email || parsedData.username,
-          parsedData.role,
-          parsedData.token ?? ""
-        );
-        dispatch(setCurrentUser(fallbackUser));
+        const securityResponse = await getSecurityMe();
+        if (securityResponse?.success && securityResponse.data) {
+          const mustChangePassword = Boolean(securityResponse.data.mustChangePassword);
+          dispatch(
+            setSecurityData({
+              menuTree: mustChangePassword ? [] : securityResponse.data.menuTree ?? [],
+              permissions: mustChangePassword ? [] : securityResponse.data.permissions ?? [],
+            })
+          );
+
+          const refreshedUser = new User(
+            securityResponse.data.userId.toString(),
+            securityResponse.data.username,
+            "",
+            securityResponse.data.fullName || "",
+            securityResponse.data.email || securityResponse.data.username,
+            securityResponse.data.role || parsedData.role,
+            parsedData.token ?? "",
+            securityResponse.data.tenantId || parsedData.tenantId || "",
+            mustChangePassword
+          );
+
+          dispatch(setCurrentUser(refreshedUser));
+          localStorage.setItem(
+            "userAccess",
+            JSON.stringify({
+              id: refreshedUser.id,
+              username: refreshedUser.username,
+              fullName: refreshedUser.fullName,
+              email: refreshedUser.email,
+              role: refreshedUser.role,
+              token: refreshedUser.token,
+              tenantId: refreshedUser.tenantId,
+              mustChangePassword: refreshedUser.mustChangePassword,
+            })
+          );
+        } else {
+          dispatch(
+            setSecurityData({
+              menuTree: [],
+              permissions: [],
+            })
+          );
+        }
+      } catch (error) {
+        console.error("Error validando sesion:", error);
+        localStorage.removeItem("userAccess");
+        dispatch(setCurrentUser(null));
+        dispatch(clearSecurity());
+      } finally {
+        setIsAppLoading(false);
       }
-    } catch (e) {
-      console.error("Error validando sesión:", e);
-      localStorage.removeItem("userAccess");
-      dispatch(setCurrentUser(null));
-    } finally {
-      setIsAppLoading(false);
-    }
     };
 
     checkUserSession();
-  }, [location.pathname, dispatch, validateToken]);
-
-  async function fetchUserFromToken(token: User) {
-    // Simulamos que el token es simplemente el ID del usuario
-    const usr = token;
-
-    const user = users.find(
-      (u) => u.email === usr.email && u.password === usr.password
-    );
-
-    if (!user) {
-      throw new Error("Token inválido");
-    }
-
-    return user;
-  }
+  }, [dispatch, validateToken, getSecurityMe, location.pathname]);
 
   useEffect(() => {
     const size = calculateWindowSize(windowSize.width);
     if (screenSize !== size) {
       dispatch(setWindowSize(size));
     }
-  }, [windowSize]);
+  }, [windowSize, screenSize, dispatch]);
 
   useEffect(() => {
-    if (location && location.pathname && VITE_NODE_ENV === "production") {
+    if (location.pathname && VITE_NODE_ENV === "production") {
       ReactGA.send({
         hitType: "pageview",
         page: location.pathname,
@@ -203,28 +235,122 @@ const App = () => {
             <Route path="/sub-menu-2" element={<Blank />} />
             <Route path="/sub-menu-1" element={<SubMenu />} />
             <Route path="/blank" element={<Blank />} />
-            <Route path="/consulta_clientes" element={<ConsultaClientes />} />
-            <Route path="/consulta_carteras" element={<ConsultaCartera />} />
-            {/* <Route path="/profile" element={<Profile />} /> */}
+            <Route
+              path="/consulta_clientes"
+              element={
+                <PermissionRoute permission="consulta_clientes.view">
+                  <ConsultaClientes />
+                </PermissionRoute>
+              }
+            />
+            <Route
+              path="/consulta_carteras"
+              element={
+                <PermissionRoute permission="consulta_carteras.view">
+                  <ConsultaCartera />
+                </PermissionRoute>
+              }
+            />
+            <Route
+              path="/modificacion_eventos"
+              element={
+                <PermissionRoute permission="modificacion_eventos.view">
+                  <ModificacionEventos />
+                </PermissionRoute>
+              }
+            />
             <Route path="/profile" element={<Dashboard />} />
+            <Route path="/cambiar-contrasena" element={<CambiarContrasena />} />
             <Route
               path="/parametros_generales"
-              element={<ParametrosGenerales />}
+              element={
+                <PermissionRoute permission="parametros_generales.view">
+                  <ParametrosGenerales />
+                </PermissionRoute>
+              }
             />
-            <Route path="/tipos_eventos" element={<TiposEventos />} />
-            <Route path="/tipos_gestiones" element={<TiposGestiones />} />
-            <Route path="/etiquetas_clientes" element={<EtiquetasClientes />} />
             <Route
-              path="/monitor_seguimientos"
-              element={<MonitorSeguimientos />}
+              path="/parametrizacion/usuarios"
+              element={
+                <PermissionRoute permission="usuarios.view">
+                  <UsuariosPage />
+                </PermissionRoute>
+              }
             />
+            <Route
+              path="/parametrizacion/roles-permisos"
+              element={
+                <PermissionRoute permission="roles_permisos.view">
+                  <RolesPermisosPage />
+                </PermissionRoute>
+              }
+            />
+            <Route
+              path="/tipos_eventos"
+              element={
+                <PermissionRoute permission="tipos_eventos.view">
+                  <TiposEventos />
+                </PermissionRoute>
+              }
+            />
+            <Route
+              path="/tipos_gestiones"
+              element={
+                <PermissionRoute permission="tipos_gestiones.view">
+                  <TiposGestiones />
+                </PermissionRoute>
+              }
+            />
+            <Route
+              path="/etiquetas_clientes"
+              element={
+                <PermissionRoute permission="etiquetas_clientes.view">
+                  <EtiquetasClientes />
+                </PermissionRoute>
+              }
+            />
+            <Route path="/monitor_seguimientos" element={<MonitorSeguimientos />} />
             <Route
               path="/rendimiento_asesores"
-              element={<RendimientoDeAsesores />}
+              element={
+                <PermissionRoute permission="rendimiento_asesores.view">
+                  <RendimientoDeAsesores />
+                </PermissionRoute>
+              }
             />
-            <Route path="/calendario" element={<Calendario />} />
-            <Route path="/campanas" element={<Campaigns />} />
-            <Route path="/" element={<Dashboard />} />
+            <Route
+              path="/asignacion_carteras"
+              element={
+                <PermissionRoute permission="asignacion_carteras.view">
+                  <AsignacionCarterasPage />
+                </PermissionRoute>
+              }
+            />
+            <Route
+              path="/calendario"
+              element={
+                <PermissionRoute permission="calendario.view">
+                  <Calendario />
+                </PermissionRoute>
+              }
+            />
+            <Route
+              path="/campanas"
+              element={
+                <PermissionRoute permission="campanas.view">
+                  <Campaigns />
+                </PermissionRoute>
+              }
+            />
+            <Route path="/unauthorized" element={<Unauthorized />} />
+            <Route
+              index
+              element={
+                <PermissionRoute permission="dashboard.view">
+                  <Dashboard />
+                </PermissionRoute>
+              }
+            />
           </Route>
         </Route>
       </Routes>

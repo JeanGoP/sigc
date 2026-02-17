@@ -12,6 +12,7 @@ import {
 // import { firebaseAuth } from '@app/firebase';
 import {} from '@app/index';
 import {useAppSelector } from '@app/store/store';
+import { useSessionService } from '@app/services/Auth/ValidateToken';
 // import { DateTime } from 'luxon';
 import { saveObjectToLocalStorage } from '@app/utils/localStorageHandler';
 
@@ -21,20 +22,32 @@ const UserDropdown = () => {
   const [t] = useTranslation();
   const currentUser = useAppSelector((state) => state.auth.currentUser);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const { logout } = useSessionService();
 
   const logOut = async (event: any) => {
-    // await firebaseAuth.signOut();
-    saveObjectToLocalStorage('userAccess', null);
-    console.log('User logged out');
     event.preventDefault();
     setDropdownOpen(false);
-    window.location.reload();
+
+    try {
+      await logout();
+    } catch {
+      // ignore
+    } finally {
+      saveObjectToLocalStorage('userAccess', null);
+      window.location.reload();
+    }
   };
 
   const navigateToProfile = (event: any) => {
     event.preventDefault();
     setDropdownOpen(false);
     navigate('/profile');
+  };
+
+  const navigateToChangePassword = (event: any) => {
+    event.preventDefault();
+    setDropdownOpen(false);
+    navigate('/cambiar-contrasena');
   };
 
   return (
@@ -92,6 +105,13 @@ const UserDropdown = () => {
             onClick={navigateToProfile}
           >
             {t('header.user.profile')}
+          </button>
+          <button
+            type="button"
+            className="btn btn-default btn-flat"
+            onClick={navigateToChangePassword}
+          >
+            Cambiar contrasena
           </button>
           <button
             type="button"

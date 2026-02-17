@@ -1,8 +1,9 @@
-import { IMenuItem, MENU } from '@app/modules/main/menu-sidebar/MenuSidebar';
-import { Dropdown } from '@profabric/react-components';
-import { useEffect, useRef, useState } from 'react';
-import { NavLink } from 'react-router-dom';
-import styled from 'styled-components';
+import { IMenuItem, mapSecurityMenuToMenuItems } from "@app/modules/main/menu-sidebar/MenuSidebar";
+import { useAppSelector } from "@app/store/store";
+import { Dropdown } from "@profabric/react-components";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { NavLink } from "react-router-dom";
+import styled from "styled-components";
 
 export const StyledDropdown = styled(Dropdown)`
   border: none;
@@ -42,59 +43,66 @@ export const StyledDropdown = styled(Dropdown)`
 `;
 
 export const SidebarSearch = () => {
-  const [searchText, setSearchText] = useState('');
+  const [searchText, setSearchText] = useState("");
   const [foundMenuItems, setFoundMenuItems] = useState<IMenuItem[]>([]);
   const dropdown = useRef(null);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const menuTree = useAppSelector((state) => state.security.menuTree);
+
+  const menuItems = useMemo(() => mapSecurityMenuToMenuItems(menuTree), [menuTree]);
 
   useEffect(() => {
-    setFoundMenuItems([]);
-    if (searchText) {
-      setFoundMenuItems(findMenuItems(MENU));
-    } else {
-      setSearchText('');
+    if (!searchText.trim()) {
       setFoundMenuItems([]);
+      return;
     }
-  }, [searchText]);
+
+    setFoundMenuItems(findMenuItems(menuItems, searchText.trim().toLowerCase()));
+  }, [searchText, menuItems]);
 
   useEffect(() => {
-    if (foundMenuItems && foundMenuItems.length > 0) {
-      setIsDropdownOpen(true);
-    } else {
-      setIsDropdownOpen(false);
-    }
+    setIsDropdownOpen(foundMenuItems.length > 0);
   }, [foundMenuItems]);
 
   const handleIconClick = () => {
-    setSearchText('');
+    setSearchText("");
     setIsDropdownOpen(false);
   };
 
   const handleMenuItemClick = () => {
-    setSearchText('');
+    setSearchText("");
     setIsDropdownOpen(false);
   };
 
   const findMenuItems = (
-    menuItems: IMenuItem[],
+    inputItems: IMenuItem[],
+    normalizedSearchText: string,
     results: IMenuItem[] = []
   ): IMenuItem[] => {
-    for (const menuItem of menuItems) {
-      if (menuItem.name.includes(searchText) && menuItem.path) {
+    for (const menuItem of inputItems) {
+      if (
+        menuItem.path &&
+        menuItem.name.toLowerCase().includes(normalizedSearchText)
+      ) {
         results.push(menuItem);
       }
-      if (menuItem.children) {
-        return findMenuItems(menuItem.children, results);
+
+      if (menuItem.children && menuItem.children.length > 0) {
+        findMenuItems(menuItem.children, normalizedSearchText, results);
       }
     }
+
     return results;
   };
 
-  const boldString = (str: string, substr: string) => {
-    return str.replaceAll(
-      substr,
-      `<strong class="text-light">${substr}</strong>`
-    );
+  const boldString = (text: string, search: string) => {
+    if (!search) {
+      return text;
+    }
+
+    const escaped = search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const regex = new RegExp(`(${escaped})`, "ig");
+    return text.replace(regex, '<strong class="text-light">$1</strong>');
   };
 
   return (
@@ -112,7 +120,7 @@ export const SidebarSearch = () => {
             placeholder="Search"
             aria-label="Search"
             value={searchText}
-            onInput={(e: any) => setSearchText(e?.target?.value)}
+            onInput={(e: any) => setSearchText(e?.target?.value || "")}
           />
           <div className="input-group-append">
             <button
@@ -121,8 +129,8 @@ export const SidebarSearch = () => {
               onClick={() => handleIconClick()}
             >
               <i
-                className={`fas ${searchText.length === 0 && 'fa-search'} ${
-                  searchText.length > 0 && 'fa-times'
+                className={`fas ${searchText.length === 0 && "fa-search"} ${
+                  searchText.length > 0 && "fa-times"
                 } fa-fw`}
               />
             </button>
@@ -130,29 +138,27 @@ export const SidebarSearch = () => {
         </div>
       </div>
       <div className="menu" slot="body">
-        {foundMenuItems && foundMenuItems.length === 0 && (
-          <div className="nothing-found">No Element found</div>
+        {searchText.trim() && foundMenuItems.length === 0 && (
+          <div className="nothing-found">No element found</div>
         )}
         {foundMenuItems.length > 0 && (
           <div className="list-group">
-            {foundMenuItems &&
-              foundMenuItems.map((menuItem: any) => (
-                <NavLink
-                  key={menuItem.name + menuItem.path}
-                  className="list-group-item"
-                  to={menuItem.path}
-                  onClick={() => handleMenuItemClick()}
-                >
-                  <div
-                    className="search-title"
-                    // eslint-disable-next-line react/no-danger
-                    dangerouslySetInnerHTML={{
-                      __html: boldString(menuItem.name, searchText),
-                    }}
-                  />
-                  <div className="search-path">{menuItem.name}</div>
-                </NavLink>
-              ))}
+            {foundMenuItems.map((menuItem) => (
+              <NavLink
+                key={menuItem.name + menuItem.path}
+                className="list-group-item"
+                to={menuItem.path || "/"}
+                onClick={() => handleMenuItemClick()}
+              >
+                <div
+                  className="search-title"
+                  dangerouslySetInnerHTML={{
+                    __html: boldString(menuItem.name, searchText),
+                  }}
+                />
+                <div className="search-path">{menuItem.path}</div>
+              </NavLink>
+            ))}
           </div>
         )}
       </div>

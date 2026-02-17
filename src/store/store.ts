@@ -1,6 +1,7 @@
 import { Action, ThunkAction, configureStore } from '@reduxjs/toolkit';
 
 import { authSlice } from '@app/store/reducers/auth';
+import { securitySlice } from '@app/store/reducers/security';
 import { uiSlice } from '@app/store/reducers/ui';
 import { createLogger } from 'redux-logger';
 import { TypedUseSelectorHook, useDispatch, useSelector } from 'react-redux';
@@ -8,6 +9,7 @@ import { TypedUseSelectorHook, useDispatch, useSelector } from 'react-redux';
 const store = configureStore({
   reducer: {
     auth: authSlice.reducer,
+    security: securitySlice.reducer,
     ui: uiSlice.reducer,
   },
   middleware: (getDefaultMiddleware) =>
