@@ -13,5 +13,5 @@ export const listadoEmpresas: Empresa[] = [
     new Empresa("ZuperMoto", "690A601D-69CF-4596-8218-181EE35B8E99"),
     new Empresa("Wigou", "6FE9CC4F-0AFB-4F42-9425-89BE9B845B76"),
     new Empresa("Moteros de la Sabana", "25133c2e-7dee-4321-97f9-51e6edcdb980"),
-    new Empresa("EMPRESA DE PRUEBA", "7f4f0d5a-9b8a-4a33-bb56-5a2b1f8a9c3e"),
+    new Empresa("Motocentro", "A913F64C-80F8-4467-8B26-0D74FDFD2BE7"),
 ];
