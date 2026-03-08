@@ -18,6 +18,8 @@ export const registerWithEmail = async (email: string, password: string) => {
         fullName: "New User",
         email,
         role: "admin",
+        mustChangePassword: false,
+        telephonyEnabled: false,
       },
     };
 
@@ -44,10 +46,12 @@ interface LoginResponse {
       fullName: string | null;
       isActive: boolean;
       mustChangePassword?: boolean;
+      telephonyEnabled?: boolean;
       role: string;
       token: string;
       userId: number;
       username: string;
+      tenantId?: string | null;
     };
   };
   statusCode: number;
@@ -84,7 +88,9 @@ export const loginWithEmailx = async (
           email: data.data.token.username,
           role: data.data.token.role,
           token: data.data.token,
+          tenantId: data.data.token.tenantId || "",
           mustChangePassword: Boolean(data.data.token.mustChangePassword),
+          telephonyEnabled: Boolean(data.data.token.telephonyEnabled),
         })
       );
 
@@ -96,8 +102,9 @@ export const loginWithEmailx = async (
         data.data.token.email,
         data.data.token.role,
         data.data.token.token,
-        "",
-        Boolean(data.data.token.mustChangePassword)
+        data.data.token.tenantId || "",
+        Boolean(data.data.token.mustChangePassword),
+        Boolean(data.data.token.telephonyEnabled)
       );
     }
 
@@ -110,13 +117,14 @@ export const loginWithEmailx = async (
 
 interface LoginData {
   token: {
-    tenantId: null;
+    tenantId?: string | null;
     creado: string;
     email: string;
     expira: string;
     fullName: string | null;
     isActive: boolean;
     mustChangePassword?: boolean;
+    telephonyEnabled?: boolean;
     role: string;
     token: string;
     userId: number;
@@ -151,6 +159,7 @@ export function useAuth() {
           token: tk.token,
           tenantId: tk.tenantId || "",
           mustChangePassword: Boolean(tk.mustChangePassword),
+          telephonyEnabled: Boolean(tk.telephonyEnabled),
         });
 
         return new User(
@@ -162,7 +171,8 @@ export function useAuth() {
           tk.role,
           tk.token,
           tk.tenantId || "",
-          Boolean(tk.mustChangePassword)
+          Boolean(tk.mustChangePassword),
+          Boolean(tk.telephonyEnabled)
         );
       }
 

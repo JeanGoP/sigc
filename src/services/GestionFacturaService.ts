@@ -171,6 +171,11 @@ export interface GestionFacturaRequest {
   tipoContacto: string | number;
   eventos: string;
   idGrabacionLlamada: string;
+  idGestionSession?: number;
+  sessionRef?: string;
+  idempotencyKey?: string;
+  source?: string;
+  tabId?: string;
 }
 
 export interface GestionFacturaResponse {
@@ -181,12 +186,17 @@ export interface GestionFacturaResponse {
   errors: string[];
 }
 
-export interface GestionFacturaInsertResponse {
-  success: boolean;
-  message: string;
-  data: boolean;
-  statusCode: number;
-  errors: string[];
+export interface GestionFacturaInsertOperation {
+  outcomeCode: string;
+  idGestionSession?: number | null;
+  sessionRef?: string | null;
+  sessionStatus?: string | null;
+  idGestionFinal?: number | null;
+  idempotencyKey?: string | null;
+  totalLlamadas?: number | null;
+  llamadasConsolidadas?: number | null;
+  llamadasPendientes?: number | null;
+  duplicated?: boolean;
 }
 
 export interface Gestion {
@@ -224,7 +234,7 @@ export interface GestionesEventosFacturaResulta {
 // Hook service
 export function useGestionFacturaService() {
   const buscarApi = useApi<GestionesEventosFacturaResulta>("/api/v1/BuscarGestiones");
-  const insertarApi = useApi<GestionFacturaInsertResponse>("/api/v1/InsertarGestionFactura");
+  const insertarApi = useApi<GestionFacturaInsertOperation>("/api/v1/InsertarGestionFactura");
 
   // Buscar gestiones
   const buscarGestiones = async (factura: string, cliente: string, cuenta: string) => {

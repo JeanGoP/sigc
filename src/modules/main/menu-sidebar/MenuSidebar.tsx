@@ -17,17 +17,37 @@ export interface IMenuItem {
 export const mapSecurityMenuToMenuItems = (
   menuTree: SecurityMenuItem[]
 ): IMenuItem[] => {
-  const mapNode = (node: SecurityMenuItem): IMenuItem => ({
-    name: node.menuName,
-    icon: node.iconClass || "far fa-circle nav-icon",
-    path: node.menuPath || undefined,
-    children:
-      node.children && node.children.length > 0
-        ? node.children.map(mapNode)
-        : undefined,
-  });
+  const hiddenMenuKeys = new Set(["llamadas_webrtc"]);
 
-  return menuTree.map(mapNode);
+  const mapNode = (node: SecurityMenuItem): IMenuItem | null => {
+    const normalizedMenuKey = String(node.menuKey ?? "").trim().toLowerCase();
+    if (hiddenMenuKeys.has(normalizedMenuKey)) {
+      return null;
+    }
+
+    const children = node.children && node.children.length > 0
+      ? node.children
+        .map(mapNode)
+        .filter((child): child is IMenuItem => child !== null)
+      : undefined;
+
+    const hasChildren = Boolean(children && children.length > 0);
+    const hasPath = Boolean(String(node.menuPath ?? "").trim());
+    if (!hasChildren && !hasPath && normalizedMenuKey) {
+      return null;
+    }
+
+    return {
+      name: node.menuName,
+      icon: node.iconClass || "far fa-circle nav-icon",
+      path: node.menuPath || undefined,
+      children: hasChildren ? children : undefined,
+    };
+  };
+
+  return menuTree
+    .map(mapNode)
+    .filter((item): item is IMenuItem => item !== null);
 };
 
 const StyledBrandImage = styled(Image)`

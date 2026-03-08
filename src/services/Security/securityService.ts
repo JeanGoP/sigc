@@ -10,6 +10,7 @@ export interface SecurityMeData {
   role: string;
   tenantId: string;
   mustChangePassword: boolean;
+  telephonyEnabled: boolean;
   menuTree: SecurityMenuItem[];
   permissions: string[];
 }
@@ -19,6 +20,7 @@ export function useSecurityService() {
     timeout: 8000,
     retries: 1,
     retryDelay: 800,
+    logoutOn401: true,
   });
 
   const getSecurityMe = useCallback(async () => {

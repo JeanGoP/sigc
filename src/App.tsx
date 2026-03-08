@@ -118,7 +118,9 @@ const App = () => {
           email: parsedData.email,
           role: parsedData.role,
           token: parsedData.token ?? "",
+          tenantId: parsedData.tenantId ?? "",
           mustChangePassword: Boolean(parsedData.mustChangePassword),
+          telephonyEnabled: Boolean(parsedData.telephonyEnabled),
         });
 
         if (tokenValidation.valid && tokenValidation.user) {
@@ -133,7 +135,8 @@ const App = () => {
             parsedData.role,
             parsedData.token ?? "",
             parsedData.tenantId ?? "",
-            Boolean(parsedData.mustChangePassword)
+            Boolean(parsedData.mustChangePassword),
+            Boolean(parsedData.telephonyEnabled)
           );
           dispatch(setCurrentUser(fallbackUser));
         }
@@ -157,7 +160,8 @@ const App = () => {
             securityResponse.data.role || parsedData.role,
             parsedData.token ?? "",
             securityResponse.data.tenantId || parsedData.tenantId || "",
-            mustChangePassword
+            mustChangePassword,
+            Boolean(securityResponse.data.telephonyEnabled)
           );
 
           dispatch(setCurrentUser(refreshedUser));
@@ -172,6 +176,7 @@ const App = () => {
               token: refreshedUser.token,
               tenantId: refreshedUser.tenantId,
               mustChangePassword: refreshedUser.mustChangePassword,
+              telephonyEnabled: refreshedUser.telephonyEnabled,
             })
           );
         } else {

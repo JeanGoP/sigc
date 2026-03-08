@@ -1,4 +1,4 @@
-// src/hooks/useApi.ts
+﻿// src/hooks/useApi.ts
 import { useState, useCallback } from "react";
 import axios, { AxiosError, AxiosRequestConfig } from "axios";
 
@@ -7,18 +7,38 @@ interface UseApiOptions {
   timeout?: number;    // en ms
   retries?: number;    // cantidad de reintentos
   retryDelay?: number; // tiempo de espera entre reintentos en ms
+  logoutOn401?: boolean;
 }
 
-const API_URL = import.meta.env.VITE_API_URL;
+const API_URL = (import.meta.env.VITE_API_URL as string | undefined)?.trim() ?? "";
+
+function isAbsoluteHttpUrl(url: string): boolean {
+  return /^https?:\/\//i.test(url.trim());
+}
+
+function buildBaseUrl(baseURL: string): string {
+  const candidate = baseURL.trim();
+  if (isAbsoluteHttpUrl(candidate)) {
+    return candidate;
+  }
+
+  if (!API_URL) {
+    return candidate;
+  }
+
+  const normalizedApiUrl = API_URL.replace(/\/+$/, "");
+  const normalizedPath = candidate.replace(/^\/+/, "");
+  return normalizedPath ? `${normalizedApiUrl}/${normalizedPath}` : normalizedApiUrl;
+}
 
 export function useApi<T>(
   baseURL: string,
-  { timeout = 5000, retries = 0, retryDelay = 1000 }: UseApiOptions = {}
+  { timeout = 5000, retries = 0, retryDelay = 1000, logoutOn401 = false }: UseApiOptions = {}
 ) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  baseURL = `${API_URL}${baseURL}`;
+  const resolvedBaseURL = buildBaseUrl(baseURL);
 
   // Pequeña utilidad para pausar la ejecución
   const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -76,7 +96,7 @@ export function useApi<T>(
       }
 
       const obj =  {
-        baseURL,
+        baseURL: resolvedBaseURL,
         timeout,
         headers: {
           "Content-Type": "application/json",
@@ -99,18 +119,26 @@ export function useApi<T>(
 
           // Manejo centralizado de 401 No Autorizado
           if (axiosErr.response?.status === 401) {
-            try {
-              localStorage.removeItem("userAccess");
-            } catch {/* ignore */}
-            // recargar para forzar flujo a /login y limpiar estados en memoria
-            window.location.reload();
-            // retornar por contrato (no debería ejecutarse tras reload, pero por typing devolvemos null)
+            if (logoutOn401) {
+              try {
+                localStorage.removeItem("userAccess");
+              } catch {/* ignore */}
+              // recargar para forzar flujo a /login y limpiar estados en memoria
+              window.location.reload();
+            }
+
+            if (axiosErr.response?.data) {
+              setError(axiosErr.response.data.message || "No autorizado");
+              return axiosErr.response.data;
+            }
+
+            setError("No autorizado");
             return null;
           }
 
           if (attempt < retries) {
             attempt++;
-            await delay(retryDelay); // ⏳ espera antes del siguiente intento
+            await delay(retryDelay); // â³ espera antes del siguiente intento
             continue;
           }
 
@@ -128,8 +156,9 @@ export function useApi<T>(
 
       return null;
     },
-    [baseURL, timeout, retries, retryDelay]
+    [resolvedBaseURL, timeout, retries, retryDelay, logoutOn401]
   );
 
   return { loading, error, request };
 }
+

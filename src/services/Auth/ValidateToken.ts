@@ -10,6 +10,7 @@ export type TokenPayload = {
   fullName: string | null;
   isActive: boolean;
   mustChangePassword?: boolean;
+  telephonyEnabled?: boolean;
   role: string;
   tenantId?: string | null;
   token: string;
@@ -27,6 +28,7 @@ type ValidateTokenData =
       role?: string;
       tenantId?: string;
       mustChangePassword?: boolean;
+      telephonyEnabled?: boolean;
       expira?: string;
     }
   | { valid?: boolean }
@@ -37,6 +39,7 @@ export const useSessionService = () => {
     timeout: 8000,
     retries: 1,
     retryDelay: 800,
+    logoutOn401: true,
   });
 
   const validateToken = useCallback(
@@ -49,6 +52,7 @@ export const useSessionService = () => {
       token: string;
       tenantId?: string;
       mustChangePassword?: boolean;
+      telephonyEnabled?: boolean;
     }): Promise<{
       valid: boolean;
       api: ApiResponse<ValidateTokenData> | null;
@@ -76,7 +80,8 @@ export const useSessionService = () => {
           tk.role,
           tk.token,
           tk.tenantId || "",
-          Boolean(tk.mustChangePassword)
+          Boolean(tk.mustChangePassword),
+          Boolean(tk.telephonyEnabled)
         );
 
         return { valid: true, api: res, user: finalUser };
@@ -92,7 +97,8 @@ export const useSessionService = () => {
           String(res.data.role || currentUser?.role || ""),
           currentUser?.token,
           String(res.data.tenantId || currentUser?.tenantId || ""),
-          Boolean(res.data.mustChangePassword)
+          Boolean(res.data.mustChangePassword),
+          Boolean(res.data.telephonyEnabled ?? currentUser?.telephonyEnabled)
         );
 
         return { valid: true, api: res, user: finalUser };
@@ -108,7 +114,8 @@ export const useSessionService = () => {
           currentUser.role,
           currentUser.token,
           currentUser.tenantId || "",
-          Boolean(currentUser.mustChangePassword)
+          Boolean(currentUser.mustChangePassword),
+          Boolean(currentUser.telephonyEnabled)
         );
       } else {
         try {
@@ -124,7 +131,8 @@ export const useSessionService = () => {
               u.role,
               u.token,
               u.tenantId || "",
-              Boolean(u.mustChangePassword)
+              Boolean(u.mustChangePassword),
+              Boolean(u.telephonyEnabled)
             );
           }
         } catch {

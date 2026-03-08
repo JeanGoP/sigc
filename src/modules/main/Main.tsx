@@ -13,6 +13,7 @@ import MenuSidebar from './menu-sidebar/MenuSidebar';
 import { styled } from 'styled-components';
 import { Outlet } from 'react-router-dom';
 import { Loading } from '@app/components/Loading';
+import { GestionSessionProvider } from '@app/modules/main/gestion-session/GestionSessionContext';
 
 const MENU_WIDTH = 250;
 
@@ -171,7 +172,7 @@ const Main = () => {
 
   return (
     <Container $isScrollbarVisible={isScrollbarVisible} className="wrapper">
-      {getAppTemplate()}
+      <GestionSessionProvider>{getAppTemplate()}</GestionSessionProvider>
     </Container>
   );
 };

@@ -68,31 +68,114 @@ export type Seguimiento = {
   grabacion: string | null;
 };
 
+type SeguimientoDraftState = {
+  texto: string;
+  eventos: Evento[];
+  tipoContacto: string | number;
+  formEvento: Evento;
+  editIndex: number | null;
+  updatedAt: string;
+};
+
+function readSeguimientoDraft(key?: string): SeguimientoDraftState | null {
+  const storageKey = String(key ?? "").trim();
+  if (!storageKey) {
+    return null;
+  }
+
+  try {
+    const raw = window.localStorage.getItem(storageKey);
+    if (!raw) {
+      return null;
+    }
+
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") {
+      return null;
+    }
+
+    return {
+      texto: String(parsed.texto ?? ""),
+      eventos: Array.isArray(parsed.eventos) ? parsed.eventos : [],
+      tipoContacto: parsed.tipoContacto ?? 0,
+      formEvento: parsed.formEvento && typeof parsed.formEvento === "object"
+        ? parsed.formEvento
+        : { id: 0, tipo: "", fecha: "", hora: null, valor: undefined },
+      editIndex:
+        typeof parsed.editIndex === "number" && Number.isInteger(parsed.editIndex)
+          ? parsed.editIndex
+          : null,
+      updatedAt: String(parsed.updatedAt ?? ""),
+    };
+  } catch (error) {
+    console.error("Error leyendo borrador de seguimiento:", error);
+    return null;
+  }
+}
+
+function writeSeguimientoDraft(key: string, draft: SeguimientoDraftState): void {
+  const storageKey = String(key ?? "").trim();
+  if (!storageKey) {
+    return;
+  }
+
+  try {
+    window.localStorage.setItem(storageKey, JSON.stringify(draft));
+  } catch (error) {
+    console.error("Error guardando borrador de seguimiento:", error);
+  }
+}
+
+function clearSeguimientoDraft(key?: string): void {
+  const storageKey = String(key ?? "").trim();
+  if (!storageKey) {
+    return;
+  }
+
+  try {
+    window.localStorage.removeItem(storageKey);
+  } catch (error) {
+    console.error("Error eliminando borrador de seguimiento:", error);
+  }
+}
+
 interface TimelineSeguimientosProps {
   seguimientos: Seguimiento[];
   onNuevoSeguimiento: (
     seguimiento: Omit<Seguimiento, "id" | "usuario" | "fecha" | "hora">
   ) => Promise<boolean>;
   onBuscar?: () => Promise<unknown> | void;
+  nuevoAbiertoControlado?: boolean;
+  onNuevoAbiertoChange?: (open: boolean) => void;
+  ocultarBotonNuevo?: boolean;
+  disableGuardarSeguimiento?: boolean;
+  disableGuardarSeguimientoReason?: string;
   contextoEvento?: {
     idUsuario?: string | number;
     cliente?: string;
     factura?: string;
     cuenta?: string;
   };
+  draftStorageKey?: string;
 }
 
 export const TimelineSeguimientos: React.FC<TimelineSeguimientosProps> = ({
   seguimientos,
   onNuevoSeguimiento,
   onBuscar,
+  nuevoAbiertoControlado,
+  onNuevoAbiertoChange,
+  ocultarBotonNuevo = false,
+  disableGuardarSeguimiento = false,
+  disableGuardarSeguimientoReason = "",
   contextoEvento,
+  draftStorageKey,
 }) => {
   const [showModal, setShowModal] = React.useState(false);
   const [showAudio, setShowAudio] = React.useState(false);
   const [seguimientoActivo, setSeguimientoActivo] =
     React.useState<Seguimiento | null>(null);
-  const [nuevoAbierto, setNuevoAbierto] = React.useState(false);
+  const [nuevoAbiertoInterno, setNuevoAbiertoInterno] = React.useState(false);
   const [nuevoTexto, setNuevoTexto] = React.useState("");
   const [nuevoEventos, setNuevoEventos] = React.useState<Evento[]>([]);
   const [nuevoGrabacion, setNuevoGrabacion] = React.useState<File | null>(null);
@@ -118,6 +201,22 @@ export const TimelineSeguimientos: React.FC<TimelineSeguimientosProps> = ({
   );
   const [isValidatingEvent, setIsValidatingEvent] = React.useState(false);
   const isValidatingEventRef = React.useRef(false);
+  const initializedDraftKeyRef = React.useRef<string | null>(null);
+  const nuevoAbierto =
+    typeof nuevoAbiertoControlado === "boolean"
+      ? nuevoAbiertoControlado
+      : nuevoAbiertoInterno;
+
+  const setNuevoAbierto = React.useCallback(
+    (open: boolean) => {
+      if (typeof nuevoAbiertoControlado !== "boolean") {
+        setNuevoAbiertoInterno(open);
+      }
+
+      onNuevoAbiertoChange?.(open);
+    },
+    [nuevoAbiertoControlado, onNuevoAbiertoChange]
+  );
   const getDefaultFormEvento = (preferNombre?: string): Evento => {
     const preferred =
       (preferNombre
@@ -129,6 +228,72 @@ export const TimelineSeguimientos: React.FC<TimelineSeguimientosProps> = ({
       id: preferred?.id ?? 0,
     };
   };
+
+  const resetDraftState = React.useCallback(() => {
+    setNuevoTexto("");
+    setNuevoEventos([]);
+    setNuevoGrabacion(null);
+    setNuevoTipoContacto(0);
+    setEditIndex(null);
+    setErrorValidacion(null);
+    setFormEvento(getDefaultFormEvento());
+  }, [tiposEvento]);
+
+  const applyDraftState = React.useCallback(
+    (draft: SeguimientoDraftState | null) => {
+      if (!draft) {
+        resetDraftState();
+        return;
+      }
+
+      const draftFormEvento =
+        draft.formEvento && typeof draft.formEvento === "object"
+          ? {
+              ...getDefaultFormEvento(String(draft.formEvento.tipo ?? "").trim() || undefined),
+              ...draft.formEvento,
+            }
+          : getDefaultFormEvento();
+
+      setNuevoTexto(String(draft.texto ?? ""));
+      setNuevoEventos(Array.isArray(draft.eventos) ? draft.eventos : []);
+      setNuevoGrabacion(null);
+      setNuevoTipoContacto(draft.tipoContacto ?? 0);
+      setEditIndex(
+        typeof draft.editIndex === "number" && Number.isInteger(draft.editIndex)
+          ? draft.editIndex
+          : null
+      );
+      setErrorValidacion(null);
+      setFormEvento(draftFormEvento);
+    },
+    [resetDraftState, tiposEvento]
+  );
+
+  const hasMeaningfulDraftContent = React.useCallback((): boolean => {
+    const defaultTipo = String(getDefaultFormEvento().tipo ?? "").trim();
+    const currentTipo = String(formEvento.tipo ?? "").trim();
+
+    return Boolean(
+      nuevoTexto.trim()
+      || nuevoEventos.length > 0
+      || Number(nuevoTipoContacto || 0) > 0
+      || editIndex !== null
+      || String(formEvento.fecha ?? "").trim()
+      || String(formEvento.hora ?? "").trim()
+      || typeof formEvento.valor === "number"
+      || (currentTipo && currentTipo !== defaultTipo)
+    );
+  }, [
+    editIndex,
+    formEvento.fecha,
+    formEvento.hora,
+    formEvento.tipo,
+    formEvento.valor,
+    nuevoEventos,
+    nuevoTexto,
+    nuevoTipoContacto,
+    tiposEvento,
+  ]);
 
   const buildEventoKey = (evento: Evento): string => {
     const tipoKey = evento.id
@@ -154,19 +319,6 @@ export const TimelineSeguimientos: React.FC<TimelineSeguimientosProps> = ({
         const resEventos = await listarTiposEvento();
         if (resEventos?.success && resEventos.data) {
           setTiposEvento(resEventos.data);
-          if (resEventos.data.length > 0) {
-            setFormEvento((prev) => ({
-              ...prev,
-              tipo:
-                resEventos.data && resEventos.data[0]
-                  ? resEventos.data[0].nombre
-                  : "",
-              id:
-                resEventos.data && resEventos.data[0]
-                  ? resEventos.data[0].id
-                  : 0,
-            }));
-          }
         }
       } catch (error) {
         console.error("Error cargando tipos:", error);
@@ -174,6 +326,54 @@ export const TimelineSeguimientos: React.FC<TimelineSeguimientosProps> = ({
     };
     cargarTipos();
   }, [listarTiposEvento]);
+
+  React.useEffect(() => {
+    if (tiposEvento.length === 0) {
+      return;
+    }
+
+    const effectiveDraftKey = String(draftStorageKey ?? "").trim() || "__no_draft_key__";
+    if (initializedDraftKeyRef.current === effectiveDraftKey) {
+      return;
+    }
+
+    initializedDraftKeyRef.current = effectiveDraftKey;
+    applyDraftState(readSeguimientoDraft(draftStorageKey));
+  }, [applyDraftState, draftStorageKey, tiposEvento]);
+
+  React.useEffect(() => {
+    if (tiposEvento.length === 0) {
+      return;
+    }
+
+    const storageKey = String(draftStorageKey ?? "").trim();
+    if (!storageKey) {
+      return;
+    }
+
+    if (!hasMeaningfulDraftContent()) {
+      clearSeguimientoDraft(storageKey);
+      return;
+    }
+
+    writeSeguimientoDraft(storageKey, {
+      texto: nuevoTexto,
+      eventos: nuevoEventos,
+      tipoContacto: nuevoTipoContacto,
+      formEvento,
+      editIndex,
+      updatedAt: new Date().toISOString(),
+    });
+  }, [
+    draftStorageKey,
+    editIndex,
+    formEvento,
+    hasMeaningfulDraftContent,
+    nuevoEventos,
+    nuevoTexto,
+    nuevoTipoContacto,
+    tiposEvento,
+  ]);
 
   function setFormCampo<K extends keyof Evento>(campo: K, valor: Evento[K]) {
     setFormEvento((prev) => ({ ...prev, [campo]: valor }));
@@ -407,6 +607,14 @@ export const TimelineSeguimientos: React.FC<TimelineSeguimientosProps> = ({
   }
 
   const handleGuardarNuevo = async () => {
+    if (disableGuardarSeguimiento) {
+      toast.warning(
+        disableGuardarSeguimientoReason ||
+          "No se puede guardar seguimiento en este momento."
+      );
+      return;
+    }
+
     // Asegurar que todos los eventos tengan el id correcto
     const eventosConId = nuevoEventos.map((evt) => {
       if (!evt.id) {
@@ -445,14 +653,9 @@ export const TimelineSeguimientos: React.FC<TimelineSeguimientosProps> = ({
     }
 
     if (await procesoGuardado) {
+      clearSeguimientoDraft(draftStorageKey);
       setNuevoAbierto(false);
-      setNuevoTexto("");
-      setNuevoEventos([]);
-      setNuevoGrabacion(null);
-      setNuevoTipoContacto(0);
-      setEditIndex(null);
-      setErrorValidacion(null);
-      setFormEvento(getDefaultFormEvento(formEvento.tipo));
+      resetDraftState();
       void onBuscar?.();
     }
   };
@@ -506,13 +709,6 @@ export const TimelineSeguimientos: React.FC<TimelineSeguimientosProps> = ({
 
   function handleNewSeguimiento(): void {
     setNuevoAbierto(true);
-    setNuevoTexto("");
-    setNuevoEventos([]);
-    setNuevoGrabacion(null);
-    setNuevoTipoContacto(0);
-    setEditIndex(null);
-    setErrorValidacion(null);
-    setFormEvento(getDefaultFormEvento(formEvento.tipo));
   }
 
   const parseEventos = (eventos: string | Evento[]): Evento[] => {
@@ -584,28 +780,77 @@ export const TimelineSeguimientos: React.FC<TimelineSeguimientosProps> = ({
 
   return (
     <div style={{ padding: 24 }}>
-      {/* Formulario para nuevo seguimiento */}
-      {nuevoAbierto ? (
-        <div
+      {!ocultarBotonNuevo && (
+        <Button
+          variant="primary"
           style={{
-            background: "#e3f2fd",
-            borderRadius: 12,
-            padding: 24,
             marginBottom: 32,
-            boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-            border: "1px solid #bbdefb",
+            borderRadius: 8,
+            padding: "8px 16px",
+            boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
           }}
+          onClick={() => handleNewSeguimiento()}
         >
+          + Nuevo seguimiento
+        </Button>
+      )}
+
+      <Modal
+        show={nuevoAbierto}
+        onHide={() => setNuevoAbierto(false)}
+        centered
+        size="xl"
+        scrollable
+        backdrop="static"
+      >
+        <Modal.Body style={{ padding: 24 }}>
           <div
             style={{
-              fontWeight: "bold",
-              fontSize: 20,
+              display: "flex",
+              alignItems: "flex-start",
+              justifyContent: "space-between",
+              gap: 16,
               marginBottom: 16,
-              color: "#1565c0",
             }}
           >
-            Nuevo seguimiento
+            <div>
+              <div
+                style={{
+                  fontWeight: "bold",
+                  fontSize: 20,
+                  color: "#1565c0",
+                }}
+              >
+                Nuevo seguimiento
+              </div>
+              <div
+                style={{
+                  fontSize: 13,
+                  color: "#5f6b7a",
+                  marginTop: 4,
+                }}
+              >
+                El borrador se conserva por gestion activa mientras no guardes.
+              </div>
+            </div>
+            <Button
+              variant="light"
+              onClick={() => setNuevoAbierto(false)}
+              style={{ borderRadius: 999, padding: "4px 12px" }}
+            >
+              Cerrar
+            </Button>
           </div>
+
+          <div
+            style={{
+              background: "#e3f2fd",
+              borderRadius: 12,
+              padding: 24,
+              boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+              border: "1px solid #bbdefb",
+            }}
+          >
           <div className="mb-3">
             <label style={{ fontWeight: 500, marginBottom: 8 }}>
               Texto del seguimiento
@@ -904,37 +1149,61 @@ export const TimelineSeguimientos: React.FC<TimelineSeguimientosProps> = ({
               }
             />
           </div>*/}
-          <div style={{ display: "flex", gap: 12 }}>
-            <Button
-              variant="success"
-              onClick={handleGuardarNuevo}
-              style={{ borderRadius: 6 }}
-            >
-              Guardar
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={() => setNuevoAbierto(false)}
-              style={{ borderRadius: 6 }}
-            >
-              Cancelar
-            </Button>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 12,
+              flexWrap: "wrap",
+            }}
+          >
+            <span style={{ fontSize: 12, color: "#5f6b7a" }}>
+              Cerrar conserva el borrador de esta gestion.
+            </span>
+            <div style={{ display: "flex", gap: 12 }}>
+              {disableGuardarSeguimiento ? (
+                <OverlayTrigger
+                  placement="top"
+                  overlay={
+                    <Tooltip id="tooltip-guardar-seguimiento-bloqueado">
+                      {disableGuardarSeguimientoReason ||
+                        "No se puede guardar seguimiento en este momento."}
+                    </Tooltip>
+                  }
+                >
+                  <span className="d-inline-block">
+                    <Button
+                      variant="success"
+                      onClick={handleGuardarNuevo}
+                      style={{ borderRadius: 6 }}
+                      disabled
+                    >
+                      Guardar
+                    </Button>
+                  </span>
+                </OverlayTrigger>
+              ) : (
+                <Button
+                  variant="success"
+                  onClick={handleGuardarNuevo}
+                  style={{ borderRadius: 6 }}
+                >
+                  Guardar
+                </Button>
+              )}
+              <Button
+                variant="secondary"
+                onClick={() => setNuevoAbierto(false)}
+                style={{ borderRadius: 6 }}
+              >
+                Cerrar
+              </Button>
+            </div>
           </div>
         </div>
-      ) : (
-        <Button
-          variant="primary"
-          style={{
-            marginBottom: 32,
-            borderRadius: 8,
-            padding: "8px 16px",
-            boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
-          }}
-          onClick={() => handleNewSeguimiento()}
-        >
-          + Nuevo seguimiento
-        </Button>
-      )}
+        </Modal.Body>
+      </Modal>
 
       {/* Timeline */}
       <div style={{ height: "75vh", overflowY: "auto", paddingRight: 12 }}>

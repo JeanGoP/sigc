@@ -8,6 +8,7 @@ export class User {
     public role: string,
     public token?: string,
     public tenantId?: string,
-    public mustChangePassword: boolean = false
+    public mustChangePassword: boolean = false,
+    public telephonyEnabled: boolean = false
   ) {}
 }

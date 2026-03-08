@@ -13,6 +13,8 @@ import { styled } from 'styled-components';
 import { Image } from '@profabric/react-components';
 import { useAppDispatch, useAppSelector } from '@app/store/store';
 import EventsDropdown from './events-dropdown/EventsDropdown';
+import SoftphoneWidget from './softphone-widget/SoftphoneWidget';
+import GestionSessionWidget from './gestion-session-widget/GestionSessionWidget';
 
 const StyledBrandImage = styled(Image)`
   float: left;
@@ -33,6 +35,7 @@ const Header = ({ containered, ...rest }: { containered?: boolean } & any) => {
   const navbarVariant = useAppSelector((state) => state.ui.navbarVariant);
   const headerBorder = useAppSelector((state) => state.ui.headerBorder);
   const topNavigation = useAppSelector((state) => state.ui.topNavigation);
+  const currentUser = useAppSelector((state) => state.auth.currentUser);
 
   const handleToggleMenuSidebar = () => {
     dispatch(toggleSidebarMenu());
@@ -87,33 +90,49 @@ const Header = ({ containered, ...rest }: { containered?: boolean } & any) => {
             </button>
           </>
         )}
-        <ul className="navbar-nav">
-          {!topNavigation && (
-            <li className="nav-item">
-              <button
-                onClick={handleToggleMenuSidebar}
-                type="button"
-                className="nav-link"
-              >
-                <i className="fas fa-bars" />
-              </button>
+        <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+          <ul className="navbar-nav">
+            {!topNavigation && (
+              <li className="nav-item">
+                <button
+                  onClick={handleToggleMenuSidebar}
+                  type="button"
+                  className="nav-link"
+                >
+                  <i className="fas fa-bars" />
+                </button>
+              </li>
+            )}
+            <li className="nav-item d-none d-sm-inline-block">
+              <Link to="/" className="nav-link">
+                {t('header.label.home')}
+              </Link>
             </li>
-          )}
-          <li className="nav-item d-none d-sm-inline-block">
-            <Link to="/" className="nav-link">
-              {t('header.label.home')}
-            </Link>
-          </li>
-          {/* <li className="nav-item d-none d-sm-inline-block">
-            <Link to="/profile" className="nav-link">
-              Profile
-            </Link>
-          </li> */}
-        </ul>
-        <ul className="navbar-nav ml-auto">
+            {/* <li className="nav-item d-none d-sm-inline-block">
+              <Link to="/profile" className="nav-link">
+                Profile
+              </Link>
+            </li> */}
+          </ul>
+        </div>
+        <div
+          style={{
+            flex: '1 1 auto',
+            minWidth: 0,
+            display: 'flex',
+            justifyContent: 'center',
+            padding: '0 12px',
+          }}
+        >
+          <ul className="navbar-nav">
+            <GestionSessionWidget />
+          </ul>
+        </div>
+        <ul className="navbar-nav" style={{ flexShrink: 0 }}>
           {/* <MessagesDropdown /> */}
           {/* <NotificationsDropdown /> */}
           {/* <LanguagesDropdown /> */}
+          {currentUser?.telephonyEnabled && <SoftphoneWidget />}
           <EventsDropdown />
           <UserDropdown />
           <li className="nav-item">
