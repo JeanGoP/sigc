@@ -33,6 +33,7 @@ import {
 } from "@app/services/GestionLlamadaService";
 import { useGestionSessionContext } from "@app/modules/main/gestion-session/GestionSessionContext";
 import { features } from "@app/config/features";
+import { useAppSelector } from "@app/store/store";
 
 const OWNER_CHANNEL_KEY = "consulta_cartera_webrtc_owner";
 const CALL_SUMMARY_AUTO_HIDE_MS = 16000;
@@ -185,6 +186,10 @@ function shouldTrackPendingInboundCall(
   return false;
 }
 
+function isAdministratorRole(role?: string | null): boolean {
+  return String(role ?? "").trim().toLowerCase() === "administrador";
+}
+
 export default function SoftphoneWidget() {
   const [open, setOpen] = useState(false);
   const [runtimeSnapshot, setRuntimeSnapshot] = useState(
@@ -194,6 +199,8 @@ export default function SoftphoneWidget() {
   const [endedCallSummary, setEndedCallSummary] = useState<EndedCallSummary | null>(null);
   const { registrarEventoLlamada } = useGestionLlamadaService();
   const { activeSession } = useGestionSessionContext();
+  const currentUser = useAppSelector((state) => state.auth.currentUser);
+  const canViewSoftphoneButton = isAdministratorRole(currentUser?.role);
 
   const ownership = useWebRtcTabOwnership({
     channelKey: OWNER_CHANNEL_KEY,
@@ -216,6 +223,12 @@ export default function SoftphoneWidget() {
       setEndedCallSummary(buildEndedCallSummary(call));
     });
   }, []);
+
+  useEffect(() => {
+    if (!canViewSoftphoneButton && open) {
+      setOpen(false);
+    }
+  }, [canViewSoftphoneButton, open]);
 
   useEffect(() => {
     const registerCallEvent = async (
@@ -540,30 +553,32 @@ export default function SoftphoneWidget() {
           </select>
         </div>
 
-        <button
-          type="button"
-          className="nav-link"
-          onClick={() => setOpen((previous) => !previous)}
-          title="Softphone"
-          aria-label="Softphone"
-          style={{ position: "relative" }}
-        >
-          <FontAwesomeIcon icon={faPhone} />
-          <Badge
-            variant={runtimeSnapshot.inProgress ? "danger" : "success"}
-            className="ms-1"
-            style={{ fontSize: "0.62rem", verticalAlign: "middle" }}
+        {canViewSoftphoneButton && (
+          <button
+            type="button"
+            className="nav-link"
+            onClick={() => setOpen((previous) => !previous)}
+            title="Softphone"
+            aria-label="Softphone"
+            style={{ position: "relative" }}
           >
-            {runtimeSnapshot.inProgress ? "busy" : "ready"}
-          </Badge>
-          <Badge
-            variant={ownership.isOwner ? "primary" : "secondary"}
-            className="ms-1"
-            style={{ fontSize: "0.58rem", verticalAlign: "middle" }}
-          >
-            {ownershipLabel}
-          </Badge>
-        </button>
+            <FontAwesomeIcon icon={faPhone} />
+            <Badge
+              variant={runtimeSnapshot.inProgress ? "danger" : "success"}
+              className="ms-1"
+              style={{ fontSize: "0.62rem", verticalAlign: "middle" }}
+            >
+              {runtimeSnapshot.inProgress ? "busy" : "ready"}
+            </Badge>
+            <Badge
+              variant={ownership.isOwner ? "primary" : "secondary"}
+              className="ms-1"
+              style={{ fontSize: "0.58rem", verticalAlign: "middle" }}
+            >
+              {ownershipLabel}
+            </Badge>
+          </button>
+        )}
       </li>
 
       {showIncomingCard && (
