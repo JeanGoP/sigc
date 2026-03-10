@@ -21,10 +21,10 @@ const EstadoClienteTable = (props: any) => {
   const columns_saldos: TableColumn[] = [
     { id: "VENCFAC", label: "Vencimiento Cuota" },
     {
-      id: "VALOR_CUOTA",
-      label: "Valor Cuota",
-      format: (value: any) =>
-        `$ ${StringToMoney(value)}`
+      id: "FECHFAC",
+      label: "Fecha Factura",
+      // format: (value: any) =>
+      //   `$ ${StringToMoney(value)}`
     },
     {
       id: "DEBE",
