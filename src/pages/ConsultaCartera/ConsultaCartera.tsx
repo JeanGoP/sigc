@@ -55,6 +55,14 @@ import {
   type Evento,
 } from "@app/modules/maestros/tipos-eventos/TimelineSeguimientos";
 import { convertirEventoAXml } from "./functions/convertEventoToXML";
+import {
+  SAVE_SESSION_SYNC_RETRY_DELAYS_MS,
+  findGestionSessionBySessionRef,
+  isGestionSessionNonActiveStatus,
+  normalizeGestionSessionStatus,
+  normalizeSaveOutcomeCode,
+  shouldCloseSeguimientoDraftAfterSave,
+} from "./functions/gestionSessionSaveSync";
 // import {
 //   GestionarFactura,
 //   GestionFacturaRequest,
@@ -131,6 +139,13 @@ interface EventoXML {
   valor?: number;
 }
 
+interface GestionSaveSyncResult {
+  confirmedNonActive: boolean;
+  sessionMissing: boolean;
+  sessionStatus: string | null;
+  synced: boolean;
+}
+
 const opciones_edades = [
   { label: "Todos", value: "todos" },
   { label: "30", value: "30" },
@@ -182,6 +197,12 @@ function createSaveFallbackIdempotencyKey(): string {
 
 function createTransitionIdempotencyKey(prefix = "transition"): string {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function wait(delayMs: number): Promise<void> {
+  return new Promise((resolve) => {
+    globalThis.setTimeout(resolve, delayMs);
+  });
 }
 
 function isInboundCallDirection(directionRaw?: string | null): boolean {
@@ -348,6 +369,7 @@ export const ConsultaCartera: React.FC = () => {
 
   const {
     startGestionSession,
+    listInProgressGestionSessions,
     transitionGestionSession,
     loadingStartGestionSession,
     loadingTransitionGestionSession,
@@ -1391,6 +1413,74 @@ export const ConsultaCartera: React.FC = () => {
     ]
   );
 
+  const synchronizeGestionSessionAfterSave = useCallback(
+    async (sessionRef: string): Promise<GestionSaveSyncResult> => {
+      const normalizedSessionRef = String(sessionRef ?? "").trim();
+      if (!normalizedSessionRef) {
+        await refreshSessions();
+        return {
+          confirmedNonActive: false,
+          sessionMissing: false,
+          sessionStatus: null,
+          synced: false,
+        };
+      }
+
+      await refreshSessions();
+
+      let lastKnownStatus: string | null = null;
+      let hasSuccessfulSync = false;
+
+      for (const delayMs of SAVE_SESSION_SYNC_RETRY_DELAYS_MS) {
+        await wait(delayMs);
+
+        const listResult = await listInProgressGestionSessions();
+        if (!listResult.success) {
+          continue;
+        }
+
+        hasSuccessfulSync = true;
+        const matchingSession = findGestionSessionBySessionRef(
+          listResult.operation?.sessions ?? [],
+          normalizedSessionRef
+        );
+
+        if (!matchingSession) {
+          await refreshSessions();
+          return {
+            confirmedNonActive: true,
+            sessionMissing: true,
+            sessionStatus: null,
+            synced: true,
+          };
+        }
+
+        const syncedStatus = normalizeGestionSessionStatus(matchingSession.status);
+        lastKnownStatus = syncedStatus || null;
+
+        if (isGestionSessionNonActiveStatus(syncedStatus)) {
+          await refreshSessions();
+          return {
+            confirmedNonActive: true,
+            sessionMissing: false,
+            sessionStatus: lastKnownStatus,
+            synced: true,
+          };
+        }
+      }
+
+      await refreshSessions();
+
+      return {
+        confirmedNonActive: isGestionSessionNonActiveStatus(lastKnownStatus),
+        sessionMissing: false,
+        sessionStatus: lastKnownStatus,
+        synced: hasSuccessfulSync,
+      };
+    },
+    [listInProgressGestionSessions, refreshSessions]
+  );
+
   useEffect(() => {
     if (!telephonyEnabled) {
       return undefined;
@@ -1534,9 +1624,12 @@ export const ConsultaCartera: React.FC = () => {
       };
 
       const responseGuardado = await GestionarFactura(request);
-      const outcomeCode = String(responseGuardado?.data?.outcomeCode ?? "")
-        .trim()
-        .toLowerCase();
+      const outcomeCode = normalizeSaveOutcomeCode(
+        responseGuardado?.data?.outcomeCode
+      );
+      const responseSessionStatus = normalizeGestionSessionStatus(
+        responseGuardado?.data?.sessionStatus
+      );
 
       if (responseGuardado?.success) {
         if (outcomeCode === "idempotent_replay") {
@@ -1545,8 +1638,34 @@ export const ConsultaCartera: React.FC = () => {
           toast.success("Proceso exitoso");
         }
 
-        if (outcomeCode === "saved_and_closed" || outcomeCode === "idempotent_replay") {
-          await refreshSessions();
+        const syncResult = await synchronizeGestionSessionAfterSave(
+          activeSessionRef
+        );
+        const shouldCloseDraft = shouldCloseSeguimientoDraftAfterSave({
+          outcomeCode,
+          sessionStatus: responseSessionStatus,
+          syncedSessionStatus: syncResult.sessionStatus,
+          sessionMissing: syncResult.sessionMissing,
+        });
+
+        if (
+          shouldCloseDraft
+          && !syncResult.confirmedNonActive
+          && !syncResult.sessionMissing
+        ) {
+          console.warn(
+            "[ConsultaCartera] El guardado reporto cierre/no-activa pero la sincronizacion no lo confirmo todavia.",
+            {
+              outcomeCode,
+              responseSessionStatus,
+              syncedSessionStatus: syncResult.sessionStatus,
+              synced: syncResult.synced,
+              sessionRef: activeSessionRef,
+            }
+          );
+        }
+
+        if (shouldCloseDraft) {
           setIsSeguimientoDraftOpen(false);
         }
 
@@ -1560,12 +1679,21 @@ export const ConsultaCartera: React.FC = () => {
             "La gestion ya fue cerrada por otro intento. Inicia una nueva gestion para continuar."
         );
 
-        if (outcomeCode === "conflict_already_closed" || outcomeCode === "conflict_transition") {
-          await refreshSessions();
+        const syncResult = await synchronizeGestionSessionAfterSave(
+          activeSessionRef
+        );
+        const shouldCloseDraft = shouldCloseSeguimientoDraftAfterSave({
+          outcomeCode,
+          sessionStatus: responseSessionStatus,
+          syncedSessionStatus: syncResult.sessionStatus,
+          sessionMissing: syncResult.sessionMissing,
+        });
+
+        if (shouldCloseDraft) {
           setIsSeguimientoDraftOpen(false);
-          await cargarGestiones();
         }
 
+        await cargarGestiones();
         return false;
       }
 

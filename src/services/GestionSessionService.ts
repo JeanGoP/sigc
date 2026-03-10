@@ -281,7 +281,14 @@ export function useGestionSessionService() {
   const startApi = useApi<GestionSessionOperationApi>("/api/v1/gestion-session/start");
   const activeApi = useApi<GestionSessionOperationApi>("/api/v1/gestion-session/active");
   const stateApi = useApi<GestionSessionOperationApi>("/api/v1/gestion-session/state");
-  const inProgressApi = useApi<GestionSessionListOperationApi>("/api/v1/gestion-session/in-progress");
+  const inProgressApi = useApi<GestionSessionListOperationApi>(
+    "/api/v1/gestion-session/in-progress",
+    {
+      timeout: 10000,
+      retries: 1,
+      retryDelay: 500,
+    }
+  );
   const switchApi = useApi<GestionSessionOperationApi>("/api/v1/gestion-session/switch-active");
   const startRequest = startApi.request;
   const activeRequest = activeApi.request;

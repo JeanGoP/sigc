@@ -31,6 +31,7 @@ import BuscadorCuentas from "@app/components/BuscadorGeneral/BuscadorCuentas";
 moment.locale("es");
 const localizer = momentLocalizer(moment);
 const CUENTA_FILTRO_SESSION_KEY = "calendario_cuenta_filtro";
+const USUARIO_FILTRO_SESSION_KEY = "calendario_usuario_filtro";
 
 // Componente reutilizable para el botón de gestión en Cartera
 interface BotonGestionCarteraProps {
@@ -80,7 +81,9 @@ const Calendario: React.FC = () => {
   const [usuarios, setUsuarios] = useState<
     { label: string; value: string | number }[]
   >([]);
-  const [usuarioFiltro, setUsuarioFiltro] = useState<string | number>("");
+  const [usuarioFiltro, setUsuarioFiltro] = useState<string | number>(() => {
+    return getSessionValue<string | number>(USUARIO_FILTRO_SESSION_KEY) ?? "";
+  });
   const [eventos, setEventos] = useState<Evento[]>([]);
   const [mostrarModalEvento, setMostrarModalEvento] = useState(false);
   const [mostrarModalDia, setMostrarModalDia] = useState(false);
@@ -174,6 +177,15 @@ const Calendario: React.FC = () => {
       fetchUsuarios();
     }
   }, [currentUser]);
+
+  useEffect(() => {
+    if (isValidUserFilter(usuarioFiltro)) {
+      saveOrUpdateSessionValue(USUARIO_FILTRO_SESSION_KEY, usuarioFiltro);
+      return;
+    }
+
+    deleteSessionValue(USUARIO_FILTRO_SESSION_KEY);
+  }, [usuarioFiltro]);
 
   // Rango inicial para la vista por defecto (mes)
   useEffect(() => {

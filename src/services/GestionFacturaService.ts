@@ -234,7 +234,10 @@ export interface GestionesEventosFacturaResulta {
 // Hook service
 export function useGestionFacturaService() {
   const buscarApi = useApi<GestionesEventosFacturaResulta>("/api/v1/BuscarGestiones");
-  const insertarApi = useApi<GestionFacturaInsertOperation>("/api/v1/InsertarGestionFactura");
+  const insertarApi = useApi<GestionFacturaInsertOperation>(
+    "/api/v1/InsertarGestionFactura",
+    { timeout: 15000 }
+  );
 
   // Buscar gestiones
   const buscarGestiones = async (factura: string, cliente: string, cuenta: string) => {
