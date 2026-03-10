@@ -6,7 +6,6 @@ import BuscadorCuentas from "@app/components/BuscadorGeneral/BuscadorCuentas";
 import BuscadorEtiquetasCliente from "@app/components/BuscadorGeneral/BuscadorEtiquetasCLiente";
 import BuscadorTiposEvento from "@app/components/BuscadorGeneral/BuscadorTiposEvento";
 import { CustomDatePicker } from "@app/components/DatePicker/DatePickerv2";
-import { NumericFilter } from "@app/components/NumericFieldForm/NumericFieldForm";
 import { SingleSelect } from "@app/components/singleSelect/singleSelect";
 
 // Helpers
@@ -42,6 +41,14 @@ const opciones: SelectOption[] = [
   { label: "90", value: "90" },
   { label: "+90", value: "+90" },
 ];
+
+const SIN_GESTION_DIAS_OPTIONS = [
+  { value: 0, label: "⚪ Todos", color: null },
+  { value: 1, label: "🔵 Sin gestión", color: "#0a95b9" },
+  { value: 2, label: "🟢 Gestionado hoy", color: "#1d9540" },
+  { value: 3, label: "🟡 1 a 5 días", color: "#ffbf06" },
+  { value: 4, label: "🔴 Más de 5 días", color: "#e24744" },
+] as const;
 
 const normalizeEdadMora = (raw?: string | null): string => {
   const trimmed = (raw ?? "").trim();
@@ -112,11 +119,9 @@ export const FiltrosCarteras: React.FC<FiltrosCarterasProps> = ({
     clearFiltrosCarteras();
   };
 
-  const handleChangeSindGestionDias = (value: number | null) => {
-    update("sinGestionDias", value);
-    // const value = e.target.value;
-    // const numericValue = value === "" ? null : parseInt(value, 10);
-    // update("sinGestionDias", numericValue);
+  const handleChangeSinGestionDias = (value: string | number) => {
+    const numericValue = Number(value);
+    update("sinGestionDias", Number.isFinite(numericValue) ? numericValue : 0);
   };
 
   const handleChangeFiltroTipoEvento = (value: string | number | null) => {
@@ -201,10 +206,11 @@ export const FiltrosCarteras: React.FC<FiltrosCarterasProps> = ({
               </Col>
 
               <Col md={6}>
-                <NumericFilter
-                  tittle="Dias sin gestion"
-                  value={filtros.sinGestionDias ?? ""}
-                  onChange={(v) => handleChangeSindGestionDias(v)}
+                <SingleSelect
+                  options={SIN_GESTION_DIAS_OPTIONS}
+                  selectedValue={filtros.sinGestionDias}
+                  onChange={handleChangeSinGestionDias}
+                  label="Días sin gestión"
                 />
               </Col>
 

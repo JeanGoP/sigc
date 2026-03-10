@@ -20,7 +20,6 @@ import "./GestionCobroLayout.css";
 import ConsultaClientes from "../ConsultaClientes/ConsultaCLientes";
 import { ContentHeader } from "@app/components";
 import { DynamicTablePagination } from "../ConsultaClientes/components/tablaReutilizablePaginacion";
-import { SingleSelect } from "@app/components/singleSelect/singleSelect";
 import {
   ClienteEstadoCuenta,
   FetchFacturasRef,
@@ -293,8 +292,6 @@ export const ConsultaCartera: React.FC = () => {
   const [unsavedFilttersChanges, useUnsavedFilttersChanges] = useState(false);
   const [filtroGenericoStringPorTipo, setFiltroGenericoStringPorTipo] =
     useState<string>("");
-  const [checkSinGestionDias, setCheckSinGestionDias] = useState(false);
-  const [sinGestionDias, setSinGestionDias] = useState("");
   const [checkSoloAsignadas, setCheckSoloAsignadas] = useState(false);
   const [checkSoloEventosPendientes, setCheckSoloEventosPendientes] =
     useState(false);
@@ -512,13 +509,6 @@ export const ConsultaCartera: React.FC = () => {
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
     setCheckIncluirSaldosCero(event.target.checked);
-  };
-
-  const handleCheckSinGestionDias = (
-    event: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    setCheckSinGestionDias(event.target.checked);
-    if (!event.target.checked) setSinGestionDias("");
   };
 
   const handleCheckSoloAsignadas = (
