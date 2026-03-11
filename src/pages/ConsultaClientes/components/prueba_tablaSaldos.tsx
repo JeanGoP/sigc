@@ -19,13 +19,13 @@ interface EstadoCliente {
 
 const EstadoClienteTable = (props: any) => {
   const columns_saldos: TableColumn[] = [
-    { id: "VENCFAC", label: "Vencimiento Cuota" },
     {
       id: "FECHFAC",
       label: "Fecha Factura",
       // format: (value: any) =>
       //   `$ ${StringToMoney(value)}`
     },
+    { id: "VENCFAC", label: "Vencimiento Cuota" },
     {
       id: "DEBE",
       label: "Valor Debe",
