@@ -202,6 +202,13 @@ export const TimelineSeguimientos: React.FC<TimelineSeguimientosProps> = ({
   const [isValidatingEvent, setIsValidatingEvent] = React.useState(false);
   const isValidatingEventRef = React.useRef(false);
   const initializedDraftKeyRef = React.useRef<string | null>(null);
+  const internalSaveBlockedReason = isValidatingEvent
+    ? "Se esta validando el evento. Espera a que finalice antes de guardar."
+    : "";
+  const isGuardarSeguimientoDisabled =
+    disableGuardarSeguimiento || isValidatingEvent;
+  const guardarSeguimientoBlockedReason =
+    disableGuardarSeguimientoReason || internalSaveBlockedReason;
   const nuevoAbierto =
     typeof nuevoAbiertoControlado === "boolean"
       ? nuevoAbiertoControlado
@@ -607,6 +614,13 @@ export const TimelineSeguimientos: React.FC<TimelineSeguimientosProps> = ({
   }
 
   const handleGuardarNuevo = async () => {
+    if (isValidatingEventRef.current || isValidatingEvent) {
+      toast.warning(
+        "Se esta validando el evento. Espera a que finalice antes de guardar."
+      );
+      return;
+    }
+
     if (disableGuardarSeguimiento) {
       toast.warning(
         disableGuardarSeguimientoReason ||
@@ -1162,12 +1176,12 @@ export const TimelineSeguimientos: React.FC<TimelineSeguimientosProps> = ({
               Cerrar conserva el borrador de esta gestion.
             </span>
             <div style={{ display: "flex", gap: 12 }}>
-              {disableGuardarSeguimiento ? (
+              {isGuardarSeguimientoDisabled ? (
                 <OverlayTrigger
                   placement="top"
                   overlay={
                     <Tooltip id="tooltip-guardar-seguimiento-bloqueado">
-                      {disableGuardarSeguimientoReason ||
+                      {guardarSeguimientoBlockedReason ||
                         "No se puede guardar seguimiento en este momento."}
                     </Tooltip>
                   }
