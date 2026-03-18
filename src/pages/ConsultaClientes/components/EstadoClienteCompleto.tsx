@@ -20,6 +20,7 @@ interface Props {
   cliente: string;
   fecha: string;
   intmora: string;
+  saldoCero?: boolean;
   // numCuotas: number;
   onSelectFactura?: (row: any) => void;
 }
@@ -29,7 +30,7 @@ export interface FetchFacturasRef {
 }
 
 export const ClienteEstadoCuenta = forwardRef<FetchFacturasRef, Props>(
-  ({ cliente, fecha, intmora, onSelectFactura }: Props, ref: any) => {
+  ({ cliente, fecha, intmora, saldoCero, onSelectFactura }: Props, ref: any) => {
     const [rowsFacturas, setRowsFacturas] = useState<FacturaListado[]>([]);
     const [clienteCuotasRows, setClienteCuotasRows] = useState<any[]>([]);
     const [TableRowsRecibosCaja, setTableRowsRecibosCaja] = useState<any[]>([]);
@@ -65,8 +66,8 @@ export const ClienteEstadoCuenta = forwardRef<FetchFacturasRef, Props>(
     const clienteKey = useMemo(() => normalizeValue(cliente), [cliente]);
     const fechaKey = useMemo(() => normalizeValue(fecha), [fecha]);
     const requestKey = useMemo(
-      () => `${clienteKey}|${fechaKey}`,
-      [clienteKey, fechaKey]
+      () => `${clienteKey}|${fechaKey}|${saldoCero}`,
+      [clienteKey, fechaKey, saldoCero]
     );
 
     useEffect(() => {
@@ -101,6 +102,7 @@ export const ClienteEstadoCuenta = forwardRef<FetchFacturasRef, Props>(
         const res = await listarFacturas({
           fecha: fechaKey,
           cliente: clienteKey,
+          saldoCero,
         });
 
         if (requestId !== requestIdRef.current) return;
@@ -128,6 +130,7 @@ export const ClienteEstadoCuenta = forwardRef<FetchFacturasRef, Props>(
       requestKey,
       listarFacturas,
       fechaKey,
+      saldoCero,
       clienteCuotasRows.length,
       TableRowsRecibosCaja.length,
     ]);

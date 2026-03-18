@@ -11,6 +11,7 @@ import {
   Col,
   Badge,
   Alert,
+  Spinner,
 } from "react-bootstrap";
 import {
   DynamicTable,
@@ -29,6 +30,7 @@ import {
   faArrowLeft,
   faArrowRight,
   faPhone,
+  faPhoneSlash,
   faHandHoldingUsd,
   faExclamationTriangle,
   faHome,
@@ -104,7 +106,6 @@ import {
 } from "@app/services/GestionSessionService";
 import {
   acquireActionLock,
-  createOrReuseSaveAttempt,
   getCurrentTabId,
   getPendingInboundCalls,
   releaseActionLock,
@@ -285,6 +286,7 @@ export const ConsultaCartera: React.FC = () => {
   const [registroSeleccionado, setRegistroSeleccionado] = useState<any>(null);
   const tablaFacturasRef = useRef<FetchFacturasRef>(null);
   const [checkIncluirSaldosCero, setCheckIncluirSaldosCero] = useState(false);
+  const [filtroSaldoCero, setFiltroSaldoCero] = useState(false);
   const [fechaConsultaFacturas, setFechaConsultaFacturas] = useState(
     new Date().toISOString().split("T")[0]
   );
@@ -398,6 +400,7 @@ export const ConsultaCartera: React.FC = () => {
     () => getPendingInboundCalls()
   );
   const [isAssociatingInboundCall, setIsAssociatingInboundCall] = useState(false);
+  const [wrongNumHovered, setWrongNumHovered] = useState(false);
   const [showGestionConflictModal, setShowGestionConflictModal] = useState(false);
   const [isSwitchingGestionContext, setIsSwitchingGestionContext] = useState(false);
   const isSavingSeguimientoRef = useRef(false);
@@ -441,7 +444,8 @@ export const ConsultaCartera: React.FC = () => {
       }
 
       (async () => {
-        const rows = await fetchFacturas();
+        const filterValue = identificacionCliente || factura || cuenta;
+        const rows = await fetchFacturas(filterValue);
         const row = rows.find((r: any) =>
           factura
             ? String(r.numefac) === String(factura)
@@ -517,13 +521,14 @@ export const ConsultaCartera: React.FC = () => {
     setCheckSoloAsignadas(event.target.checked);
   };
 
-  const fetchFacturas = async (): Promise<any[]> => {
+  const fetchFacturas = async (filterOverride?: string): Promise<any[]> => {
     setTablaLoading(true);
     let resultRows: any[] = [];
     try {
       const storedRaw =
         loadFiltrosCarteras() as Partial<FiltrosFacturasCarteraModel> | null;
       const filtros = new FiltrosFacturasCarteraModel(storedRaw ?? undefined);
+      setFiltroSaldoCero(filtros.checkIncluirSaldosCero);
 
       const params = {
         fecha: fechaConsultaFacturas,
@@ -539,7 +544,7 @@ export const ConsultaCartera: React.FC = () => {
         filtroPorEtiqueta: filtros.etiqueta,
         page: Math.max(1, tablaPage + 1),
         numPage: tablaRowsPerPage,
-        filter: tablaSearch,
+        filter: filterOverride !== undefined ? filterOverride : tablaSearch,
       };
 
       const data = await getFacturasList(params);
@@ -981,19 +986,57 @@ export const ConsultaCartera: React.FC = () => {
     transitionGestionSession,
   ]);
 
+  const handleDismissWrongNumberInbound = useCallback(async (): Promise<void> => {
+    const pendingCall = nextPendingInboundCall;
+    if (!pendingCall?.callSid) return;
+
+    const confirmado = window.confirm(
+      "¿Confirmas que esta llamada fue un número equivocado y deseas descartarla?\n\nEsta acción quedará registrada."
+    );
+    if (!confirmado) return;
+
+    try {
+      const shouldClose = Boolean(pendingCall.endedAt) || isTerminalCallStatus(pendingCall.status);
+      await registrarEventoLlamada({
+        callSid: pendingCall.callSid,
+        eventType: shouldClose ? "end" : "status",
+        direction: pendingCall.direction ?? "inbound-client",
+        status: pendingCall.status ?? (shouldClose ? "completed" : "in-progress"),
+        finalStatus: shouldClose ? pendingCall.status ?? "completed" : null,
+        startedAt: pendingCall.startedAt ?? null,
+        endedAt: shouldClose ? pendingCall.endedAt ?? new Date().toISOString() : null,
+        source: "wrong_number_dismiss",
+        // idGestionSession omitido intencionalmente — evento autónomo sin gestión
+      });
+    } catch {
+      // No bloqueante — si el backend falla, igual limpiamos el estado local
+    }
+
+    removePendingInboundCall(pendingCall.callSid);
+    toast.success("Llamada descartada como número equivocado.");
+  }, [nextPendingInboundCall, registrarEventoLlamada]);
+
   const handleContinueCurrentActiveGestion = useCallback(() => {
     if (!activeGestionSession) {
       setShowGestionConflictModal(false);
       return;
     }
 
-    navigateToGestionSession(
-      activeGestionSession.cliente,
-      activeGestionSession.factura,
-      activeGestionSession.cuenta
-    );
+    const { cliente, factura, cuenta } = activeGestionSession;
+
+    // Actualizar estado directamente para garantizar el cambio de contexto,
+    // sin depender del useEffect de location.search (que puede no re-ejecutarse
+    // cuando ya hay params en la URL y se navega a otros params en la misma ruta).
+    setTablaSearch(cliente);
+    setRegistroSeleccionado({ cliente, numefac: factura, cuenta });
+    setSelectedValue(cliente);
+    setIsSeguimientoDraftOpen(false);
+    setActiveTab("seguimiento");
+
+    // Actualizar la URL para reflejar el contexto activo
+    navigateToGestionSession(cliente, factura, cuenta);
     setShowGestionConflictModal(false);
-  }, [activeGestionSession, navigateToGestionSession]);
+  }, [activeGestionSession, navigateToGestionSession]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleConfirmSwitchToSelectedContext = useCallback(async () => {
     if (!hasFullSelection) {
@@ -1583,19 +1626,25 @@ export const ConsultaCartera: React.FC = () => {
             .join("\n")
         : "";
 
-      const saveAttempt = createOrReuseSaveAttempt({
-        sessionRef: activeSessionRef,
-        selectionKey: selectedContextKey,
-        cliente: selectedCliente,
-        factura: selectedFactura,
-        cuenta: selectedCuenta,
-        userId: currentUser?.id ?? null,
-        descripcion: seguimiento.texto,
-        tipoContacto: seguimiento.tipoContacto ?? null,
-      });
+      const activeContextKey = buildGestionContextKey(
+        activeGestionSession!.cliente,
+        activeGestionSession!.factura,
+        activeGestionSession!.cuenta
+      );
+      const selectedContextKeyNow = buildGestionContextKey(
+        registroSeleccionado.cliente,
+        registroSeleccionado.numefac,
+        registroSeleccionado.cuenta
+      );
 
-      const saveIdempotencyKey =
-        saveAttempt?.idempotencyKey || createSaveFallbackIdempotencyKey();
+      if (activeContextKey !== selectedContextKeyNow) {
+        toast.warning(
+          "El contexto cambio mientras intentabas guardar. Verifica que estes en el cliente correcto e intenta de nuevo."
+        );
+        return false;
+      }
+
+      const saveIdempotencyKey = createSaveFallbackIdempotencyKey();
 
       const request: GestionFacturaRequest = {
         numefac: registroSeleccionado.numefac,
@@ -1631,6 +1680,13 @@ export const ConsultaCartera: React.FC = () => {
         const syncResult = await synchronizeGestionSessionAfterSave(
           activeSessionRef
         );
+
+        if (!syncResult.synced) {
+          toast.warning(
+            "El seguimiento se guardó correctamente, pero no se pudo confirmar el estado de la sesión. Recarga si algo parece incorrecto."
+          );
+        }
+
         const shouldCloseDraft = shouldCloseSeguimientoDraftAfterSave({
           outcomeCode,
           sessionStatus: responseSessionStatus,
@@ -1742,17 +1798,20 @@ export const ConsultaCartera: React.FC = () => {
     } catch (error) {
       console.error("Error al cargar información del cliente:", error);
       setClienteInfo(null);
+      toast.error("No se pudo cargar la información del cliente.");
     }
   };
 
-  // Actualizar la información del cliente cuando se selecciona un registro
+  // Actualizar la información del cliente cuando se selecciona un registro o cuando
+  // se conoce el cliente aunque no se haya seleccionado factura aún
   useEffect(() => {
-    if (registroSeleccionado?.cliente) {
-      cargarInfoCliente(registroSeleccionado.cliente);
+    const clienteId = registroSeleccionado?.cliente || selectedValue;
+    if (clienteId) {
+      cargarInfoCliente(String(clienteId));
     } else {
       setClienteInfo(null);
     }
-  }, [registroSeleccionado]);
+  }, [registroSeleccionado, selectedValue]);
 
   // Función para abrir WhatsApp
   const abrirWhatsApp = (telefono: string) => {
@@ -1982,7 +2041,7 @@ export const ConsultaCartera: React.FC = () => {
                   <Button
                     variant="primary"
                     // size="sm"
-                    onClick={fetchFacturas}
+                    onClick={() => void fetchFacturas()}
                     disabled={tablaLoading}
                     style={{
                       marginLeft: 8,
@@ -2076,35 +2135,6 @@ export const ConsultaCartera: React.FC = () => {
             </div>
 
             <div className="col main-panel">
-              {activeGestionSession && hasFullSelection && !isSameActiveContext && (
-                <Alert variant="info" className="py-2">
-                  <div className="d-flex flex-column flex-lg-row justify-content-between gap-2 align-items-lg-center">
-                    <div className="small">
-                      Estás viendo otro cliente. Tu gestion activa sigue en{" "}
-                      <strong>
-                        {activeGestionSession.cliente} | F{activeGestionSession.factura} | C{activeGestionSession.cuenta}
-                      </strong>.
-                    </div>
-                    <div className="d-flex gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline-primary"
-                        onClick={handleContinueCurrentActiveGestion}
-                      >
-                        Ir a la activa
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="primary"
-                        onClick={() => setShowGestionConflictModal(true)}
-                        disabled={Boolean(switchBlockedReason)}
-                      >
-                        {currentContextGestionSession ? "Activar esta" : "Crear esta"}
-                      </Button>
-                    </div>
-                  </div>
-                </Alert>
-              )}
               <Tabs
                 activeKey={activeTab}
                 onSelect={(k) => setActiveTab(k || "info")}
@@ -2184,64 +2214,66 @@ export const ConsultaCartera: React.FC = () => {
                       </div> */}
 
                       <EtiquetasClienteGestion
-                        cliente={selectedValue}
+                        cliente={selectedCliente}
+                        factura={selectedFactura}
+                        cuenta={selectedCuenta}
                         idUser={currentUser?.id ?? 0}
                       />
                     </Col>
                   </Row>
 
-                  {/* <StickyNote clientId={""} currentUser={""} /> */}
-                  {clienteInfo && (
-                    <Card className="mb-4">
-                      <Card.Header style={{ backgroundColor: "#f8f9fa" }}>
-                        <h5 className="mb-0">Información del Cliente</h5>
-                      </Card.Header>
-                      <Card.Body>
-                        <Row>
-                          <Col md={6}>
-                            <Form.Group className="mb-3">
-                              <Form.Label>Razón Social</Form.Label>
-                              <Form.Control
-                                type="text"
-                                value={clienteInfo.razonSocial ?? ""}
-                                readOnly
-                              />
-                            </Form.Group>
-                            <Form.Group className="mb-3">
-                              <Form.Label>Dirección</Form.Label>
-                              <Form.Control
-                                type="text"
-                                value={clienteInfo.direccion ?? ""}
-                                readOnly
-                              />
-                            </Form.Group>
-                            <Form.Group className="mb-3">
-                              <Form.Label>Ciudad</Form.Label>
-                              <Form.Control
-                                type="text"
-                                value={clienteInfo.ciudad ?? ""}
-                                readOnly
-                              />
-                            </Form.Group>
-                          </Col>
-                          <Col md={6}>
-                            <Form.Group className="mb-3">
-                              <Form.Label>Teléfono</Form.Label>
-                              <Form.Control
-                                type="text"
-                                value={clienteInfo.telefono}
-                                readOnly
-                              />
-                            </Form.Group>
-                            <Form.Group className="mb-3">
-                              <Form.Label>Email</Form.Label>
-                              <Form.Control
-                                type="text"
-                                value={clienteInfo.email}
-                                readOnly
-                              />
-                            </Form.Group>
-                            <div className="d-flex justify-content-end mt-4 align-items-center gap-2">
+                  {clienteInfo && (() => {
+                    const _words = (clienteInfo.razonSocial || "").trim().split(/\s+/);
+                    const _initials = _words.slice(0, 2).map(w => w[0]?.toUpperCase() ?? "").join("");
+                    const _palette = ["#4f86c6", "#3a7d44", "#c65f4f", "#8e5ea2", "#c67c4f", "#4f9da6"];
+                    const _hash = String(clienteInfo.cliente).split("").reduce((h, c) => (h * 31 + c.charCodeAt(0)) & 0xffffff, 0);
+                    const _avatarBg = _palette[Math.abs(_hash) % _palette.length];
+                    const _lbl: React.CSSProperties = { fontSize: "0.68rem", textTransform: "uppercase", letterSpacing: "0.05em" };
+                    return (
+                    <Card className="mb-3 border-0 shadow-sm" style={{ borderLeft: `3px solid ${_avatarBg}`, borderRadius: 8 }}>
+                      <Card.Body className="py-2 px-3">
+
+                        {/* ── Encabezado del cliente ── */}
+                        <div className="d-flex align-items-center gap-2 mb-2">
+                          <div style={{ width: 32, height: 32, borderRadius: "50%", flexShrink: 0, background: _avatarBg, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 700, fontSize: 12, letterSpacing: 1 }}>
+                            {_initials}
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div className="fw-bold text-truncate" style={{ fontSize: "0.88rem" }} title={clienteInfo.razonSocial ?? ""}>
+                              {clienteInfo.razonSocial || "—"}
+                            </div>
+                            <div className="text-muted" style={{ fontSize: "0.7rem" }}>ID {clienteInfo.cliente}</div>
+                          </div>
+                          {loadingCliente && <Spinner animation="border" size="sm" className="text-muted flex-shrink-0" />}
+                          <StickyNote
+                            clienteId={selectedValue}
+                            currentUserId={Number(currentUser?.id ?? 0)}
+                            currentUserName={String(currentUser?.fullName ?? currentUser?.email ?? "")}
+                            isAdmin={String(currentUser?.role ?? "").trim().toLowerCase() === "administrador"}
+                          />
+                        </div>
+
+                        {/* ── Datos + Acciones ── */}
+                        <div className="d-flex align-items-center gap-3 py-2" style={{ borderTop: "1px solid #f0f0f0", borderBottom: "1px solid #f0f0f0" }}>
+                          <div className="d-flex flex-wrap gap-3" style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ flex: "2 1 130px", minWidth: 0 }}>
+                              <div className="text-muted" style={_lbl}>Dirección</div>
+                              <div className="small fw-semibold text-truncate" title={clienteInfo.direccion ?? ""}>{clienteInfo.direccion || "—"}</div>
+                            </div>
+                            <div style={{ flex: "1 1 70px" }}>
+                              <div className="text-muted" style={_lbl}>Ciudad</div>
+                              <div className="small fw-semibold">{clienteInfo.ciudad || "—"}</div>
+                            </div>
+                            <div style={{ flex: "1 1 80px" }}>
+                              <div className="text-muted" style={_lbl}>Teléfono</div>
+                              <div className="small fw-semibold">{clienteInfo.telefono || "—"}</div>
+                            </div>
+                            <div style={{ flex: "2 1 130px", minWidth: 0 }}>
+                              <div className="text-muted" style={_lbl}>Email</div>
+                              <div className="small fw-semibold text-truncate" title={clienteInfo.email ?? ""}>{clienteInfo.email || "—"}</div>
+                            </div>
+                          </div>
+                          <div className="d-flex align-items-center gap-2 flex-shrink-0">
                               {telephonyEnabled && (
                                 <Button
                                   variant="outline-primary"
@@ -2327,8 +2359,9 @@ export const ConsultaCartera: React.FC = () => {
                               >
                                 <FontAwesomeIcon icon={faEnvelope} size="lg" />
                               </Button>
-                            </div>
-                            <div className="mt-3">
+                          </div>
+                        </div>
+                        <div className="mt-2">
                               {telephonyEnabled && (!canStartOutboundCall || isCallInProgress) && (
                                 <div className="d-flex align-items-center gap-2 small text-muted">
                                   <FontAwesomeIcon
@@ -2342,162 +2375,80 @@ export const ConsultaCartera: React.FC = () => {
                                 </div>
                               )}
                               {hasPendingInboundCalls && (
-                                <Alert
-                                  variant="warning"
-                                  className={`mb-0 py-2 px-3 border-0 shadow-sm ${
-                                    !canStartOutboundCall || isCallInProgress ? "mt-3" : ""
-                                  }`}
+                                <div
+                                  className={!canStartOutboundCall || isCallInProgress ? "mt-3" : ""}
                                   style={{
-                                    borderRadius: 16,
-                                    background:
-                                      "linear-gradient(135deg, rgba(255,243,205,0.98) 0%, rgba(255,248,230,0.98) 100%)",
+                                    borderLeft: "4px solid #f59e0b",
+                                    background: "rgba(255,243,205,0.55)",
+                                    borderRadius: "0 8px 8px 0",
+                                    padding: "8px 10px",
                                   }}
                                 >
-                                  <div className="d-flex flex-column gap-3">
-                                    <div className="d-flex flex-column flex-lg-row justify-content-between align-items-start gap-2">
-                                      <div className="d-flex align-items-start gap-2">
-                                        <div
-                                          className="d-inline-flex align-items-center justify-content-center rounded-circle flex-shrink-0"
-                                          style={{
-                                            width: 34,
-                                            height: 34,
-                                            background: "rgba(255, 193, 7, 0.18)",
-                                            color: "#9a6700",
-                                          }}
-                                        >
-                                          <FontAwesomeIcon icon={faExclamationTriangle} />
-                                        </div>
-                                        <div>
-                                          <div className="d-flex align-items-center flex-wrap gap-2">
-                                            <strong style={{ fontSize: "0.95rem" }}>
-                                              Llamadas entrantes pendientes
-                                            </strong>
-                                            <Badge
-                                              variant="light"
-                                              className="border"
-                                              style={{
-                                                color: "#9a6700",
-                                                fontWeight: 700,
-                                                background: "rgba(255,255,255,0.72)",
-                                              }}
-                                            >
-                                              {pendingInboundCount}
-                                            </Badge>
-                                          </div>
-                                          <div className="small text-muted">
-                                            Debes resolver esto antes de guardar seguimiento.
-                                          </div>
-                                        </div>
-                                      </div>
-
-                                      {nextPendingInboundCall && (
-                                        <div
-                                          className="small text-muted px-2 py-1 rounded"
-                                          style={{
-                                            background: "rgba(255,255,255,0.72)",
-                                            border: "1px solid rgba(0,0,0,0.08)",
-                                          }}
-                                        >
-                                          <strong>SID:</strong> {nextPendingInboundCall.callSid}
-                                          {nextPendingInboundCall.from && (
-                                            <span> | Desde: {nextPendingInboundCall.from}</span>
-                                          )}
-                                        </div>
-                                      )}
-                                    </div>
-
-                                    <div className="d-flex flex-column flex-lg-row gap-2">
-                                      <div
-                                        className="flex-fill px-3 py-2 rounded"
-                                        style={{
-                                          background: "rgba(255,255,255,0.76)",
-                                          border: "1px solid rgba(0,0,0,0.08)",
-                                        }}
-                                      >
-                                        <div className="d-flex align-items-center gap-2 mb-1">
-                                          <FontAwesomeIcon
-                                            icon={faCheck}
-                                            className="text-warning"
-                                          />
-                                          <strong className="small">
-                                            Asociar a gestion activa
-                                          </strong>
-                                        </div>
-                                        <div className="small text-muted mb-2">
-                                          {!gestionOperativaActiva
-                                            ? "Primero inicia una gestion para poder asociar la llamada."
-                                            : "Vincula la llamada pendiente a la gestion que ya tienes abierta."}
-                                        </div>
-                                        <Button
-                                          size="sm"
-                                          variant="warning"
-                                          className="w-100"
-                                          onClick={() => void handleAttachPendingInboundToActiveSession()}
-                                          disabled={
-                                            !gestionOperativaActiva
-                                            || isAssociatingInboundCall
-                                            || isSaveRequestInFlight
-                                            || loadingTransitionGestionSession
-                                          }
-                                        >
-                                          {isAssociatingInboundCall
-                                            ? "Asociando..."
-                                            : "Asociar llamada"}
-                                        </Button>
-                                      </div>
-
-                                      {gestionOperativaActiva && (
-                                        <div
-                                          className="flex-fill px-3 py-2 rounded"
-                                          style={{
-                                            background: "rgba(255,255,255,0.76)",
-                                            border: "1px solid rgba(0,0,0,0.08)",
-                                          }}
-                                        >
-                                          <div className="d-flex align-items-center gap-2 mb-1">
-                                            <FontAwesomeIcon
-                                              icon={faArrowRight}
-                                              className="text-secondary"
-                                            />
-                                            <strong className="small">
-                                              Cerrar activa e iniciar nueva
-                                            </strong>
-                                          </div>
-                                          <div className="small text-muted mb-2">
-                                            Usa esta opcion si la llamada no corresponde a la gestion actual.
-                                          </div>
-                                          <Button
-                                            size="sm"
-                                            variant="outline-secondary"
-                                            className="w-100"
-                                            onClick={() => void handleCloseActiveGestionForInbound()}
-                                            disabled={
-                                              isAssociatingInboundCall
-                                              || loadingTransitionGestionSession
-                                            }
-                                          >
-                                            {loadingTransitionGestionSession
-                                              ? "Cerrando..."
-                                              : "Cambiar gestion"}
-                                          </Button>
-                                        </div>
-                                      )}
-                                    </div>
+                                  {/* Fila 1: icono + título + teléfono */}
+                                  <div className="d-flex align-items-center gap-2 mb-2">
+                                    <FontAwesomeIcon icon={faExclamationTriangle} style={{ color: "#d97706", fontSize: 12, flexShrink: 0 }} />
+                                    <span style={{ fontSize: "0.8rem", fontWeight: 600, color: "#7c3504" }}>
+                                      Llamada pendiente
+                                    </span>
+                                    {nextPendingInboundCall?.from && (
+                                      <span style={{ fontSize: "0.75rem", color: "#b45309", fontFamily: "monospace" }}>
+                                        · {nextPendingInboundCall.from}
+                                      </span>
+                                    )}
                                   </div>
-                                </Alert>
+                                  {/* Fila 2: acciones */}
+                                  <div className="d-flex align-items-center flex-wrap" style={{ gap: 10 }}>
+                                    <Button
+                                      size="sm"
+                                      variant="warning"
+                                      style={{ fontSize: "0.75rem", padding: "2px 10px" }}
+                                      onClick={() => void handleAttachPendingInboundToActiveSession()}
+                                      disabled={
+                                        !gestionOperativaActiva
+                                        || isAssociatingInboundCall
+                                        || isSaveRequestInFlight
+                                        || loadingTransitionGestionSession
+                                      }
+                                    >
+                                      {isAssociatingInboundCall ? "Asociando..." : "Asociar"}
+                                    </Button>
+                                    <button
+                                      onClick={() => void handleDismissWrongNumberInbound()}
+                                      disabled={isAssociatingInboundCall || loadingTransitionGestionSession}
+                                      onMouseEnter={() => setWrongNumHovered(true)}
+                                      onMouseLeave={() => setWrongNumHovered(false)}
+                                      style={{
+                                        background: wrongNumHovered ? "rgba(220,53,69,0.07)" : "none",
+                                        border: `1px dashed ${wrongNumHovered ? "#dc3545" : "#adb5bd"}`,
+                                        borderRadius: 4,
+                                        padding: "2px 8px",
+                                        color: wrongNumHovered ? "#dc3545" : "#6c757d",
+                                        fontSize: "0.72rem",
+                                        cursor: "pointer",
+                                        display: "inline-flex",
+                                        alignItems: "center",
+                                        gap: 5,
+                                        transition: "all 0.15s",
+                                      }}
+                                    >
+                                      <FontAwesomeIcon icon={faPhoneSlash} />
+                                      Número equivocado
+                                    </button>
+                                  </div>
+                                </div>
                               )}
                             </div>
-                          </Col>
-                        </Row>
                       </Card.Body>
                     </Card>
-                  )}
+                    );
+                  })()}
                   {/* <ScoringVisual/> */}
 
                   <ClienteEstadoCuenta
                     cliente={selectedValue}
                     fecha={fechaConsultaFacturas}
                     intmora={intMora}
+                    saldoCero={filtroSaldoCero}
                     ref={tablaFacturasRef}
                     onSelectFactura={handleSeleccionarFactura}
                     // numCuotas={registroSeleccionado.CUOTAS}

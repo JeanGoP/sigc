@@ -14,7 +14,6 @@ import {
 } from "@app/services/WebRtc/webrtcService";
 import {
   AdvisorInternalStateOrder,
-  bindCallToGestionSession,
   getAdvisorInternalStateLabel,
   mapAdvisorInternalStateToCommsAvailability,
 } from "@app/services/GestionLlamadas";
@@ -601,18 +600,10 @@ export default function WebRtcDialer({
   const refreshRecentCalls = useCallback(async (_reason: string) => {
     return;
   }, []);
-  const bindRuntimeCall = useCallback((callSid?: string | null) => {
-    const normalizedCallSid = String(callSid ?? "").trim();
-    if (!normalizedCallSid || !runtimeSessionRef) {
-      return;
-    }
-
-    bindCallToGestionSession({
-      callSid: normalizedCallSid,
-      sessionRef: runtimeSessionRef,
-      idGestionSession: runtimeGestionSessionId,
-    });
-  }, [runtimeGestionSessionId, runtimeSessionRef]);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const bindRuntimeCall = useCallback((_callSid?: string | null) => {
+    // La asociación llamada-sesión es manejada por el backend.
+  }, []);
   const notifyCallStatusChanged = useCallback(
     (call: WebRtcCallDto | null | undefined) => {
       if (!call) {

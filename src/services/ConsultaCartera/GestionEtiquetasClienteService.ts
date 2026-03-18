@@ -13,6 +13,13 @@ export interface EtiquetaClienteListado extends EtiquetaCliente {
   asignado: boolean;
 }
 
+export interface EtiquetaClienteScope {
+  idUser: number | string;
+  cliente: string;
+  factura: string;
+  cuenta: string;
+}
+
 // -----------------------------------------------------------------------------
 // Listar etiquetas por cliente
 // GET /api/v1/listar-etiquetas-cliente?idUser=2&cliente=1000184575
@@ -25,11 +32,11 @@ export function useListarEtiquetasCliente() {
   });
 
   const listarEtiquetasCliente = useCallback(
-    (idUser: number | string, cliente: string) => {
+    (scope: EtiquetaClienteScope) => {
       return request({
         url: `/listar-etiquetas-cliente`,
         method: "GET",
-        params: { idUser, cliente },
+        params: scope,
       });
     },
     [request]
@@ -48,11 +55,11 @@ export function useGestionarEtiquetaCliente() {
   });
 
   const gestionarEtiquetaCliente = useCallback(
-    (idUser: number | string, cliente: string, idEtiqueta: number) => {
+    (scope: EtiquetaClienteScope, idEtiqueta: number) => {
       return request({
         url: "/gestionarEtiquetaCliente",
         method: "POST",
-        data: { idUser, cliente, idEtiqueta },
+        data: { ...scope, idEtiqueta },
       });
     },
     [request]

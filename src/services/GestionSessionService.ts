@@ -27,6 +27,7 @@ export interface TransitionGestionSessionRequest {
   idempotencyKey?: string;
   source?: string;
   tabId?: string;
+  forzarCancelacion?: boolean;
 }
 
 export interface SwitchActiveGestionSessionRequest {
@@ -278,18 +279,30 @@ export function calculateGestionSessionElapsedSeconds(
 }
 
 export function useGestionSessionService() {
-  const startApi = useApi<GestionSessionOperationApi>("/api/v1/gestion-session/start");
+  const startApi = useApi<GestionSessionOperationApi>("/api/v1/gestion-session/start", {
+    retries: 2,
+    retryDelay: 500,
+    timeout: 10000,
+  });
   const activeApi = useApi<GestionSessionOperationApi>("/api/v1/gestion-session/active");
-  const stateApi = useApi<GestionSessionOperationApi>("/api/v1/gestion-session/state");
+  const stateApi = useApi<GestionSessionOperationApi>("/api/v1/gestion-session/state", {
+    retries: 2,
+    retryDelay: 500,
+    timeout: 10000,
+  });
   const inProgressApi = useApi<GestionSessionListOperationApi>(
     "/api/v1/gestion-session/in-progress",
     {
       timeout: 10000,
-      retries: 1,
+      retries: 2,
       retryDelay: 500,
     }
   );
-  const switchApi = useApi<GestionSessionOperationApi>("/api/v1/gestion-session/switch-active");
+  const switchApi = useApi<GestionSessionOperationApi>("/api/v1/gestion-session/switch-active", {
+    retries: 2,
+    retryDelay: 500,
+    timeout: 10000,
+  });
   const startRequest = startApi.request;
   const activeRequest = activeApi.request;
   const stateRequest = stateApi.request;

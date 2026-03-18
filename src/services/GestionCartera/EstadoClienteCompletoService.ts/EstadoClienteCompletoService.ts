@@ -9,7 +9,7 @@ export function useFacturasService() {
     retryDelay: 5000,
   });
 
-  const listarFacturas = (params: { fecha: string; cliente: string }) => {
+  const listarFacturas = (params: { fecha: string; cliente: string; saldoCero?: boolean }) => {
     const cliente = String(params?.cliente ?? "").trim();
     if (!cliente) {
       return Promise.resolve({

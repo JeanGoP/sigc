@@ -88,7 +88,7 @@ export default function GestionSessionConflictModal({
           Cancelar
         </Button>
         <Button variant="outline-primary" onClick={onContinueActive} disabled={switching}>
-          Continuar activa
+          Ir a la activa
         </Button>
         <Button
           variant="primary"

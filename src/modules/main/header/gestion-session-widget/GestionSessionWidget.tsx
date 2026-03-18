@@ -96,6 +96,7 @@ export default function GestionSessionWidget() {
   const [cancelModalSession, setCancelModalSession] = useState<GestionSession | null>(null);
   const [cancelReason, setCancelReason] = useState("");
   const [cancelingSessionRef, setCancelingSessionRef] = useState<string | null>(null);
+  const [blockedByCalls, setBlockedByCalls] = useState(false);
 
   useEffect(() => {
     const interval = window.setInterval(() => {
@@ -154,6 +155,7 @@ export default function GestionSessionWidget() {
   const openCancelModal = (session: GestionSession) => {
     setCancelModalSession(session);
     setCancelReason("");
+    setBlockedByCalls(false);
   };
 
   const closeCancelModal = () => {
@@ -163,9 +165,10 @@ export default function GestionSessionWidget() {
 
     setCancelModalSession(null);
     setCancelReason("");
+    setBlockedByCalls(false);
   };
 
-  const handleCancelSession = async () => {
+  const handleCancelSession = async (forzar = false) => {
     if (!cancelModalSession) {
       return;
     }
@@ -183,6 +186,7 @@ export default function GestionSessionWidget() {
         sessionRef: cancelModalSession.sessionRef,
         newState: "cancelada",
         reason,
+        forzarCancelacion: forzar,
         source: "navbar_gestion_session_widget_cancel",
         idempotencyKey: `cancel_${cancelModalSession.sessionRef}_${Date.now()}`,
       });
@@ -190,6 +194,10 @@ export default function GestionSessionWidget() {
       await refreshSessions();
 
       if (!result.success) {
+        if (result.operation?.outcomeCode === "blocked_associated_calls") {
+          setBlockedByCalls(true);
+          return;
+        }
         toast.warning(result.message || "No se pudo cancelar la gestion seleccionada.");
         return;
       }
@@ -197,6 +205,7 @@ export default function GestionSessionWidget() {
       toast.success(result.message || "Gestion cancelada correctamente.");
       setCancelModalSession(null);
       setCancelReason("");
+      setBlockedByCalls(false);
       setShow(false);
     } finally {
       setCancelingSessionRef(null);
@@ -411,6 +420,11 @@ export default function GestionSessionWidget() {
               Este campo es obligatorio.
             </Form.Text>
           </Form.Group>
+          {blockedByCalls && (
+            <div className="alert alert-warning py-2 px-3 small mt-3">
+              Esta gestion tiene llamadas asociadas. ¿Deseas cancelarla de todas formas junto con sus llamadas?
+            </div>
+          )}
           <div className="d-flex justify-content-end gap-2 mt-4">
             <Button
               variant="secondary"
@@ -419,13 +433,23 @@ export default function GestionSessionWidget() {
             >
               Volver
             </Button>
-            <Button
-              variant="danger"
-              onClick={() => void handleCancelSession()}
-              disabled={!cancelReason.trim() || Boolean(cancelingSessionRef)}
-            >
-              {cancelingSessionRef ? "Cancelando..." : "Confirmar cancelacion"}
-            </Button>
+            {blockedByCalls ? (
+              <Button
+                variant="danger"
+                onClick={() => void handleCancelSession(true)}
+                disabled={Boolean(cancelingSessionRef)}
+              >
+                {cancelingSessionRef ? "Cancelando..." : "Sí, cancelar de todas formas"}
+              </Button>
+            ) : (
+              <Button
+                variant="danger"
+                onClick={() => void handleCancelSession(false)}
+                disabled={!cancelReason.trim() || Boolean(cancelingSessionRef)}
+              >
+                {cancelingSessionRef ? "Cancelando..." : "Confirmar cancelacion"}
+              </Button>
+            )}
           </div>
         </Modal.Body>
       </Modal>

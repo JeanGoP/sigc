@@ -6,6 +6,7 @@ import { faTag, faTimes } from "@fortawesome/free-solid-svg-icons";
 import { toast } from "react-toastify";
 import {
   EtiquetaClienteListado,
+  EtiquetaClienteScope,
   useListarEtiquetasCliente,
   useGestionarEtiquetaCliente,
 } from "@app/services/ConsultaCartera/GestionEtiquetasClienteService";
@@ -15,6 +16,8 @@ import {
 // -----------------------------------------------------------------------------
 export interface EtiquetasClienteProps {
   cliente: string;
+  factura: string;
+  cuenta: string;
   idUser: number | string;
   disabled?: boolean;
   className?: string;
@@ -51,6 +54,8 @@ function normalizarLista(raw: any[]): EtiquetaClienteListado[] {
 // -----------------------------------------------------------------------------
 export const EtiquetasClienteGestion: React.FC<EtiquetasClienteProps> = ({
   cliente,
+  factura,
+  cuenta,
   idUser,
   disabled = false,
   className,
@@ -64,17 +69,45 @@ export const EtiquetasClienteGestion: React.FC<EtiquetasClienteProps> = ({
   // hooks de servicio
   const { loading, listarEtiquetasCliente } = useListarEtiquetasCliente();
   const { gestionarEtiquetaCliente } = useGestionarEtiquetaCliente();
+  const normalizedCliente = String(cliente ?? "").trim();
+  const normalizedFactura = String(factura ?? "").trim();
+  const normalizedCuenta = String(cuenta ?? "").trim();
+  const normalizedIdUser = String(idUser ?? "").trim();
+  const hasFullScope = Boolean(
+    normalizedCliente &&
+      normalizedFactura &&
+      normalizedCuenta &&
+      normalizedIdUser
+  );
+  const scope: EtiquetaClienteScope | null = useMemo(
+    () =>
+      hasFullScope
+        ? {
+            idUser,
+            cliente: normalizedCliente,
+            factura: normalizedFactura,
+            cuenta: normalizedCuenta,
+          }
+        : null,
+    [
+      hasFullScope,
+      idUser,
+      normalizedCliente,
+      normalizedFactura,
+      normalizedCuenta,
+    ]
+  );
 
   // Cargar / recargar lista
   const cargarLista = useCallback(async () => {
-    if (!cliente) {
+    if (!scope) {
       setLista([]);
       onChangeIds?.([]);
       return;
     }
 
     try {
-      const resp = await listarEtiquetasCliente(idUser, cliente);
+      const resp = await listarEtiquetasCliente(scope);
 
       if (resp && resp.success && Array.isArray(resp.data)) {
         const listaNorm = normalizarLista(resp.data as any[]);
@@ -93,7 +126,7 @@ export const EtiquetasClienteGestion: React.FC<EtiquetasClienteProps> = ({
       setLista([]);
       onChangeIds?.([]);
     }
-  }, [cliente, idUser, listarEtiquetasCliente, onChangeIds]);
+  }, [listarEtiquetasCliente, onChangeIds, scope]);
 
   // se ejecuta solo cuando cambia cliente o idUser
   useEffect(() => {
@@ -106,7 +139,7 @@ export const EtiquetasClienteGestion: React.FC<EtiquetasClienteProps> = ({
   // Toggle etiqueta
   const toggleEtiqueta = useCallback(
     async (idEtiqueta: number) => {
-      if (!cliente || updatingId !== null) return;
+      if (!scope || updatingId !== null) return;
 
       const etiqueta = lista.find((x) => x.id === idEtiqueta);
       const esAsignada = !!etiqueta?.asignado;
@@ -119,7 +152,7 @@ export const EtiquetasClienteGestion: React.FC<EtiquetasClienteProps> = ({
       if (!ok) return;
 
       setUpdatingId(idEtiqueta);
-      const resp = await gestionarEtiquetaCliente(idUser, cliente, idEtiqueta);
+      const resp = await gestionarEtiquetaCliente(scope, idEtiqueta);
 
       if (resp && resp.success) {
         toast.success("Operación exitosa.");
@@ -130,7 +163,7 @@ export const EtiquetasClienteGestion: React.FC<EtiquetasClienteProps> = ({
       }
       setUpdatingId(null);
     },
-    [cliente, idUser, lista, updatingId, cargarLista, gestionarEtiquetaCliente]
+    [scope, lista, updatingId, cargarLista, gestionarEtiquetaCliente]
   );
 
   const abrirModal = useCallback(() => setShowModal(true), []);
@@ -160,7 +193,7 @@ export const EtiquetasClienteGestion: React.FC<EtiquetasClienteProps> = ({
           variant="outline-primary"
           size="sm"
           onClick={abrirModal}
-          disabled={disabled || !cliente || loading}
+          disabled={disabled || !hasFullScope || loading}
         >
           <FontAwesomeIcon icon={faTag} className="me-1" /> Gestionar etiquetas
         </Button>
@@ -171,6 +204,10 @@ export const EtiquetasClienteGestion: React.FC<EtiquetasClienteProps> = ({
         {loading ? (
           <span className="d-inline-flex align-items-center gap-2">
             <Spinner animation="border" size="sm" /> Cargando...
+          </span>
+        ) : !hasFullScope ? (
+          <span className="text-muted" style={{ fontStyle: "italic" }}>
+            Seleccione cliente, factura y cuenta.
           </span>
         ) : etiquetasAsignadas.length === 0 ? (
           <span className="text-muted" style={{ fontStyle: "italic" }}>
@@ -203,7 +240,11 @@ export const EtiquetasClienteGestion: React.FC<EtiquetasClienteProps> = ({
           <Modal.Title>Gestionar etiquetas</Modal.Title>
         </Modal.Header>
         <Modal.Body>
-          {loading ? (
+          {!hasFullScope ? (
+            <p className="text-muted mb-0" style={{ fontStyle: "italic" }}>
+              Seleccione cliente, factura y cuenta para gestionar etiquetas.
+            </p>
+          ) : loading ? (
             <p className="d-flex align-items-center gap-2 mb-0">
               <Spinner animation="border" size="sm" className="me-2" /> Cargando...
             </p>

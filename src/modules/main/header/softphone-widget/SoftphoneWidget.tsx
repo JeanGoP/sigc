@@ -13,8 +13,6 @@ import { AdvisorInternalState, WebRtcCallDto } from "@app/services/WebRtc/webrtc
 import {
   AdvisorInternalStateOrder,
   getAdvisorInternalStateLabel,
-  getCallGestionSessionBinding,
-  removeCallGestionSessionBinding,
   upsertPendingInboundCall,
 } from "@app/services/GestionLlamadas";
 import {
@@ -245,14 +243,16 @@ export default function SoftphoneWidget() {
       }
 
       if (!isInboundCallDirection(call.direction)) {
-        const binding = getCallGestionSessionBinding(callSid);
-        if (!binding?.sessionRef) {
+        const sessionRef = activeSession?.sessionRef ?? null;
+        const idGestionSession = activeSession?.idGestionSession ?? null;
+
+        if (!sessionRef) {
           return;
         }
 
         const response = await registrarEventoLlamada({
-          idGestionSession: binding.idGestionSession ?? undefined,
-          sessionRef: binding.sessionRef,
+          idGestionSession: idGestionSession ?? undefined,
+          sessionRef,
           callSid,
           eventType,
           direction: call.direction ?? "outbound-client",
@@ -279,9 +279,6 @@ export default function SoftphoneWidget() {
           });
         }
 
-        if (eventType === "end") {
-          removeCallGestionSessionBinding(callSid);
-        }
         return;
       }
 

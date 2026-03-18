@@ -16,15 +16,9 @@ import {
   useGestionSessionService,
 } from "@app/services/GestionSessionService";
 import {
-  clearActiveGestionPointer,
-  setActiveGestionPointer,
-} from "@app/services/GestionLlamadas";
-import {
   getGlobalWebRtcRuntimeSnapshot,
   subscribeGlobalWebRtcRuntimeSnapshot,
 } from "@app/services/WebRtc/webrtcBridge";
-
-const ACTIVE_POINTER_STORAGE_KEY = "sigc.gestion.active.pointer.v1";
 
 interface GestionSessionContextValue {
   sessions: GestionSession[];
@@ -112,11 +106,7 @@ export function GestionSessionProvider({ children }: PropsWithChildren) {
       }
     };
 
-    const handleStorage = (event: StorageEvent) => {
-      if (event.key && event.key !== ACTIVE_POINTER_STORAGE_KEY) {
-        return;
-      }
-
+    const handleStorage = () => {
       void refreshSessions();
     };
 
@@ -144,25 +134,6 @@ export function GestionSessionProvider({ children }: PropsWithChildren) {
     [sessions]
   );
 
-  useEffect(() => {
-    if (!activeSession) {
-      clearActiveGestionPointer();
-      return;
-    }
-
-    setActiveGestionPointer({
-      idGestionSession: activeSession.idGestionSession,
-      sessionRef: activeSession.sessionRef,
-      contextKey: getGestionSessionContextKey(activeSession),
-      startedAt: activeSession.startedAt,
-      status:
-        activeSession.status === "pausada"
-          ? "pausada"
-          : activeSession.status === "interrumpida"
-            ? "interrumpida"
-            : "activa",
-    });
-  }, [activeSession]);
 
   const hasIncomingCall = Boolean(runtimeSnapshot.incomingCall?.callSid);
   const hasLiveOutboundOrConnectedCall = Boolean(

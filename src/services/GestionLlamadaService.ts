@@ -37,7 +37,11 @@ export interface GestionLlamadaEventOperation {
 }
 
 export function useGestionLlamadaService() {
-  const eventApi = useApi<GestionLlamadaEventOperation>("/api/v1/gestion-llamada/event");
+  const eventApi = useApi<GestionLlamadaEventOperation>("/api/v1/gestion-llamada/event", {
+    retries: 2,
+    retryDelay: 500,
+    timeout: 10000,
+  });
   const eventRequest = eventApi.request;
 
   const registrarEventoLlamada = useCallback(

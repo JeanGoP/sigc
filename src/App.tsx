@@ -76,6 +76,29 @@ const App = () => {
   }, []);
 
   useEffect(() => {
+    const DRAFT_PREFIX = "sigc.gestion.seguimiento-draft:";
+    const MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 horas
+    const now = Date.now();
+    try {
+      Object.keys(localStorage)
+        .filter((key) => key.startsWith(DRAFT_PREFIX))
+        .forEach((key) => {
+          try {
+            const parsed = JSON.parse(localStorage.getItem(key) ?? "{}");
+            const age = now - new Date(parsed.updatedAt ?? 0).getTime();
+            if (age > MAX_AGE_MS) {
+              localStorage.removeItem(key);
+            }
+          } catch {
+            localStorage.removeItem(key);
+          }
+        });
+    } catch {
+      // Si localStorage no está disponible, ignorar silenciosamente
+    }
+  }, []);
+
+  useEffect(() => {
     const checkUserSession = async () => {
       try {
         const currentPath = location.pathname;
