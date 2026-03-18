@@ -203,6 +203,8 @@ export const StickyNote: React.FC<Props> = ({
         <Rnd
           size={size}
           position={pos}
+          minWidth={320}
+          minHeight={420}
           onDragStop={(_, d) => setPos({ x: d.x, y: d.y })}
           onResizeStop={(_, __, ref, ___, position) => {
             setSize({ width: ref.offsetWidth, height: ref.offsetHeight });
