@@ -280,9 +280,9 @@ const App = () => {
               }
             />
             <Route
-              path="/modificacion_eventos"
+              path="/modificacion_gestiones"
               element={
-                <PermissionRoute permission="modificacion_eventos.view">
+                <PermissionRoute permission="modificacion_gestiones.view">
                   <ModificacionEventos />
                 </PermissionRoute>
               }
@@ -386,6 +386,17 @@ const App = () => {
         autoClose={3000}
         draggable={false}
         position="top-right"
+        hideProgressBar={false}
+        newestOnTop
+        closeOnClick
+        rtl={false}
+        pauseOnHover
+      />
+      <ToastContainer
+        containerId="eventos-container"
+        autoClose={10000}
+        draggable={false}
+        position="top-center"
         hideProgressBar={false}
         newestOnTop
         closeOnClick

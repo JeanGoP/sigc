@@ -29,6 +29,7 @@ specifiers:
   '@vitejs/plugin-react': 4.3.0
   axios: ^1.11.0
   bootstrap: 4.6.1
+  chart.js: ^4.5.1
   dayjs: ^1.11.13
   dotenv: 16.4.5
   eslint-config-airbnb: 19.0.4
@@ -50,6 +51,7 @@ specifiers:
   react: 18.3.1
   react-big-calendar: ^1.18.0
   react-bootstrap: 1.6.1
+  react-chartjs-2: ^5.3.1
   react-datepicker: ^8.3.0
   react-dom: 18.3.1
   react-ga4: 2.1.0
@@ -85,6 +87,7 @@ dependencies:
   '@reduxjs/toolkit': 2.2.5_irch7jnnqrn7hjrrnjtulxh6lm
   '@twilio/voice-sdk': 2.18.0
   axios: 1.12.2
+  chart.js: 4.5.1
   dayjs: 1.11.18
   formik: 2.4.6_3vdbhqr2ncalcx7opnshezpx3q
   i18next: 23.11.5
@@ -94,6 +97,7 @@ dependencies:
   react: 18.3.1
   react-big-calendar: 1.19.4_nnrd3gsncyragczmpvfhocinkq
   react-bootstrap: 1.6.1_nnrd3gsncyragczmpvfhocinkq
+  react-chartjs-2: 5.3.1_xlxv3h7ccipwgrc6qexjpgobd4
   react-datepicker: 8.7.0_nnrd3gsncyragczmpvfhocinkq
   react-dom: 18.3.1_react@18.3.1
   react-ga4: 2.1.0
@@ -2592,6 +2596,10 @@ packages:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
 
+  /@kurkle/color/0.3.4:
+    resolution: {integrity: sha512-M5UknZPHRu3DEDWoipU6sE8PdkZ6Z/S+v4dD+Ke8IaNlpdSQah50lz1KtcFBa2vsdOnwbbnxJwVM4wty6udA5w==}
+    dev: false
+
   /@leichtgewicht/ip-codec/2.0.5:
     resolution: {integrity: sha512-Vo+PSpZG2/fmgmiNzYK9qWRh8h/CHrwD0mo1h1DzL4yzHNSfWYujGTYsWGreD000gcgmZ7K4Ys6Tx9TxtsKdDw==}
     dev: false
@@ -4856,6 +4864,13 @@ packages:
   /char-regex/2.0.2:
     resolution: {integrity: sha512-cbGOjAptfM2LVmWhwRFHEKTPkLwNddVmuqYZQt895yXwAsWsXObCG+YN4DGQ/JBtT4GP1a1lPPdio2z413LmTg==}
     engines: {node: '>=12.20'}
+    dev: false
+
+  /chart.js/4.5.1:
+    resolution: {integrity: sha512-GIjfiT9dbmHRiYi6Nl2yFCq7kkwdkp1W/lp2J99rX0yo9tgJGn3lKQATztIjb5tVtevcBtIdICNWqlq5+E8/Pw==}
+    engines: {pnpm: '>=8'}
+    dependencies:
+      '@kurkle/color': 0.3.4
     dev: false
 
   /check-types/11.2.3:
@@ -10964,6 +10979,16 @@ packages:
       react-transition-group: 4.4.5_nnrd3gsncyragczmpvfhocinkq
       uncontrollable: 7.2.1_react@18.3.1
       warning: 4.0.3
+    dev: false
+
+  /react-chartjs-2/5.3.1_xlxv3h7ccipwgrc6qexjpgobd4:
+    resolution: {integrity: sha512-h5IPXKg9EXpjoBzUfyWJvllMjG2mQ4EiuHQFhms/AjUm0XSZHhyRy2xVmLXHKrtcdrPO4mnGqRtYoD0vp95A0A==}
+    peerDependencies:
+      chart.js: ^4.1.1
+      react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
+    dependencies:
+      chart.js: 4.5.1
+      react: 18.3.1
     dev: false
 
   /react-datepicker/8.7.0_nnrd3gsncyragczmpvfhocinkq:

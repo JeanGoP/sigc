@@ -513,12 +513,15 @@
 
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import { MessagesMenu as EventsMenu } from '@app/styles/dropdown-menus';
 import Modal from 'react-bootstrap/Modal';
 import Table from 'react-bootstrap/Table';
 import Button from 'react-bootstrap/Button';
 import { useAppSelector } from '@app/store/store';
 import { useEventosDiariosService, ApiEventoDiario } from '@app/services/Calendario/eventosDiariosService';
+import { toast } from 'react-toastify';
+import { buildConsultaCarteraUrl } from '@app/utils/consultaCarteraNavigation';
 
 /* ------------------------------------------------------------------
  * Estructura "ligera" que usa el dropdown para render rápido.
@@ -597,11 +600,37 @@ function humanStartsIn(diffMs: number, t: (k: string, d?: string | any, o?: any)
 
 const DEFAULT_ACTIVE_WINDOW_MINUTES = 3;
 
+function playNotificationSound() {
+  try {
+    const ctx = new AudioContext();
+    const now = ctx.currentTime;
+
+    const notes = [784, 1046]; // G5 → C6 (ding agradable)
+    notes.forEach((freq, i) => {
+      const osc  = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      const t = now + i * 0.18;
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(0.35, t + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
+      osc.start(t);
+      osc.stop(t + 0.4);
+    });
+  } catch {
+    // Navegador sin soporte o bloqueado por política de autoplay
+  }
+}
+
 /* ------------------------------------------------------------------
  * Componente principal
  * ------------------------------------------------------------------ */
 const EventsDropdown: React.FC = () => {
   const [t] = useTranslation();
+  const navigate = useNavigate();
   const currentUser = useAppSelector((state) => state.auth.currentUser);
   /* Tiempo "ahora" */
   const [now, setNow] = useState(() => Date.now());
@@ -614,16 +643,26 @@ const EventsDropdown: React.FC = () => {
   const { loading, error, obtenerEventosDiarios } = useEventosDiariosService();
   const [rawEvents, setRawEvents] = useState<ApiEventoDiario[]>([]);
 
-  const fetchEvents = useCallback(async () => {
-  if (!currentUser?.id) return;
-  const resp = await obtenerEventosDiarios(Number(currentUser.id));
-  if (resp && resp.success) {
-    setRawEvents(resp.data ?? []);
-  }
-}, [currentUser?.id]); // 👈 ahora solo depende del id
+  const notifiedRef = useRef<Set<string>>(new Set());
 
+  const fetchEvents = useCallback(async () => {
+    if (!currentUser?.id) return;
+    const resp = await obtenerEventosDiarios(Number(currentUser.id));
+    if (resp && resp.success) {
+      notifiedRef.current.clear();
+      setRawEvents(resp.data ?? []);
+    }
+  }, [currentUser?.id]);
+
+  // Fetch inicial
   useEffect(() => {
     fetchEvents();
+  }, [fetchEvents]);
+
+  // Refresco de API cada 60 minutos
+  useEffect(() => {
+    const id = setInterval(() => fetchEvents(), 60 * 60_000);
+    return () => clearInterval(id);
   }, [fetchEvents]);
 
   /* Procesamiento */
@@ -651,6 +690,52 @@ const EventsDropdown: React.FC = () => {
   const upcomingProcessed: ProcessedEvent[] = useMemo(() => {
     return processedEvents.filter((ev) => ev.start > now);
   }, [processedEvents, now]);
+
+  // Notificaciones pop-up a los 10, 5 y 1 minuto antes de cada evento
+  const UMBRALES = [10, 5, 1];
+  useEffect(() => {
+    processedEvents.forEach((ev) => {
+      if (ev.cumplido || ev.finished || ev.minutesToStart === undefined) return;
+      UMBRALES.forEach((u) => {
+        const key = `${ev.id}_${u}`;
+        if (notifiedRef.current.has(key)) return;
+        if (ev.minutesToStart! <= u + 0.5 && ev.minutesToStart! > u - 0.5) {
+          notifiedRef.current.add(key);
+          playNotificationSound();
+          const url = buildConsultaCarteraUrl({
+            cuenta: ev.cuenta,
+            factura: ev.factura,
+            identificacionCliente: ev.identificacionCliente,
+          });
+          toast.info(
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+              <div style={{ fontSize: 13, fontWeight: 700 }}>⏰ En {u} min</div>
+              <div style={{ fontSize: 12 }}>{ev.tipo} — {ev.cliente}</div>
+              <div style={{ fontSize: 11, color: '#aaa' }}>a las {ev.hourLabel}</div>
+              <button
+                onClick={() => navigate(url)}
+                style={{
+                  alignSelf: 'flex-end',
+                  marginTop: 4,
+                  padding: '2px 12px',
+                  fontSize: 11,
+                  fontWeight: 600,
+                  borderRadius: 4,
+                  border: '1px solid #4f86c6',
+                  background: '#4f86c6',
+                  color: '#fff',
+                  cursor: 'pointer',
+                }}
+              >
+                Ir
+              </button>
+            </div>,
+            { autoClose: 10_000, containerId: 'eventos-container' }
+          );
+        }
+      });
+    });
+  }, [processedEvents]);
 
   const dropdownEvents: EventLite[] = useMemo(() => {
     return upcomingProcessed.map((e) => ({
@@ -829,18 +914,59 @@ const EventsDropdown: React.FC = () => {
 
           {/* Footer del dropdown */}
           <div
-            className="dropdown-footer text-center"
             style={{
               position: 'sticky',
               bottom: 0,
               backgroundColor: '#fff',
               borderTop: '1px solid #e9ecef',
               padding: '0.5rem',
-              cursor: 'pointer',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
             }}
-            onClick={() => setShowModal(true)}
           >
-            {t('header.events.seeAll', 'Ver todos')}
+            <span
+              style={{ cursor: 'pointer', color: '#007bff', fontSize: 13 }}
+              onClick={() => setShowModal(true)}
+            >
+              {t('header.events.seeAll', 'Ver todos')}
+            </span>
+            {/* 🧪 BOTÓN DE PRUEBA — ELIMINAR ANTES DE PRODUCCIÓN */}
+            <button
+              style={{
+                fontSize: 11,
+                padding: '2px 8px',
+                border: '1px dashed #f0ad4e',
+                borderRadius: 4,
+                background: '#fffbe6',
+                color: '#856404',
+                cursor: 'pointer',
+              }}
+              onClick={() => {
+                const ev = processedEvents[0];
+                if (!ev) return;
+                playNotificationSound();
+                const url = buildConsultaCarteraUrl({
+                  cuenta: ev.cuenta,
+                  factura: ev.factura,
+                  identificacionCliente: ev.identificacionCliente,
+                });
+                toast.info(
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700 }}>⏰ En 5 min</div>
+                    <div style={{ fontSize: 12 }}>{ev.tipo} — {ev.cliente}</div>
+                    <div style={{ fontSize: 11, color: '#aaa' }}>a las {ev.hourLabel}</div>
+                    <button
+                      onClick={() => navigate(url)}
+                      style={{ alignSelf: 'flex-end', marginTop: 4, padding: '2px 12px', fontSize: 11, fontWeight: 600, borderRadius: 4, border: '1px solid #4f86c6', background: '#4f86c6', color: '#fff', cursor: 'pointer' }}
+                    >Ir</button>
+                  </div>,
+                  { autoClose: 10_000, containerId: 'eventos-container' }
+                );
+              }}
+            >
+              🧪 Test notificación
+            </button>
           </div>
         </div>
       </EventsMenu>

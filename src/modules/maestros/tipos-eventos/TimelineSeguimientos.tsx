@@ -24,6 +24,11 @@ import {
   TipoEvento,
 } from "@app/services/ConsultaCartera/TipoEventoService";
 import { useValidarEvento } from "@app/services/ConsultaCartera/ValidarEventoNuevoService";
+import {
+  useHorasDispDia,
+  HoraDispItem,
+} from "@app/services/ConsultaCartera/HorasDispDiaService";
+import { HoraSelectorEvento } from "./components/HoraSelectorEvento";
 
 import { convertirEventoAXml } from "@app/pages/ConsultaCartera/functions/convertEventoToXML";
 import { IconMap } from "@app/services/IconMap";
@@ -186,6 +191,9 @@ export const TimelineSeguimientos: React.FC<TimelineSeguimientosProps> = ({
 
   const { loading: loadingEventos, listarTiposEvento } = useListarTiposEvento();
   const { validarEvento, loading } = useValidarEvento();
+  const { obtenerHoras, loading: loadingHoras } = useHorasDispDia();
+  const [horasDisponibles, setHorasDisponibles] = React.useState<HoraDispItem[]>([]);
+  const horasFechaRef = React.useRef<string>("");
 
   const emptyFormEvento: Evento = {
     id: 0,
@@ -381,6 +389,39 @@ export const TimelineSeguimientos: React.FC<TimelineSeguimientosProps> = ({
     nuevoTipoContacto,
     tiposEvento,
   ]);
+
+  // Carga las horas disponibles del día cuando cambia la fecha del evento
+  // (solo si el tipo de evento requiere hora y hay un idUsuario en el contexto)
+  React.useEffect(() => {
+    const fecha = formEvento.fecha;
+    const tipoObj = tiposEvento.find((t) => t.nombre === formEvento.tipo);
+    const idUsuario = contextoEvento?.idUsuario;
+
+    if (!tipoObj?.requiereHora || !fecha || !idUsuario) {
+      setHorasDisponibles([]);
+      horasFechaRef.current = "";
+      return;
+    }
+
+    if (horasFechaRef.current === fecha) return; // ya cargadas para esta fecha
+
+    horasFechaRef.current = fecha;
+    setHorasDisponibles([]);
+
+    obtenerHoras(fecha, idUsuario).then((res) => {
+      const horasData = res?.data;
+      if (!horasData) return;
+      setHorasDisponibles(horasData);
+      // Si la hora/minuto actual está ocupada en la nueva fecha, la blanqueamos
+      setFormEvento((prev) => {
+        if (!prev.hora) return prev;
+        const [h, m] = prev.hora.split(":").map(Number);
+        const minItem = horasData.find((x) => x.hora === h && x.minuto === m);
+        if (minItem?.ocupado) return { ...prev, hora: null };
+        return prev;
+      });
+    });
+  }, [formEvento.fecha, formEvento.tipo, tiposEvento, contextoEvento?.idUsuario, obtenerHoras]);
 
   function setFormCampo<K extends keyof Evento>(campo: K, valor: Evento[K]) {
     setFormEvento((prev) => ({ ...prev, [campo]: valor }));
@@ -1008,15 +1049,12 @@ export const TimelineSeguimientos: React.FC<TimelineSeguimientosProps> = ({
 
                     {t?.requiereHora && (
                       <Form.Group>
-                        <Form.Label>Hora</Form.Label>
-                        <input
-                          type="time"
-                          className="form-control"
-                          style={{ width: 110, borderRadius: 6 }}
-                          value={formEvento.hora || ""}
-                          onChange={(e) =>
-                            setFormCampo("hora", e.target.value as any)
-                          }
+                        <HoraSelectorEvento
+                          fecha={formEvento.fecha || ""}
+                          value={formEvento.hora ?? null}
+                          onChange={(hora) => setFormCampo("hora", hora as any)}
+                          horas={horasDisponibles}
+                          loading={loadingHoras}
                         />
                       </Form.Group>
                     )}
@@ -1282,14 +1320,19 @@ export const TimelineSeguimientos: React.FC<TimelineSeguimientosProps> = ({
                     marginBottom: 8,
                   }}
                 >
-                  <div
-                    style={{
-                      fontWeight: "bold",
-                      color: "#1565c0",
-                      fontSize: 16,
-                    }}
-                  >
-                    {seg.usuario}
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <div
+                      style={{
+                        fontWeight: "bold",
+                        color: "#1565c0",
+                        fontSize: 16,
+                      }}
+                    >
+                      {seg.usuario}
+                    </div>
+                    <span style={{ fontSize: 13, color: "#adb5bd", fontWeight: 400 }}>
+                      #{seg.id}
+                    </span>
                   </div>
                   <div
                     style={{

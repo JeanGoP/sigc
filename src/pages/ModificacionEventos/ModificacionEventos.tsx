@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Button,
   Card,
@@ -7,19 +7,23 @@ import {
   Modal,
   Row,
   Spinner,
+  Table,
 } from "react-bootstrap";
 import { toast } from "react-toastify";
+import {
+  Checkbox,
+  Chip,
+  Divider,
+  IconButton,
+  TablePagination,
+  Tooltip,
+} from "@mui/material";
 import { useAppSelector } from "@app/store/store";
 import BuscadorCuentas from "@app/components/BuscadorGeneral/BuscadorCuentas";
 import { SingleSelect } from "@app/components/singleSelect/singleSelect";
 import BuscadoClientes from "@app/pages/ConsultaClientes/components/BuscadoClientes";
 import ModalTablaClientes from "@app/pages/ConsultaClientes/components/ModalTablaClientes";
 import { useClientesService } from "@app/services/GestionCartera/ConsultaClientes/clientesService";
-import {
-  DynamicTablePaginationConsultaCartera as DynamicTablePagination,
-  TableColumn,
-} from "@app/pages/ConsultaClientes/components/tablaReutilizablePaginacionConsultaCartera";
-import { Checkbox } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faCircleCheck } from "@fortawesome/free-solid-svg-icons";
 import {
@@ -28,12 +32,22 @@ import {
   GridRowParams,
 } from "@mui/x-data-grid";
 import {
+  ActualizarDescripcionGestionRequest,
   ActualizarModificacionEventoRequest,
-  ListarModificacionEventosRequest,
+  CrearEventoGestionRequest,
+  EliminarEventoGestionRequest,
+  EliminarGestionRequest,
+  ListarGestionesModificacionRequest,
   useEventosService,
 } from "@app/services/Calendario/CalendarioService";
 import { useListarTiposEvento } from "@app/services/ConsultaCartera/TipoEventoService";
+import { useHorasDispDia, HoraDispItem } from "@app/services/ConsultaCartera/HorasDispDiaService";
+import { HoraSelectorEvento } from "@app/modules/maestros/tipos-eventos/components/HoraSelectorEvento";
 import { buildConsultaCarteraUrl } from "@app/utils/consultaCarteraNavigation";
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
 
 interface TipoEventoItem {
   id: string;
@@ -43,6 +57,34 @@ interface TipoEventoItem {
   requiereMonto: boolean;
 }
 
+interface EventoGestion {
+  id: number;
+  idGestion: number;
+  cliente: string;
+  factura: string;
+  cuenta: string;
+  idUsuarioAsignado: number;
+  idTipoEvento: number;
+  fechaHoraProgramada: string;
+  montoCompromiso: number | null;
+  requiereFecha: boolean;
+  requiereHora: boolean;
+  requiereMonto: boolean;
+}
+
+interface GestionModificacion {
+  idGestion: number;
+  cliente: string;
+  factura: string;
+  cuenta: string;
+  usuario: number;
+  Username: string;
+  FechaHora: string;
+  descripcion: string;
+  eventos: EventoGestion[];
+}
+
+// Kept for edit-modal compatibility
 interface EventoModificacion {
   id: number;
   cliente: string;
@@ -59,8 +101,8 @@ interface EventoModificacion {
   requiereMonto: boolean;
 }
 
-type FiltrosConsultaEventos = Omit<
-  ListarModificacionEventosRequest,
+type FiltrosConsultaGestiones = Omit<
+  ListarGestionesModificacionRequest,
   "page" | "pageSize"
 >;
 
@@ -74,12 +116,24 @@ interface EdicionEventoForm {
   monto: string;
 }
 
+const EMPTY_FORM: EdicionEventoForm = {
+  usuario: "",
+  cuenta: "",
+  cliente: "",
+  tipoEventoId: "",
+  fechaEvento: "",
+  horaEvento: "",
+  monto: "",
+};
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
 const pickFirstValue = (source: any, keys: string[]) => {
   for (const key of keys) {
     const value = source?.[key];
-    if (value !== undefined && value !== null && value !== "") {
-      return value;
-    }
+    if (value !== undefined && value !== null && value !== "") return value;
   }
   return null;
 };
@@ -94,8 +148,8 @@ const parseBooleanValue = (value: unknown): boolean => {
   if (typeof value === "boolean") return value;
   if (typeof value === "number") return value === 1;
   if (typeof value === "string") {
-    const normalized = value.trim().toLowerCase();
-    return normalized === "true" || normalized === "1" || normalized === "si";
+    const n = value.trim().toLowerCase();
+    return n === "true" || n === "1" || n === "si";
   }
   return false;
 };
@@ -103,53 +157,31 @@ const parseBooleanValue = (value: unknown): boolean => {
 const extractDatePart = (value?: unknown): string => {
   if (value === undefined || value === null) return "";
   if (value instanceof Date) {
-    const year = value.getFullYear();
-    const month = String(value.getMonth() + 1).padStart(2, "0");
-    const day = String(value.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
+    return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}`;
   }
-
-  const rawValue = String(value).trim();
-  if (!rawValue) return "";
-
-  const normalized = rawValue.includes(" ")
-    ? rawValue.replace(" ", "T")
-    : rawValue;
-  const isoMatch = normalized.match(/^(\d{4}-\d{2}-\d{2})/);
-  if (isoMatch?.[1]) return isoMatch[1];
-
-  const parsed = new Date(normalized);
-  if (Number.isNaN(parsed.getTime())) return "";
-
-  const year = parsed.getFullYear();
-  const month = String(parsed.getMonth() + 1).padStart(2, "0");
-  const day = String(parsed.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+  const raw = String(value).trim();
+  if (!raw) return "";
+  const norm = raw.includes(" ") ? raw.replace(" ", "T") : raw;
+  const m = norm.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (m?.[1]) return m[1];
+  const d = new Date(norm);
+  if (Number.isNaN(d.getTime())) return "";
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
 
 const extractTimePart = (value?: unknown): string => {
   if (value === undefined || value === null) return "";
   if (value instanceof Date) {
-    const hours = String(value.getHours()).padStart(2, "0");
-    const minutes = String(value.getMinutes()).padStart(2, "0");
-    return `${hours}:${minutes}`;
+    return `${String(value.getHours()).padStart(2, "0")}:${String(value.getMinutes()).padStart(2, "0")}`;
   }
-
-  const rawValue = String(value).trim();
-  if (!rawValue) return "";
-
-  const normalized = rawValue.includes(" ")
-    ? rawValue.replace(" ", "T")
-    : rawValue;
-  const timeMatch = normalized.match(/T(\d{2}:\d{2})/);
-  if (timeMatch?.[1]) return timeMatch[1];
-
-  const parsed = new Date(normalized);
-  if (Number.isNaN(parsed.getTime())) return "";
-
-  const hours = String(parsed.getHours()).padStart(2, "0");
-  const minutes = String(parsed.getMinutes()).padStart(2, "0");
-  return `${hours}:${minutes}`;
+  const raw = String(value).trim();
+  if (!raw) return "";
+  const norm = raw.includes(" ") ? raw.replace(" ", "T") : raw;
+  const m = norm.match(/T(\d{2}:\d{2})/);
+  if (m?.[1]) return m[1];
+  const d = new Date(norm);
+  if (Number.isNaN(d.getTime())) return "";
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 };
 
 const mergeDateAndTime = (
@@ -158,112 +190,39 @@ const mergeDateAndTime = (
   includeTime: boolean,
 ) => {
   if (!datePart) return "";
-  if (includeTime && timePart) return `${datePart}T${timePart}:00`;
-  return `${datePart}T00:00:00`;
+  return includeTime && timePart
+    ? `${datePart}T${timePart}:00`
+    : `${datePart}T00:00:00`;
 };
 
-const toLocalDateString = (value: Date) => {
-  const year = value.getFullYear();
-  const month = String(value.getMonth() + 1).padStart(2, "0");
-  const day = String(value.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+const toLocalDateString = (v: Date) =>
+  `${v.getFullYear()}-${String(v.getMonth() + 1).padStart(2, "0")}-${String(v.getDate()).padStart(2, "0")}`;
+
+const toLocalTimeString = (v: Date) =>
+  `${String(v.getHours()).padStart(2, "0")}:${String(v.getMinutes()).padStart(2, "0")}`;
+
+const getApiErrorMessage = (response: any, fallback: string) => {
+  const first =
+    Array.isArray(response?.errors) &&
+    response.errors.find(
+      (e: unknown) => typeof e === "string" && (e as string).trim().length > 0,
+    );
+  return first || response?.message || fallback;
 };
 
-const toLocalTimeString = (value: Date) => {
-  const hours = String(value.getHours()).padStart(2, "0");
-  const minutes = String(value.getMinutes()).padStart(2, "0");
-  return `${hours}:${minutes}`;
+const formatMonto = (value: number | null): string =>
+  value === null ? "-" : value.toFixed(2);
+
+const formatFechaHora = (value: string): string => {
+  if (!value) return "-";
+  try {
+    return new Date(value).toLocaleString("es-CO");
+  } catch {
+    return value;
+  }
 };
 
-const mapEventoFromApi = (item: any, rowIndex: number): EventoModificacion => {
-  const idValue =
-    parseNumberValue(
-      pickFirstValue(item, ["id", "Id", "idEvento", "IdEvento"]),
-    ) ?? rowIndex + 1;
-
-  const montoValue = parseNumberValue(
-    pickFirstValue(item, [
-      "monto",
-      "Monto",
-      "montoCompromiso",
-      "MontoCompromiso",
-    ]),
-  );
-
-  return {
-    id: idValue,
-    cliente: String(
-      pickFirstValue(item, [
-        "cliente",
-        "Cliente",
-        "identificacionCliente",
-        "IdentificacionCliente",
-      ]) ?? "",
-    ),
-    factura: String(
-      pickFirstValue(item, ["factura", "Factura", "numefac", "Numefac"]) ?? "",
-    ),
-    cuenta: String(
-      pickFirstValue(item, ["cuenta", "Cuenta", "codigoCuenta", "CodigoCuenta"]) ??
-        "",
-    ),
-    tipoEventoId: String(
-      pickFirstValue(item, [
-        "tipoEventoId",
-        "TipoEventoId",
-        "idTipoEvento",
-        "IdTipoEvento",
-      ]) ?? "",
-    ),
-    tipoEvento: String(
-      pickFirstValue(item, [
-        "tipoEvento",
-        "TipoEvento",
-        "nombreTipoEvento",
-        "NombreTipoEvento",
-      ]) ?? "",
-    ),
-    fechaCreacion: String(
-      pickFirstValue(item, [
-        "fechaCreacion",
-        "FechaCreacion",
-        "fechaGestion",
-        "FECHAGES",
-      ]) ?? "",
-    ),
-    fechaEvento: String(
-      pickFirstValue(item, [
-        "fechaEvento",
-        "FechaEvento",
-        "fechaHoraProgramada",
-        "FechaHoraProgramada",
-        "start",
-      ]) ?? "",
-    ),
-    monto: montoValue,
-    usuario: String(
-      pickFirstValue(item, [
-        "usuario",
-        "Usuario",
-        "idUsuario",
-        "IdUsuario",
-        "IdUsuarioAsignado",
-        "NombreUsuario",
-      ]) ?? "",
-    ),
-    requiereFecha: parseBooleanValue(
-      pickFirstValue(item, ["requiereFecha", "RequiereFecha"]),
-    ),
-    requiereHora: parseBooleanValue(
-      pickFirstValue(item, ["requiereHora", "RequiereHora"]),
-    ),
-    requiereMonto: parseBooleanValue(
-      pickFirstValue(item, ["requiereMonto", "RequiereMonto"]),
-    ),
-  };
-};
-
-const normalizeEventosResponse = (rawData: any) => {
+const normalizeGestionesResponse = (rawData: any) => {
   const rows =
     (Array.isArray(rawData) && rawData) ||
     (Array.isArray(rawData?.items) && rawData.items) ||
@@ -271,62 +230,144 @@ const normalizeEventosResponse = (rawData: any) => {
     (Array.isArray(rawData?.results) && rawData.results) ||
     (Array.isArray(rawData?.data) && rawData.data) ||
     [];
-
   const totalCandidates = [
     rawData?.totalRows,
     rawData?.total,
     rawData?.totalRecords,
     rawData?.count,
-    rawData?.recordsTotal,
     rawData?.pagination?.totalRows,
     rawData?.pagination?.total,
   ];
   const total = totalCandidates.find(
-    (value) => typeof value === "number" && !Number.isNaN(value),
+    (v) => typeof v === "number" && !Number.isNaN(v),
   );
+  return { rows, totalRows: typeof total === "number" ? total : rows.length };
+};
+
+const mapEventoGestionFromApi = (
+  item: any,
+  gestionFactura: string,
+  gestionCuenta: string,
+  gestionCliente: string,
+): EventoGestion => ({
+  id:
+    parseNumberValue(
+      pickFirstValue(item, ["id", "Id", "idEvento", "IdEvento"]),
+    ) ?? 0,
+  idGestion:
+    parseNumberValue(pickFirstValue(item, ["idGestion", "IdGestion"])) ?? 0,
+  cliente: String(
+    pickFirstValue(item, ["cliente", "Cliente"]) ?? gestionCliente,
+  ),
+  factura: gestionFactura,
+  cuenta: gestionCuenta,
+  idUsuarioAsignado:
+    parseNumberValue(
+      pickFirstValue(item, ["IdUsuarioAsignado", "idUsuarioAsignado"]),
+    ) ?? 0,
+  idTipoEvento:
+    parseNumberValue(pickFirstValue(item, ["IdTipoEvento", "idTipoEvento"])) ??
+    0,
+  fechaHoraProgramada: String(
+    pickFirstValue(item, ["FechaHoraProgramada", "fechaHoraProgramada"]) ?? "",
+  ),
+  montoCompromiso: parseNumberValue(
+    pickFirstValue(item, ["MontoCompromiso", "montoCompromiso"]),
+  ),
+  requiereFecha: parseBooleanValue(
+    pickFirstValue(item, ["requiereFecha", "RequiereFecha"]),
+  ),
+  requiereHora: parseBooleanValue(
+    pickFirstValue(item, ["requiereHora", "RequiereHora"]),
+  ),
+  requiereMonto: parseBooleanValue(
+    pickFirstValue(item, ["RequiereMonto", "requiereMonto"]),
+  ),
+});
+
+const mapGestionFromApi = (item: any): GestionModificacion => {
+  const cliente = String(pickFirstValue(item, ["cliente", "Cliente"]) ?? "");
+  const factura = String(pickFirstValue(item, ["factura", "Factura"]) ?? "");
+  const cuenta = String(pickFirstValue(item, ["cuenta", "Cuenta"]) ?? "");
+
+  let eventosRaw: any[] = [];
+  const eventosField = pickFirstValue(item, ["eventos", "Eventos"]);
+  if (typeof eventosField === "string") {
+    try {
+      const p = JSON.parse(eventosField);
+      if (Array.isArray(p)) eventosRaw = p;
+    } catch {
+      /* empty */
+    }
+  } else if (Array.isArray(eventosField)) {
+    eventosRaw = eventosField;
+  }
 
   return {
-    rows,
-    totalRows: typeof total === "number" ? total : rows.length,
+    idGestion:
+      parseNumberValue(pickFirstValue(item, ["idGestion", "IdGestion"])) ?? 0,
+    cliente,
+    factura,
+    cuenta,
+    usuario:
+      parseNumberValue(pickFirstValue(item, ["usuario", "Usuario"])) ?? 0,
+    Username: String(
+      pickFirstValue(item, ["Username", "username", "NombreUsuario"]) ?? "",
+    ),
+    FechaHora: String(
+      pickFirstValue(item, ["FechaHora", "fechaHora", "FechaGestion"]) ?? "",
+    ),
+    descripcion: String(
+      pickFirstValue(item, ["Descripcion", "descripcion"]) ?? "",
+    ),
+    eventos: eventosRaw.map((ev) =>
+      mapEventoGestionFromApi(ev, factura, cuenta, cliente),
+    ),
   };
 };
 
-const getApiErrorMessage = (response: any, fallback: string) => {
-  const firstError =
-    Array.isArray(response?.errors) &&
-    response.errors.find(
-      (err: unknown) => typeof err === "string" && err.trim().length > 0,
-    );
-  return firstError || response?.message || fallback;
-};
-
-const formatMonto = (value: number | null): string => {
-  if (value === null) return "NULL";
-  return value.toFixed(2);
-};
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
 
 export const ModificacionEventos: React.FC = () => {
   const currentUser = useAppSelector((state) => state.auth.currentUser);
 
-  const { obtenerUsuariosPorRol, listarModificacionEventos, actualizarModificacionEvento } =
-    useEventosService();
+  const {
+    obtenerUsuariosPorRol,
+    actualizarModificacionEvento,
+    listarGestionesModificacion,
+    crearEventoGestion,
+    eliminarEventoGestion,
+    eliminarGestion,
+    actualizarDescripcionGestion,
+  } = useEventosService();
   const { listarTiposEvento } = useListarTiposEvento();
   const { listarClientes } = useClientesService();
+  const { obtenerHoras, loading: loadingHoras } = useHorasDispDia();
 
+  // Dropdowns
   const [usuarios, setUsuarios] = useState<
     { label: string; value: string | number }[]
   >([{ label: "Todos", value: "" }]);
   const [tiposEvento, setTiposEvento] = useState<TipoEventoItem[]>([]);
 
-  const [fechaInicio, setFechaInicio] = useState(new Date().toISOString().split("T")[0]);
-  const [fechaFin, setFechaFin] = useState(new Date().toISOString().split("T")[0]);
+  // Filters
+  const [fechaInicio, setFechaInicio] = useState(
+    new Date().toISOString().split("T")[0],
+  );
+  const [fechaFin, setFechaFin] = useState(
+    new Date().toISOString().split("T")[0],
+  );
   const [erroresFechas, setErroresFechas] = useState<{
     fechaInicio?: string;
     fechaFin?: string;
   }>({});
   const [usuarioFiltro, setUsuarioFiltro] = useState<string | number>("");
-  const [cuentaFiltro, setCuentaFiltro] = useState<string>("");
+  const [cuentaFiltro, setCuentaFiltro] = useState("");
   const [clienteFiltro, setClienteFiltro] = useState("");
+
+  // Client modal
   const [showModalClientes, setShowModalClientes] = useState(false);
   const [searchClienteTerm, setSearchClienteTerm] = useState("");
   const [tableRowsClientes, setTableRowsClientes] = useState<any[]>([]);
@@ -338,42 +379,58 @@ export const ModificacionEventos: React.FC = () => {
       page: 0,
       pageSize: 20,
     });
-  const [tipoEventoFiltro, setTipoEventoFiltro] = useState<string | number>("");
 
-  const [rows, setRows] = useState<EventoModificacion[]>([]);
+  // Main data
+  const [rows, setRows] = useState<GestionModificacion[]>([]);
   const [totalRows, setTotalRows] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [rowsPerPage, setRowsPerPage] = useState(20);
   const [page, setPage] = useState(0);
   const [filtrosConsulta, setFiltrosConsulta] =
-    useState<FiltrosConsultaEventos | null>(null);
+    useState<FiltrosConsultaGestiones | null>(null);
   const [loadingConsulta, setLoadingConsulta] = useState(false);
+  const [busquedaGestion, setBusquedaGestion] = useState("");
 
+  // Drawer
+  const [drawerGestion, setDrawerGestion] =
+    useState<GestionModificacion | null>(null);
+
+  // Description edit (inside drawer)
+  const [editandoDescripcion, setEditandoDescripcion] = useState(false);
+  const [descripcionEdit, setDescripcionEdit] = useState("");
+  const [savingDescripcion, setSavingDescripcion] = useState(false);
+
+  // Edit event modal
   const [showModalEdicion, setShowModalEdicion] = useState(false);
-  const [eventoEditando, setEventoEditando] = useState<EventoModificacion | null>(
-    null,
-  );
+  const [eventoEditando, setEventoEditando] =
+    useState<EventoModificacion | null>(null);
   const [savingEdicion, setSavingEdicion] = useState(false);
-  const [formEdicion, setFormEdicion] = useState<EdicionEventoForm>({
-    usuario: "",
-    cuenta: "",
-    cliente: "",
-    tipoEventoId: "",
-    fechaEvento: "",
-    horaEvento: "",
-    monto: "",
-  });
+  const [formEdicion, setFormEdicion] = useState<EdicionEventoForm>(EMPTY_FORM);
   const [formEdicionInicial, setFormEdicionInicial] =
     useState<EdicionEventoForm | null>(null);
 
+  // Add event modal
+  const [showModalAgregar, setShowModalAgregar] = useState(false);
+  const [formAgregar, setFormAgregar] = useState<EdicionEventoForm>(EMPTY_FORM);
+  const [savingAgregar, setSavingAgregar] = useState(false);
+
+  // Horas disponibles
+  const [horasDisponiblesEdicion, setHorasDisponiblesEdicion] = useState<HoraDispItem[]>([]);
+  const [horasDisponiblesAgregar, setHorasDisponiblesAgregar] = useState<HoraDispItem[]>([]);
+  const horasFechaEdicionRef = useRef<string>("");
+  const horasFechaAgregarRef = useRef<string>("");
+
+  // ---------------------------------------------------------------------------
+  // Client modal handlers
+  // ---------------------------------------------------------------------------
+
   const handleSelectRowCliente = (id: string) => {
     setSelectedRowsClientes((prev) =>
-      prev.includes(id) ? prev.filter((rowId) => rowId !== id) : [...prev, id],
+      prev.includes(id) ? prev.filter((r) => r !== id) : [...prev, id],
     );
   };
 
   const handleRowClickCliente = (params: GridRowParams) => {
-    const selectedCliente = params.row.id.toString();
-    setClienteFiltro(selectedCliente);
+    setClienteFiltro(params.row.id.toString());
     setShowModalClientes(false);
     setSelectedRowsClientes([]);
   };
@@ -384,18 +441,6 @@ export const ModificacionEventos: React.FC = () => {
     searchClientes();
   };
 
-  const handleCloseModalCliente = () => {
-    setShowModalClientes(false);
-  };
-
-  const handleClearCliente = () => {
-    setClienteFiltro("");
-  };
-
-  const handlePaginationChangeCliente = (model: GridPaginationModel) => {
-    setPaginationModelClientes(model);
-  };
-
   const searchClientes = async (filter = "") => {
     const params = {
       page: paginationModelClientes.page + 1,
@@ -403,86 +448,75 @@ export const ModificacionEventos: React.FC = () => {
       filter,
       intmora: "3.00",
     };
-
     if (params.filter.length <= 2) {
       setTableRowsClientes([]);
       return;
     }
-
     try {
       const response: any = await listarClientes(params);
-      if (response?.success) {
-        setTableRowsClientes(response.data || []);
-      } else {
-        setTableRowsClientes([]);
-      }
-    } catch (error) {
-      console.error("No fue posible buscar clientes:", error);
+      setTableRowsClientes(response?.success ? response.data || [] : []);
+    } catch {
       setTableRowsClientes([]);
     }
   };
 
-  useEffect(() => {
-    const fetchUsuarios = async () => {
-      if (!currentUser?.id) return;
+  // ---------------------------------------------------------------------------
+  // Effects
+  // ---------------------------------------------------------------------------
 
+  useEffect(() => {
+    const fetch = async () => {
+      if (!currentUser?.id) return;
       try {
         const response = await obtenerUsuariosPorRol(
           "Asesor",
           Number(currentUser.id),
         );
         if (response?.success && Array.isArray(response.data)) {
-          const mapped = response.data.map((user: any) => ({
-            label: user.fullName,
-            value: String(user.userId),
-          }));
-          setUsuarios([{ label: "Todos", value: "" }, ...mapped]);
+          setUsuarios([
+            { label: "Todos", value: "" },
+            ...response.data.map((u: any) => ({
+              label: u.fullName,
+              value: String(u.userId),
+            })),
+          ]);
         }
-      } catch (error) {
-        console.error(
-          "No fue posible cargar usuarios para modificacion:",
-          error,
-        );
+      } catch {
+        /* silent */
       }
     };
-
-    fetchUsuarios();
+    fetch();
   }, [currentUser]);
 
   useEffect(() => {
-    const fetchTiposEvento = async () => {
+    const fetch = async () => {
       try {
         const response: any = await listarTiposEvento();
         if (response?.success && Array.isArray(response.data)) {
-          const mapped = response.data
-            .map((item: any): TipoEventoItem => ({
-              id: String(item?.id ?? ""),
-              nombre: String(item?.nombre ?? ""),
-              requiereFecha: parseBooleanValue(item?.requiereFecha),
-              requiereHora: parseBooleanValue(item?.requiereHora),
-              requiereMonto: parseBooleanValue(item?.requiereMonto),
-            }))
-            .filter((item: TipoEventoItem) => item.id && item.nombre);
-
-          setTiposEvento(mapped);
-          return;
+          setTiposEvento(
+            response.data
+              .map(
+                (item: any): TipoEventoItem => ({
+                  id: String(item?.id ?? ""),
+                  nombre: String(item?.nombre ?? ""),
+                  requiereFecha: parseBooleanValue(item?.requiereFecha),
+                  requiereHora: parseBooleanValue(item?.requiereHora),
+                  requiereMonto: parseBooleanValue(item?.requiereMonto),
+                }),
+              )
+              .filter((i: TipoEventoItem) => i.id && i.nombre),
+          );
         }
-
-        setTiposEvento([]);
-      } catch (error) {
-        console.error("No fue posible cargar tipos de evento:", error);
+      } catch {
         setTiposEvento([]);
       }
     };
-
-    fetchTiposEvento();
+    fetch();
   }, [listarTiposEvento]);
 
   useEffect(() => {
     const maxPage = Math.max(0, Math.ceil(totalRows / rowsPerPage) - 1);
-    if (page > maxPage) {
-      setPage(maxPage);
-    }
+    if (page > maxPage) setPage(maxPage);
   }, [totalRows, rowsPerPage, page]);
 
   useEffect(() => {
@@ -497,119 +531,113 @@ export const ModificacionEventos: React.FC = () => {
 
   useEffect(() => {
     if (!showModalClientes) return;
-    const timeout = setTimeout(() => {
-      searchClientes(searchClienteTerm);
-    }, 400);
-
-    return () => clearTimeout(timeout);
+    const t = setTimeout(() => searchClientes(searchClienteTerm), 400);
+    return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchClienteTerm, showModalClientes]);
 
   useEffect(() => {
     if (!filtrosConsulta) return;
-
-    const fetchEventosModificacion = async () => {
+    const fetch = async () => {
       setLoadingConsulta(true);
-
-      const payload: ListarModificacionEventosRequest = {
-        ...filtrosConsulta,
-        page: page + 1,
-        pageSize: rowsPerPage,
-      };
-
       try {
-        const response: any = await listarModificacionEventos(payload);
+        const response: any = await listarGestionesModificacion({
+          ...filtrosConsulta,
+          page: page + 1,
+          pageSize: rowsPerPage,
+        });
         if (response?.success) {
-          const normalized = normalizeEventosResponse(response.data);
-          const mappedRows = normalized.rows.map((item: any, idx: number) =>
-            mapEventoFromApi(item, idx),
+          const { rows: raw, totalRows: total } = normalizeGestionesResponse(
+            response.data,
           );
-          const fallbackTotal = page * rowsPerPage + mappedRows.length;
-          setRows(mappedRows);
-          setTotalRows(Math.max(normalized.totalRows, fallbackTotal));
+          const mapped = raw.map((item: any) => mapGestionFromApi(item));
+          setRows(mapped);
+          setTotalRows(Math.max(total, page * rowsPerPage + mapped.length));
         } else {
           setRows([]);
           setTotalRows(0);
           toast.error(
-            getApiErrorMessage(response, "No fue posible consultar eventos."),
+            getApiErrorMessage(response, "No fue posible consultar gestiones."),
           );
         }
       } catch (error) {
-        console.error("No fue posible consultar eventos para modificacion:", error);
         setRows([]);
         setTotalRows(0);
         toast.error(
           getApiErrorMessage(
             (error as any)?.response?.data ?? error,
-            "No fue posible consultar eventos. Intente nuevamente.",
+            "No fue posible consultar gestiones.",
           ),
         );
       } finally {
         setLoadingConsulta(false);
       }
     };
+    fetch();
+  }, [filtrosConsulta, page, rowsPerPage, listarGestionesModificacion]);
 
-    fetchEventosModificacion();
-  }, [filtrosConsulta, page, rowsPerPage, listarModificacionEventos]);
+  // ---------------------------------------------------------------------------
+  // Memos
+  // ---------------------------------------------------------------------------
 
   const tipoEventoOptions = useMemo(
     () => [
       { label: "Seleccione tipo de evento", value: "" },
-      ...tiposEvento.map((item) => ({ label: item.nombre, value: item.id })),
+      ...tiposEvento.map((t) => ({ label: t.nombre, value: t.id })),
     ],
     [tiposEvento],
   );
 
   const usuarioOptionsEdicion = useMemo(() => {
-    const usuariosSinTodos = usuarios.filter((option) => {
-      const value = String(option.value ?? "").trim();
-      const label = String(option.label ?? "").trim().toLowerCase();
-      return value !== "" && label !== "todos";
-    });
-
-    const current = String(formEdicion.usuario ?? "").trim();
-    if (!current) return usuariosSinTodos;
-
-    const exists = usuariosSinTodos.some(
-      (option) => String(option.value) === current || option.label === current,
+    const sinTodos = usuarios.filter(
+      (o) =>
+        String(o.value ?? "").trim() !== "" &&
+        String(o.label ?? "")
+          .trim()
+          .toLowerCase() !== "todos",
     );
-    if (exists) return usuariosSinTodos;
-
-    if (current.toLowerCase() === "todos") {
-      return usuariosSinTodos;
-    }
-
-    return [{ label: current, value: current }, ...usuariosSinTodos];
+    const current = String(formEdicion.usuario ?? "").trim();
+    if (!current) return sinTodos;
+    const exists = sinTodos.some(
+      (o) => String(o.value) === current || o.label === current,
+    );
+    if (exists || current.toLowerCase() === "todos") return sinTodos;
+    return [{ label: current, value: current }, ...sinTodos];
   }, [usuarios, formEdicion.usuario]);
 
   const tipoEventoOptionsEdicion = useMemo(() => {
-    const currentTipoNombre = eventoEditando?.tipoEvento ?? "";
-    const currentTipoValue = String(formEdicion.tipoEventoId ?? "");
-    const exists = tipoEventoOptions.some(
-      (option) => String(option.value) === currentTipoValue,
-    );
-
-    if (!currentTipoNombre || exists || currentTipoValue === "") {
-      return tipoEventoOptions;
-    }
-
-    return [
-      { label: currentTipoNombre, value: currentTipoValue },
-      ...tipoEventoOptions,
-    ];
+    const nombre = eventoEditando?.tipoEvento ?? "";
+    const val = String(formEdicion.tipoEventoId ?? "");
+    const exists = tipoEventoOptions.some((o) => String(o.value) === val);
+    if (!nombre || exists || val === "") return tipoEventoOptions;
+    return [{ label: nombre, value: val }, ...tipoEventoOptions];
   }, [tipoEventoOptions, eventoEditando, formEdicion.tipoEventoId]);
 
-  const tipoEventoSeleccionadoEdicion = useMemo(() => {
-    const tipoId = String(formEdicion.tipoEventoId ?? "").trim();
-    if (!tipoId) return null;
-    return tiposEvento.find((item) => String(item.id) === tipoId) ?? null;
-  }, [tiposEvento, formEdicion.tipoEventoId]);
+  const tipoEventoSeleccionadoEdicion = useMemo(
+    () =>
+      tiposEvento.find(
+        (t) => String(t.id) === String(formEdicion.tipoEventoId ?? "").trim(),
+      ) ?? null,
+    [tiposEvento, formEdicion.tipoEventoId],
+  );
 
-  const tipoEventoInicialEdicion = useMemo(() => {
-    const tipoId = String(formEdicionInicial?.tipoEventoId ?? "").trim();
-    if (!tipoId) return null;
-    return tiposEvento.find((item) => String(item.id) === tipoId) ?? null;
-  }, [tiposEvento, formEdicionInicial?.tipoEventoId]);
+  const tipoEventoInicialEdicion = useMemo(
+    () =>
+      tiposEvento.find(
+        (t) =>
+          String(t.id) ===
+          String(formEdicionInicial?.tipoEventoId ?? "").trim(),
+      ) ?? null,
+    [tiposEvento, formEdicionInicial?.tipoEventoId],
+  );
+
+  const tipoEventoSeleccionadoAgregar = useMemo(
+    () =>
+      tiposEvento.find(
+        (t) => String(t.id) === String(formAgregar.tipoEventoId ?? "").trim(),
+      ) ?? null,
+    [tiposEvento, formAgregar.tipoEventoId],
+  );
 
   const requiereFechaEdicion =
     tipoEventoSeleccionadoEdicion?.requiereFecha ??
@@ -624,14 +652,32 @@ export const ModificacionEventos: React.FC = () => {
     eventoEditando?.requiereMonto ??
     false;
   const requiereHoraInicialEdicion =
-    tipoEventoInicialEdicion?.requiereHora ?? eventoEditando?.requiereHora ?? false;
+    tipoEventoInicialEdicion?.requiereHora ??
+    eventoEditando?.requiereHora ??
+    false;
+
+  const requiereFechaAgregar =
+    tipoEventoSeleccionadoAgregar?.requiereFecha ?? false;
+  const requiereHoraAgregar =
+    tipoEventoSeleccionadoAgregar?.requiereHora ?? false;
+  const requiereMontoAgregar =
+    tipoEventoSeleccionadoAgregar?.requiereMonto ?? false;
+
+  const rowsFiltradas = useMemo(() => {
+    const term = busquedaGestion.trim();
+    if (!term) return rows;
+    return rows.filter((g) => String(g.idGestion).includes(term));
+  }, [rows, busquedaGestion]);
+
+  // ---------------------------------------------------------------------------
+  // Columns for client modal
+  // ---------------------------------------------------------------------------
 
   const columnsClientes: GridColDef[] = [
     {
       field: "select",
       headerName: "",
       width: 40,
-      minWidth: 20,
       sortable: false,
       filterable: false,
       renderCell: (params) => (
@@ -653,95 +699,192 @@ export const ModificacionEventos: React.FC = () => {
     { field: "codIcta", headerName: "Codigo ICTA", width: 150 },
   ];
 
+  // ---------------------------------------------------------------------------
+  // Filter handlers
+  // ---------------------------------------------------------------------------
+
   const validarFechas = (): boolean => {
     const errores: { fechaInicio?: string; fechaFin?: string } = {};
-
-    if (!fechaInicio.trim()) {
+    if (!fechaInicio.trim())
       errores.fechaInicio = "La fecha inicio es obligatoria.";
-    }
-
-    if (!fechaFin.trim()) {
-      errores.fechaFin = "La fecha fin es obligatoria.";
-    }
-
-    if (fechaInicio && fechaFin) {
-      const inicio = new Date(`${fechaInicio}T00:00:00`);
-      const fin = new Date(`${fechaFin}T23:59:59`);
-      if (inicio > fin) {
-        errores.fechaFin =
-          "La fecha fin debe ser mayor o igual a la fecha inicio.";
-      }
-    }
-
+    if (!fechaFin.trim()) errores.fechaFin = "La fecha fin es obligatoria.";
+    if (
+      fechaInicio &&
+      fechaFin &&
+      new Date(`${fechaInicio}T00:00:00`) > new Date(`${fechaFin}T23:59:59`)
+    )
+      errores.fechaFin =
+        "La fecha fin debe ser mayor o igual a la fecha inicio.";
     setErroresFechas(errores);
     return Object.keys(errores).length === 0;
   };
 
   const handleConsultar = () => {
     if (!validarFechas()) return;
-
-    const nextFilters: FiltrosConsultaEventos = {
+    setFiltrosConsulta({
       fechaInicio,
       fechaFin,
       userId: parseNumberValue(usuarioFiltro),
       cuenta: cuentaFiltro.trim() || null,
       cliente: clienteFiltro.trim() || null,
-      tipoEventoId: parseNumberValue(tipoEventoFiltro),
-    };
-
-    setFiltrosConsulta(nextFilters);
+      filtro: null,
+    });
     setPage(0);
+    setDrawerGestion(null);
   };
 
-  const handleChangeTipoEventoEdicion = (value: string | number) => {
-    const selectedTipo = tiposEvento.find(
-      (item) => String(item.id) === String(value),
-    );
+  // ---------------------------------------------------------------------------
+  // Horas disponibles effects
+  // ---------------------------------------------------------------------------
 
-    setFormEdicion((prev) => ({
-      ...prev,
-      tipoEventoId: value,
-      fechaEvento:
-        selectedTipo && !selectedTipo.requiereFecha ? "" : prev.fechaEvento,
-      horaEvento: selectedTipo && !selectedTipo.requiereHora ? "" : prev.horaEvento,
-      monto: selectedTipo && !selectedTipo.requiereMonto ? "" : prev.monto,
-    }));
+  useEffect(() => {
+    const fecha = formEdicion.fechaEvento;
+    const idUsuario = formEdicion.usuario;
+    if (!requiereHoraEdicion || !fecha || !idUsuario) {
+      setHorasDisponiblesEdicion([]);
+      horasFechaEdicionRef.current = "";
+      return;
+    }
+    if (horasFechaEdicionRef.current === fecha) return;
+    horasFechaEdicionRef.current = fecha;
+    setHorasDisponiblesEdicion([]);
+    obtenerHoras(fecha, idUsuario).then((res) => {
+      const data = (res as any)?.data as HoraDispItem[] | undefined;
+      if (!data) return;
+      setHorasDisponiblesEdicion(data);
+      setFormEdicion((prev) => {
+        if (!prev.horaEvento) return prev;
+        const [h, m] = prev.horaEvento.split(":").map(Number);
+        const item = data.find((x) => x.hora === h && x.minuto === m);
+        if (item?.ocupado) return { ...prev, horaEvento: "" };
+        return prev;
+      });
+    });
+  }, [formEdicion.fechaEvento, formEdicion.usuario, requiereHoraEdicion, obtenerHoras]);
+
+  useEffect(() => {
+    const fecha = formAgregar.fechaEvento;
+    const idUsuario = formAgregar.usuario;
+    if (!requiereHoraAgregar || !fecha || !idUsuario) {
+      setHorasDisponiblesAgregar([]);
+      horasFechaAgregarRef.current = "";
+      return;
+    }
+    if (horasFechaAgregarRef.current === fecha) return;
+    horasFechaAgregarRef.current = fecha;
+    setHorasDisponiblesAgregar([]);
+    obtenerHoras(fecha, idUsuario).then((res) => {
+      const data = (res as any)?.data as HoraDispItem[] | undefined;
+      if (!data) return;
+      setHorasDisponiblesAgregar(data);
+      setFormAgregar((prev) => {
+        if (!prev.horaEvento) return prev;
+        const [h, m] = prev.horaEvento.split(":").map(Number);
+        const item = data.find((x) => x.hora === h && x.minuto === m);
+        if (item?.ocupado) return { ...prev, horaEvento: "" };
+        return prev;
+      });
+    });
+  }, [formAgregar.fechaEvento, formAgregar.usuario, requiereHoraAgregar, obtenerHoras]);
+
+  // ---------------------------------------------------------------------------
+  // Drawer handlers
+  // ---------------------------------------------------------------------------
+
+  const handleOpenDrawer = (gestion: GestionModificacion) => {
+    setDrawerGestion(gestion);
+    setEditandoDescripcion(false);
+    setDescripcionEdit(gestion.descripcion ?? "");
+    setShowModalAgregar(false);
   };
 
-  const handleEditar = (evento: EventoModificacion) => {
-    const matchedTipo = tiposEvento.find(
-      (item) =>
-        String(item.id) === String(evento.tipoEventoId) ||
-        item.nombre === evento.tipoEvento,
+  const handleCloseDrawer = () => {
+    setDrawerGestion(null);
+    setEditandoDescripcion(false);
+  };
+
+  // ---------------------------------------------------------------------------
+  // Description handlers
+  // ---------------------------------------------------------------------------
+
+  const handleIniciarEditarDescripcion = () => {
+    setDescripcionEdit(drawerGestion?.descripcion ?? "");
+    setEditandoDescripcion(true);
+  };
+
+  const handleCancelarDescripcion = () => {
+    setEditandoDescripcion(false);
+    setDescripcionEdit("");
+  };
+
+  const handleGuardarDescripcion = async () => {
+    if (!drawerGestion) return;
+    setSavingDescripcion(true);
+    try {
+      const payload: ActualizarDescripcionGestionRequest = {
+        idGestion: drawerGestion.idGestion,
+        descripcion: descripcionEdit,
+      };
+      const result: any = await actualizarDescripcionGestion(payload);
+      if (!result?.success) {
+        toast.error(getApiErrorMessage(result, "No fue posible actualizar la descripcion."));
+        return;
+      }
+      const updated = { ...drawerGestion, descripcion: descripcionEdit };
+      setRows((prev) =>
+        prev.map((g) =>
+          g.idGestion === drawerGestion.idGestion ? updated : g,
+        ),
+      );
+      setDrawerGestion(updated);
+      setEditandoDescripcion(false);
+      toast.success("Descripcion actualizada.");
+    } catch {
+      toast.error("No fue posible actualizar la descripcion.");
+    } finally {
+      setSavingDescripcion(false);
+    }
+  };
+
+  // ---------------------------------------------------------------------------
+  // Edit event handlers
+  // ---------------------------------------------------------------------------
+
+  const handleEditarEvento = (ev: EventoGestion) => {
+    const tipoEncontrado = tiposEvento.find(
+      (t) => String(t.id) === String(ev.idTipoEvento),
+    );
+    const usuarioEncontrado = usuarios.find(
+      (u) => String(u.value) === String(ev.idUsuarioAsignado),
     );
 
-    const fechaHoraSource =
-      pickFirstValue(evento as any, [
-        "fechaEvento",
-        "FechaEvento",
-        "fechaHoraProgramada",
-        "FechaHoraProgramada",
-        "start",
-      ]) ??
-      pickFirstValue(evento as any, [
-        "fechaCreacion",
-        "FechaCreacion",
-        "FECHAGES",
-      ]);
-    const fechaEventoInicial = extractDatePart(fechaHoraSource);
-    const horaEventoInicial = extractTimePart(fechaHoraSource);
+    const eventoMapped: EventoModificacion = {
+      id: ev.id,
+      cliente: ev.cliente,
+      factura: ev.factura,
+      cuenta: ev.cuenta,
+      tipoEventoId: String(ev.idTipoEvento),
+      tipoEvento: tipoEncontrado?.nombre ?? String(ev.idTipoEvento),
+      fechaCreacion: "",
+      fechaEvento: ev.fechaHoraProgramada ?? "",
+      monto: ev.montoCompromiso,
+      usuario: usuarioEncontrado?.label ?? String(ev.idUsuarioAsignado),
+      requiereFecha: ev.requiereFecha,
+      requiereHora: ev.requiereHora,
+      requiereMonto: ev.requiereMonto,
+    };
 
     const initialForm: EdicionEventoForm = {
-      usuario: evento.usuario || "",
-      cuenta: evento.cuenta || "",
-      cliente: evento.cliente || "",
-      tipoEventoId: matchedTipo?.id ?? evento.tipoEventoId ?? "",
-      fechaEvento: fechaEventoInicial,
-      horaEvento: horaEventoInicial,
-      monto: evento.monto == null ? "" : String(evento.monto),
+      usuario: usuarioEncontrado?.value ?? String(ev.idUsuarioAsignado),
+      cuenta: ev.cuenta,
+      cliente: ev.cliente,
+      tipoEventoId: tipoEncontrado?.id ?? String(ev.idTipoEvento),
+      fechaEvento: extractDatePart(ev.fechaHoraProgramada),
+      horaEvento: extractTimePart(ev.fechaHoraProgramada),
+      monto: ev.montoCompromiso == null ? "" : String(ev.montoCompromiso),
     };
 
-    setEventoEditando(evento);
+    setEventoEditando(eventoMapped);
     setFormEdicion(initialForm);
     setFormEdicionInicial(initialForm);
     setShowModalEdicion(true);
@@ -760,12 +903,21 @@ export const ModificacionEventos: React.FC = () => {
     setFormEdicion((prev) => ({ ...prev, [field]: value }));
   };
 
+  const handleChangeTipoEventoEdicion = (value: string | number) => {
+    const tipo = tiposEvento.find((t) => String(t.id) === String(value));
+    setFormEdicion((prev) => ({
+      ...prev,
+      tipoEventoId: value,
+      fechaEvento: tipo && !tipo.requiereFecha ? "" : prev.fechaEvento,
+      horaEvento: tipo && !tipo.requiereHora ? "" : prev.horaEvento,
+      monto: tipo && !tipo.requiereMonto ? "" : prev.monto,
+    }));
+  };
+
   const handleGuardarEdicion = async () => {
     if (!eventoEditando || !formEdicionInicial) return;
 
     const usuarioValue = String(formEdicion.usuario ?? "").trim();
-    const cuentaValue = formEdicion.cuenta.trim();
-    const clienteValue = formEdicion.cliente.trim();
     const tipoEventoValue = String(formEdicion.tipoEventoId ?? "").trim();
     const now = new Date();
     const today = toLocalDateString(now);
@@ -775,48 +927,35 @@ export const ModificacionEventos: React.FC = () => {
       toast.error("Debe seleccionar un usuario valido.");
       return;
     }
-
-    if (!cuentaValue) {
-      toast.error("La cuenta es obligatoria.");
-      return;
-    }
-
-    if (!clienteValue) {
-      toast.error("El cliente es obligatorio.");
-      return;
-    }
-
     if (!tipoEventoValue) {
       toast.error("El tipo de evento es obligatorio.");
       return;
     }
-
     if (requiereFechaEdicion && !formEdicion.fechaEvento) {
       toast.error("La fecha del evento es obligatoria.");
       return;
     }
-
     if (requiereFechaEdicion && formEdicion.fechaEvento < today) {
       toast.error("La fecha del evento no puede ser menor a la fecha actual.");
       return;
     }
-
     if (requiereHoraEdicion && !formEdicion.horaEvento) {
       toast.error("La hora del evento es obligatoria.");
       return;
     }
-
     if (requiereHoraEdicion) {
       if (requiereFechaEdicion) {
-        const selectedDateTime = new Date(
+        const dt = new Date(
           `${formEdicion.fechaEvento}T${formEdicion.horaEvento}:00`,
         );
-        if (Number.isNaN(selectedDateTime.getTime())) {
+        if (Number.isNaN(dt.getTime())) {
           toast.error("La fecha y hora del evento no son validas.");
           return;
         }
-        if (selectedDateTime < now) {
-          toast.error("La fecha y hora del evento no pueden ser menores a la actual.");
+        if (dt < now) {
+          toast.error(
+            "La fecha y hora del evento no pueden ser menores a la actual.",
+          );
           return;
         }
       } else if (formEdicion.horaEvento < currentTime) {
@@ -824,10 +963,10 @@ export const ModificacionEventos: React.FC = () => {
         return;
       }
     }
-
     if (
       requiereMontoEdicion &&
-      (formEdicion.monto.trim() === "" || Number.isNaN(Number(formEdicion.monto)))
+      (formEdicion.monto.trim() === "" ||
+        Number.isNaN(Number(formEdicion.monto)))
     ) {
       toast.error("El monto del evento es obligatorio.");
       return;
@@ -839,21 +978,17 @@ export const ModificacionEventos: React.FC = () => {
     const tipoEventoChanged =
       String(formEdicion.tipoEventoId ?? "").trim() !==
       String(formEdicionInicial.tipoEventoId ?? "").trim();
-
-    const currentFechaHoraProgramada = mergeDateAndTime(
+    const currentFHP = mergeDateAndTime(
       formEdicion.fechaEvento,
       formEdicion.horaEvento,
       requiereHoraEdicion,
     );
-    const initialFechaHoraProgramada = mergeDateAndTime(
+    const initialFHP = mergeDateAndTime(
       formEdicionInicial.fechaEvento,
       formEdicionInicial.horaEvento,
       requiereHoraInicialEdicion,
     );
-    const fechaHoraChanged =
-      requiereFechaEdicion &&
-      currentFechaHoraProgramada !== initialFechaHoraProgramada;
-
+    const fechaHoraChanged = requiereFechaEdicion && currentFHP !== initialFHP;
     const currentMonto =
       formEdicion.monto.trim() === "" ? null : Number(formEdicion.monto);
     const initialMonto =
@@ -862,183 +997,329 @@ export const ModificacionEventos: React.FC = () => {
         : Number(formEdicionInicial.monto);
     const montoChanged = requiereMontoEdicion && currentMonto !== initialMonto;
 
-    const updatePayload: ActualizarModificacionEventoRequest = {
+    const payload: ActualizarModificacionEventoRequest = {
       idEvento: eventoEditando.id,
     };
-
     if (usuarioChanged) {
-      const userId = parseNumberValue(formEdicion.usuario);
-      if (userId === null) {
-        toast.error(
-          "El usuario seleccionado no es valido para actualizar el evento.",
-        );
+      const uid = parseNumberValue(formEdicion.usuario);
+      if (uid === null) {
+        toast.error("El usuario seleccionado no es valido.");
         return;
       }
-      updatePayload.idUsuarioAsignado = userId;
+      payload.idUsuarioAsignado = uid;
     }
-
     if (tipoEventoChanged) {
-      const tipoId = parseNumberValue(formEdicion.tipoEventoId);
-      if (tipoId === null) {
-        toast.error(
-          "El tipo de evento seleccionado no es valido para actualizar el evento.",
-        );
+      const tid = parseNumberValue(formEdicion.tipoEventoId);
+      if (tid === null) {
+        toast.error("El tipo de evento seleccionado no es valido.");
         return;
       }
-      updatePayload.idTipoEvento = tipoId;
+      payload.idTipoEvento = tid;
     }
+    if (fechaHoraChanged) payload.fechaHoraProgramada = currentFHP;
+    if (montoChanged) payload.montoCompromiso = currentMonto;
 
-    if (fechaHoraChanged) {
-      updatePayload.fechaHoraProgramada = currentFechaHoraProgramada;
-    }
-
-    if (montoChanged) {
-      updatePayload.montoCompromiso = currentMonto;
-    }
-
-    const changedFieldsCount = Object.keys(updatePayload).length - 1;
-    if (changedFieldsCount <= 0) {
+    if (Object.keys(payload).length <= 1) {
       toast.error("No hay cambios para guardar.");
       return;
     }
 
     setSavingEdicion(true);
-
     try {
-      const result: any = await actualizarModificacionEvento(updatePayload);
+      const result: any = await actualizarModificacionEvento(payload);
       if (!result?.success) {
         toast.error(
-          getApiErrorMessage(
-            result,
-            "No fue posible guardar la edicion del evento.",
-          ),
+          getApiErrorMessage(result, "No fue posible guardar la edicion."),
         );
         return;
       }
 
-      const usuarioSeleccionado = usuarios.find(
-        (option) => String(option.value) === String(formEdicion.usuario),
-      );
-      const tipoEventoSeleccionado = tiposEvento.find(
-        (item) => String(item.id) === String(formEdicion.tipoEventoId),
+      const tipoSel = tiposEvento.find(
+        (t) => String(t.id) === String(formEdicion.tipoEventoId),
       );
 
-      setRows((prevRows) =>
-        prevRows.map((item) =>
-          item.id === eventoEditando.id
-            ? {
-                ...item,
-                usuario: usuarioSeleccionado?.label || String(formEdicion.usuario || item.usuario),
-                cuenta: formEdicion.cuenta.trim() || item.cuenta,
-                cliente: formEdicion.cliente.trim() || item.cliente,
-                tipoEventoId: String(formEdicion.tipoEventoId || item.tipoEventoId),
-                tipoEvento: tipoEventoSeleccionado?.nombre || item.tipoEvento,
-                requiereFecha:
-                  tipoEventoSeleccionado?.requiereFecha ?? item.requiereFecha,
-                requiereHora:
-                  tipoEventoSeleccionado?.requiereHora ?? item.requiereHora,
-                requiereMonto:
-                  tipoEventoSeleccionado?.requiereMonto ?? item.requiereMonto,
-                fechaEvento:
-                  currentFechaHoraProgramada || item.fechaEvento,
-                monto:
-                  formEdicion.monto.trim() === ""
-                    ? null
-                    : Number(formEdicion.monto),
-                }
-            : item,
-        ),
+      const updateEvento = (ev: EventoGestion): EventoGestion =>
+        ev.id !== eventoEditando.id
+          ? ev
+          : {
+              ...ev,
+              idUsuarioAsignado: usuarioChanged
+                ? parseNumberValue(formEdicion.usuario) ?? ev.idUsuarioAsignado
+                : ev.idUsuarioAsignado,
+              idTipoEvento: tipoEventoChanged
+                ? parseNumberValue(formEdicion.tipoEventoId) ?? ev.idTipoEvento
+                : ev.idTipoEvento,
+              requiereFecha: tipoSel?.requiereFecha ?? ev.requiereFecha,
+              requiereHora: tipoSel?.requiereHora ?? ev.requiereHora,
+              requiereMonto: tipoSel?.requiereMonto ?? ev.requiereMonto,
+              fechaHoraProgramada: fechaHoraChanged
+                ? currentFHP
+                : ev.fechaHoraProgramada,
+              montoCompromiso: montoChanged ? currentMonto : ev.montoCompromiso,
+            };
+
+      setRows((prev) =>
+        prev.map((g) => ({ ...g, eventos: g.eventos.map(updateEvento) })),
+      );
+      setDrawerGestion((prev) =>
+        prev ? { ...prev, eventos: prev.eventos.map(updateEvento) } : prev,
       );
 
       toast.success(result?.message || "Evento actualizado correctamente.");
       handleCloseModalEdicion();
-    } catch (error) {
-      console.error("No fue posible preparar la edicion del evento:", error);
-      toast.error("No fue posible preparar la edicion del evento.");
+    } catch {
+      toast.error("No fue posible guardar la edicion del evento.");
     } finally {
       setSavingEdicion(false);
     }
   };
 
-  const handleEliminar = (evento: EventoModificacion) => {
-    const confirmDelete = window.confirm(
-      `Desea eliminar el evento con id ${evento.id}?`,
-    );
-    if (!confirmDelete) return;
+  // ---------------------------------------------------------------------------
+  // Add event handlers
+  // ---------------------------------------------------------------------------
 
-    setRows((prevRows) => prevRows.filter((item) => item.id !== evento.id));
-    setTotalRows((prevTotal) => Math.max(0, prevTotal - 1));
-  };
-
-  const handleIrSeguimiento = (evento: EventoModificacion) => {
-    const targetUrl = buildConsultaCarteraUrl({
-      cuenta: evento.cuenta,
-      factura: evento.factura,
-      identificacionCliente: evento.cliente,
+  const handleOpenModalAgregar = () => {
+    if (!drawerGestion) return;
+    setFormAgregar({
+      ...EMPTY_FORM,
+      cuenta: drawerGestion.cuenta,
+      cliente: drawerGestion.cliente,
     });
-    const hashUrl = `${window.location.origin}${window.location.pathname}#${targetUrl}`;
-    window.open(hashUrl, "_blank", "noopener,noreferrer");
+    setShowModalAgregar(true);
   };
 
-  const columns: TableColumn[] = useMemo(
-    () => [
-      { id: "id", label: "ID" },
-      { id: "cliente", label: "Cliente" },
-      { id: "factura", label: "Factura" },
-      { id: "cuenta", label: "Cuenta" },
-      { id: "tipoEvento", label: "Tipo evento" },
-      { id: "fechaCreacion", label: "Fecha creacion" },
-      { id: "fechaEvento", label: "Fecha evento" },
-      {
-        id: "monto",
-        label: "Monto",
-        align: "right",
-        format: (value: number | null) => formatMonto(value),
-      },
-      {
-        id: "acciones",
-        label: "Acciones",
-        align: "center",
-        format: (_value, row: EventoModificacion) => (
-          <div style={{ display: "flex", justifyContent: "center", gap: 6 }}>
-            <Button
-              size="sm"
-              variant="light"
-              onClick={() => handleEditar(row)}
-              title="Editar"
-              style={{ padding: "2px 6px", border: "1px solid #d0d7de" }}
-            >
-              <i className="fas fa-edit" />
-            </Button>
-            <Button
-              size="sm"
-              variant="light"
-              onClick={() => handleEliminar(row)}
-              title="Eliminar"
-              style={{ padding: "2px 6px", border: "1px solid #d0d7de" }}
-            >
-              <i className="fas fa-trash-alt" />
-            </Button>
-            <Button
-              size="sm"
-              variant="light"
-              onClick={() => handleIrSeguimiento(row)}
-              title="Ir a seguimiento"
-              style={{ padding: "2px 6px", border: "1px solid #d0d7de" }}
-            >
-              <i className="fas fa-external-link-alt" />
-            </Button>
-          </div>
-        ),
-      },
-    ],
-    [handleEditar, handleEliminar, handleIrSeguimiento],
-  );
+  const handleCloseModalAgregar = () => {
+    setShowModalAgregar(false);
+    setFormAgregar(EMPTY_FORM);
+  };
+
+  const setFieldAgregar = <K extends keyof EdicionEventoForm>(
+    field: K,
+    value: EdicionEventoForm[K],
+  ) => {
+    setFormAgregar((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleChangeTipoEventoAgregar = (value: string | number) => {
+    const tipo = tiposEvento.find((t) => String(t.id) === String(value));
+    setFormAgregar((prev) => ({
+      ...prev,
+      tipoEventoId: value,
+      fechaEvento: tipo && !tipo.requiereFecha ? "" : prev.fechaEvento,
+      horaEvento: tipo && !tipo.requiereHora ? "" : prev.horaEvento,
+      monto: tipo && !tipo.requiereMonto ? "" : prev.monto,
+    }));
+  };
+
+  const handleGuardarAgregar = async () => {
+    if (!drawerGestion) return;
+
+    const usuarioValue = String(formAgregar.usuario ?? "").trim();
+    const tipoValue = String(formAgregar.tipoEventoId ?? "").trim();
+    const now = new Date();
+    const today = toLocalDateString(now);
+    const currentTime = toLocalTimeString(now);
+
+    if (!usuarioValue || usuarioValue.toLowerCase() === "todos") {
+      toast.error("Debe seleccionar un usuario.");
+      return;
+    }
+    if (!tipoValue) {
+      toast.error("El tipo de evento es obligatorio.");
+      return;
+    }
+    if (requiereFechaAgregar && !formAgregar.fechaEvento) {
+      toast.error("La fecha del evento es obligatoria.");
+      return;
+    }
+    if (requiereFechaAgregar && formAgregar.fechaEvento < today) {
+      toast.error("La fecha del evento no puede ser menor a la fecha actual.");
+      return;
+    }
+    if (requiereHoraAgregar && !formAgregar.horaEvento) {
+      toast.error("La hora del evento es obligatoria.");
+      return;
+    }
+    if (requiereHoraAgregar) {
+      if (requiereFechaAgregar) {
+        const dt = new Date(
+          `${formAgregar.fechaEvento}T${formAgregar.horaEvento}:00`,
+        );
+        if (Number.isNaN(dt.getTime())) {
+          toast.error("La fecha y hora no son validas.");
+          return;
+        }
+        if (dt < now) {
+          toast.error("La fecha y hora no pueden ser menores a la actual.");
+          return;
+        }
+      } else if (formAgregar.horaEvento < currentTime) {
+        toast.error("La hora no puede ser menor a la hora actual.");
+        return;
+      }
+    }
+    if (
+      requiereMontoAgregar &&
+      (formAgregar.monto.trim() === "" ||
+        Number.isNaN(Number(formAgregar.monto)))
+    ) {
+      toast.error("El monto es obligatorio.");
+      return;
+    }
+
+    const idUsuario = parseNumberValue(formAgregar.usuario);
+    const idTipo = parseNumberValue(formAgregar.tipoEventoId);
+    if (!idUsuario || !idTipo) {
+      toast.error("Datos invalidos.");
+      return;
+    }
+
+    const payload: CrearEventoGestionRequest = {
+      idGestion: drawerGestion.idGestion,
+      idUsuarioAsignado: idUsuario,
+      idTipoEvento: idTipo,
+      fechaHoraProgramada: requiereFechaAgregar
+        ? mergeDateAndTime(
+            formAgregar.fechaEvento,
+            formAgregar.horaEvento,
+            requiereHoraAgregar,
+          )
+        : undefined,
+      montoCompromiso: requiereMontoAgregar
+        ? formAgregar.monto.trim() === ""
+          ? null
+          : Number(formAgregar.monto)
+        : undefined,
+    };
+
+    setSavingAgregar(true);
+    try {
+      const result: any = await crearEventoGestion(payload);
+      if (!result?.success) {
+        toast.error(
+          getApiErrorMessage(result, "No fue posible agregar el evento."),
+        );
+        return;
+      }
+
+      const tipoSel = tiposEvento.find((t) => String(t.id) === String(idTipo));
+      const nuevoEvento: EventoGestion = {
+        id: result?.data?.id ?? Date.now(),
+        idGestion: drawerGestion.idGestion,
+        cliente: drawerGestion.cliente,
+        factura: drawerGestion.factura,
+        cuenta: drawerGestion.cuenta,
+        idUsuarioAsignado: idUsuario,
+        idTipoEvento: idTipo,
+        fechaHoraProgramada: payload.fechaHoraProgramada ?? "",
+        montoCompromiso: payload.montoCompromiso ?? null,
+        requiereFecha: tipoSel?.requiereFecha ?? false,
+        requiereHora: tipoSel?.requiereHora ?? false,
+        requiereMonto: tipoSel?.requiereMonto ?? false,
+      };
+
+      const addEvento = (g: GestionModificacion): GestionModificacion =>
+        g.idGestion === drawerGestion.idGestion
+          ? { ...g, eventos: [...g.eventos, nuevoEvento] }
+          : g;
+
+      setRows((prev) => prev.map(addEvento));
+      setDrawerGestion((prev) =>
+        prev ? { ...prev, eventos: [...prev.eventos, nuevoEvento] } : prev,
+      );
+
+      toast.success(result?.message || "Evento agregado correctamente.");
+      handleCloseModalAgregar();
+    } catch {
+      toast.error("No fue posible agregar el evento.");
+    } finally {
+      setSavingAgregar(false);
+    }
+  };
+
+  // ---------------------------------------------------------------------------
+  // Delete event handler
+  // ---------------------------------------------------------------------------
+
+  const handleEliminarGestion = async () => {
+    if (!drawerGestion) return;
+    if (!window.confirm(`¿Desea eliminar la gestión #${drawerGestion.idGestion}? Esta acción también eliminará todos sus eventos.`)) return;
+    try {
+      const payload: EliminarGestionRequest = { idGestion: drawerGestion.idGestion };
+      const result: any = await eliminarGestion(payload);
+      if (!result?.success) {
+        toast.error(getApiErrorMessage(result, "No fue posible eliminar la gestión."));
+        return;
+      }
+      setRows((prev) => prev.filter((g) => g.idGestion !== drawerGestion.idGestion));
+      handleCloseDrawer();
+      toast.success("Gestión eliminada correctamente.");
+    } catch {
+      toast.error("No fue posible eliminar la gestión.");
+    }
+  };
+
+  const handleEliminarEvento = async (ev: EventoGestion) => {
+    if (!window.confirm(`¿Desea eliminar el evento con id ${ev.id}?`)) return;
+    try {
+      const payload: EliminarEventoGestionRequest = { idEvento: ev.id };
+      const result: any = await eliminarEventoGestion(payload);
+      if (!result?.success) {
+        toast.error(getApiErrorMessage(result, "No fue posible eliminar el evento."));
+        return;
+      }
+      const removeEvento = (g: GestionModificacion): GestionModificacion => ({
+        ...g,
+        eventos: g.eventos.filter((e) => e.id !== ev.id),
+      });
+      setRows((prev) => prev.map(removeEvento));
+      setDrawerGestion((prev) => (prev ? removeEvento(prev) : prev));
+      toast.success("Evento eliminado correctamente.");
+    } catch {
+      toast.error("No fue posible eliminar el evento.");
+    }
+  };
+
+  const handleIrSeguimientoEvento = (ev: EventoGestion) => {
+    const url = buildConsultaCarteraUrl({
+      cuenta: ev.cuenta,
+      factura: ev.factura,
+      identificacionCliente: ev.cliente,
+    });
+    window.open(
+      `${window.location.origin}${window.location.pathname}#${url}`,
+      "_blank",
+      "noopener,noreferrer",
+    );
+  };
+
+  // ---------------------------------------------------------------------------
+  // Render helpers
+  // ---------------------------------------------------------------------------
+
+  const resolverNombreTipo = (id: number) =>
+    tiposEvento.find((t) => String(t.id) === String(id))?.nombre ?? String(id);
+
+  const resolverNombreUsuario = (id: number) =>
+    usuarios.find((u) => String(u.value) === String(id))?.label ?? String(id);
+
+  const renderFechaEvento = (ev: EventoGestion) => {
+    if (!ev.fechaHoraProgramada) return "-";
+    return (
+      extractDatePart(ev.fechaHoraProgramada) +
+      (ev.requiereHora ? ` ${extractTimePart(ev.fechaHoraProgramada)}` : "")
+    );
+  };
+
+  // ---------------------------------------------------------------------------
+  // JSX
+  // ---------------------------------------------------------------------------
 
   return (
     <div className="mt-5" style={{ margin: "auto", width: "90%" }}>
-      <h3>Modificacion de eventos</h3>
+      <h3>Modificacion de gestiones</h3>
 
+      {/* ---- Filters ---- */}
       <Card className="shadow-sm border-0 mb-4">
         <Card.Body>
           <Form>
@@ -1050,10 +1331,10 @@ export const ModificacionEventos: React.FC = () => {
                     type="date"
                     value={fechaInicio}
                     isInvalid={Boolean(erroresFechas.fechaInicio)}
-                    onChange={(event) => {
-                      setFechaInicio(event.target.value);
-                      setErroresFechas((prev) => ({
-                        ...prev,
+                    onChange={(e) => {
+                      setFechaInicio(e.target.value);
+                      setErroresFechas((p) => ({
+                        ...p,
                         fechaInicio: undefined,
                       }));
                     }}
@@ -1063,7 +1344,6 @@ export const ModificacionEventos: React.FC = () => {
                   </Form.Control.Feedback>
                 </Form.Group>
               </Col>
-
               <Col md={2}>
                 <Form.Group controlId="fechaFin">
                   <Form.Label>Fecha fin</Form.Label>
@@ -1071,12 +1351,9 @@ export const ModificacionEventos: React.FC = () => {
                     type="date"
                     value={fechaFin}
                     isInvalid={Boolean(erroresFechas.fechaFin)}
-                    onChange={(event) => {
-                      setFechaFin(event.target.value);
-                      setErroresFechas((prev) => ({
-                        ...prev,
-                        fechaFin: undefined,
-                      }));
+                    onChange={(e) => {
+                      setFechaFin(e.target.value);
+                      setErroresFechas((p) => ({ ...p, fechaFin: undefined }));
                     }}
                   />
                   <Form.Control.Feedback type="invalid">
@@ -1084,7 +1361,6 @@ export const ModificacionEventos: React.FC = () => {
                   </Form.Control.Feedback>
                 </Form.Group>
               </Col>
-
               <Col md={2}>
                 <SingleSelect
                   label="Usuario"
@@ -1093,7 +1369,6 @@ export const ModificacionEventos: React.FC = () => {
                   onChange={setUsuarioFiltro}
                 />
               </Col>
-
               <Col md={3}>
                 <BuscadorCuentas
                   opcion="CU"
@@ -1101,7 +1376,7 @@ export const ModificacionEventos: React.FC = () => {
                   placeholder="Buscar cuenta..."
                   label="Cuenta"
                   value={cuentaFiltro || undefined}
-                  onChange={(cuenta) => setCuentaFiltro(cuenta ?? "")}
+                  onChange={(c) => setCuentaFiltro(c ?? "")}
                   onSelect={() => {}}
                 />
               </Col>
@@ -1109,23 +1384,12 @@ export const ModificacionEventos: React.FC = () => {
                 <BuscadoClientes
                   selectedValue={clienteFiltro}
                   onOpenModal={handleOpenModalCliente}
-                  onClear={handleClearCliente}
+                  onClear={() => setClienteFiltro("")}
                 />
               </Col>
-
-              <Col md={2}>
-                <SingleSelect
-                  label="Tipo de evento"
-                  options={tipoEventoOptions}
-                  selectedValue={tipoEventoFiltro}
-                  onChange={setTipoEventoFiltro}
-                />
-              </Col>
-
-              <Col md={2} className="d-flex align-items-center">
+              <Col md={1} className="d-flex align-items-center">
                 <Button
                   variant="primary"
-                  type="button"
                   onClick={handleConsultar}
                   style={{ marginTop: 14 }}
                   disabled={loadingConsulta}
@@ -1136,8 +1400,6 @@ export const ModificacionEventos: React.FC = () => {
                         as="span"
                         animation="border"
                         size="sm"
-                        role="status"
-                        aria-hidden="true"
                         className="me-2"
                       />
                       Consultando...
@@ -1148,39 +1410,356 @@ export const ModificacionEventos: React.FC = () => {
                 </Button>
               </Col>
             </Row>
-
-            <Row className="mt-3">
-              
-            </Row>
           </Form>
         </Card.Body>
       </Card>
 
+      {/* ---- Gestiones table ---- */}
       <Card className="shadow-sm border-0">
         <Card.Body>
-          <DynamicTablePagination
-            columns={columns}
-            rows={rows}
-            totalRows={totalRows}
-            withSearch={false}
-            searchText=""
-            onSearchChange={() => {}}
-            rowsPerPage={rowsPerPage}
-            onRowsPerPageChange={setRowsPerPage}
-            page={page}
-            onPageChange={setPage}
-            maxHeight="500px"
-          />
+          <div className="mb-3" style={{ maxWidth: 280 }}>
+            <Form.Control
+              type="text"
+              placeholder="Buscar por ID Gestion..."
+              value={busquedaGestion}
+              onChange={(e) => setBusquedaGestion(e.target.value)}
+            />
+          </div>
+
+          {loadingConsulta ? (
+            <div className="text-center py-5">
+              <Spinner animation="border" />
+            </div>
+          ) : rowsFiltradas.length === 0 ? (
+            <div className="text-center py-5 text-muted">
+              {filtrosConsulta
+                ? "No se encontraron gestiones."
+                : "Aplique los filtros para consultar."}
+            </div>
+          ) : (
+            <Table hover responsive style={{ cursor: "pointer", fontSize: 14 }}>
+              <thead className="table-light">
+                <tr>
+                  <th>ID Gestion</th>
+                  <th>Usuario</th>
+                  <th>Cliente</th>
+                  <th>Factura</th>
+                  <th>Cuenta</th>
+                  <th>Fecha / Hora</th>
+                  <th className="text-center">Eventos</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rowsFiltradas.map((gestion) => (
+                  <tr
+                    key={gestion.idGestion}
+                    onClick={() => handleOpenDrawer(gestion)}
+                    style={{
+                      backgroundColor:
+                        drawerGestion?.idGestion === gestion.idGestion
+                          ? "#eef2ff"
+                          : undefined,
+                    }}
+                  >
+                    <td>
+                      <strong>{gestion.idGestion}</strong>
+                    </td>
+                    <td>{gestion.Username}</td>
+                    <td>{gestion.cliente}</td>
+                    <td>{gestion.factura}</td>
+                    <td>{gestion.cuenta}</td>
+                    <td>{formatFechaHora(gestion.FechaHora)}</td>
+                    <td className="text-center">
+                      <Chip
+                        size="small"
+                        label={gestion.eventos.length}
+                        color={
+                          gestion.eventos.length > 0 ? "primary" : "default"
+                        }
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </Table>
+          )}
+
+          {filtrosConsulta && !loadingConsulta && (
+            <TablePagination
+              component="div"
+              count={totalRows}
+              page={page}
+              onPageChange={(_, p) => setPage(p)}
+              rowsPerPage={rowsPerPage}
+              onRowsPerPageChange={(e) => {
+                setRowsPerPage(Number(e.target.value));
+                setPage(0);
+              }}
+              rowsPerPageOptions={[10, 20, 50, 100]}
+              labelRowsPerPage="Filas por pagina:"
+              labelDisplayedRows={({ from, to, count }) =>
+                `${from}-${to} de ${count !== -1 ? count : `mas de ${to}`}`
+              }
+            />
+          )}
         </Card.Body>
       </Card>
 
+      {/* ---- Modal Seguimiento ---- */}
+      <Modal
+        show={drawerGestion !== null}
+        onHide={handleCloseDrawer}
+        size="xl"
+        scrollable
+        enforceFocus={false}
+        centered
+      >
+        {drawerGestion && (
+          <>
+            <Modal.Header
+              closeButton
+              placeholder=""
+              onPointerEnterCapture={undefined}
+              onPointerLeaveCapture={undefined}
+            >
+              <Modal.Title className="d-flex align-items-center" style={{ marginRight: "1rem" }}>
+                Gestión #{drawerGestion.idGestion}
+                <Tooltip title="Eliminar gestión">
+                  <button
+                    className="btn btn-sm btn-outline-danger"
+                    onClick={handleEliminarGestion}
+                    type="button"
+                    style={{ marginLeft: "1rem" }}
+                  >
+                    <i className="fas fa-trash-alt" />
+                  </button>
+                </Tooltip>
+              </Modal.Title>
+            </Modal.Header>
+
+            <Modal.Body>
+              <Row>
+                <Col md={3}>
+                  <Form.Group>
+                    <Form.Label>Usuario</Form.Label>
+                    <Form.Control
+                      type="text"
+                      value={drawerGestion.Username}
+                      readOnly
+                    />
+                  </Form.Group>
+                </Col>
+                <Col md={3}>
+                  <Form.Group>
+                    <Form.Label>Fecha / Hora</Form.Label>
+                    <Form.Control
+                      type="text"
+                      value={formatFechaHora(drawerGestion.FechaHora)}
+                      readOnly
+                    />
+                  </Form.Group>
+                </Col>
+                <Col md={3}>
+                  <Form.Group>
+                    <Form.Label>Cliente</Form.Label>
+                    <Form.Control
+                      type="text"
+                      value={drawerGestion.cliente}
+                      readOnly
+                    />
+                  </Form.Group>
+                </Col>
+                <Col md={3}>
+                  <Form.Group>
+                    <Form.Label>Factura</Form.Label>
+                    <Form.Control
+                      type="text"
+                      value={drawerGestion.factura}
+                      readOnly
+                    />
+                  </Form.Group>
+                </Col>
+              </Row>
+              <Row className="mt-2">
+                <Col md={3}>
+                  <Form.Group>
+                    <Form.Label>Cuenta</Form.Label>
+                    <Form.Control
+                      type="text"
+                      value={drawerGestion.cuenta}
+                      readOnly
+                    />
+                  </Form.Group>
+                </Col>
+              </Row>
+
+              <hr />
+
+              {/* Descripcion */}
+              <Row>
+                <Col>
+                  <Form.Group>
+                    <div className="d-flex justify-content-between align-items-center mb-1">
+                      <Form.Label className="mb-0">Descripción</Form.Label>
+                      {!editandoDescripcion ? (
+                        <Tooltip title="Editar descripción">
+                          <button className="btn btn-sm btn-outline-primary" onClick={handleIniciarEditarDescripcion} type="button">
+                            <i className="fas fa-edit" />
+                          </button>
+                        </Tooltip>
+                      ) : (
+                        <div className="d-flex" style={{ gap: "0.5rem" }}>
+                          <Tooltip title="Cancelar">
+                            <button className="btn btn-sm btn-outline-secondary" onClick={handleCancelarDescripcion} type="button">
+                              <i className="fas fa-times" />
+                            </button>
+                          </Tooltip>
+                          <Tooltip title="Guardar">
+                            <button className="btn btn-sm btn-primary" onClick={handleGuardarDescripcion} disabled={savingDescripcion} type="button">
+                              {savingDescripcion ? <i className="fas fa-spinner fa-spin" /> : <i className="fas fa-check" />}
+                            </button>
+                          </Tooltip>
+                        </div>
+                      )}
+                    </div>
+                    <Form.Control
+                      as="textarea"
+                      rows={3}
+                      value={descripcionEdit}
+                      onChange={(e) => setDescripcionEdit(e.target.value)}
+                      placeholder="Sin descripcion"
+                      style={{ resize: "vertical" }}
+                      readOnly={!editandoDescripcion}
+                    />
+                  </Form.Group>
+                </Col>
+              </Row>
+
+              <hr />
+
+              {/* Eventos */}
+              <div className="d-flex justify-content-between align-items-center mb-2">
+                <Form.Label className="mb-0">
+                  Eventos ({drawerGestion.eventos.length})
+                </Form.Label>
+                <Button
+                  size="sm"
+                  variant="success"
+                  onClick={handleOpenModalAgregar}
+                >
+                  <i className="fas fa-plus mr-1" />
+                  Añadir
+                </Button>
+              </div>
+
+              {drawerGestion.eventos.length === 0 ? (
+                <p className="text-muted mb-0" style={{ fontSize: 13 }}>
+                  Sin eventos registrados.
+                </p>
+              ) : (
+                <Table
+                  size="sm"
+                  bordered
+                  hover
+                  responsive
+                  style={{ fontSize: 13 }}
+                >
+                  <thead className="thead-light">
+                    <tr>
+                      <th>ID</th>
+                      <th>Usuario</th>
+                      <th>Tipo</th>
+                      <th>Fecha / Hora</th>
+                      <th className="text-right">Monto</th>
+                      <th className="text-center">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {drawerGestion.eventos.map((ev) => (
+                      <tr key={ev.id}>
+                        <td>{ev.id}</td>
+                        <td>{resolverNombreUsuario(ev.idUsuarioAsignado)}</td>
+                        <td>{resolverNombreTipo(ev.idTipoEvento)}</td>
+                        <td>{renderFechaEvento(ev)}</td>
+                        <td className="text-right">
+                          {formatMonto(ev.montoCompromiso)}
+                        </td>
+                        <td className="text-center">
+                          <div
+                            className="d-flex justify-content-center"
+                            style={{ gap: 4 }}
+                          >
+                            <Tooltip title="Editar">
+                              <Button
+                                size="sm"
+                                variant="light"
+                                onClick={() => handleEditarEvento(ev)}
+                                style={{
+                                  padding: "2px 6px",
+                                  border: "1px solid #d0d7de",
+                                }}
+                              >
+                                <i className="fas fa-edit" />
+                              </Button>
+                            </Tooltip>
+                            <Tooltip title="Eliminar">
+                              <Button
+                                size="sm"
+                                variant="light"
+                                onClick={() => handleEliminarEvento(ev)}
+                                style={{
+                                  padding: "2px 6px",
+                                  border: "1px solid #d0d7de",
+                                }}
+                              >
+                                <i className="fas fa-trash-alt" />
+                              </Button>
+                            </Tooltip>
+                            <Tooltip title="Ir a seguimiento">
+                              <Button
+                                size="sm"
+                                variant="light"
+                                onClick={() => handleIrSeguimientoEvento(ev)}
+                                style={{
+                                  padding: "2px 6px",
+                                  border: "1px solid #d0d7de",
+                                }}
+                              >
+                                <i className="fas fa-external-link-alt" />
+                              </Button>
+                            </Tooltip>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </Table>
+              )}
+            </Modal.Body>
+
+            <Modal.Footer>
+              <Button variant="secondary" onClick={handleCloseDrawer}>
+                Cerrar
+              </Button>
+            </Modal.Footer>
+          </>
+        )}
+      </Modal>
+
+      {/* ---- Edit event modal ---- */}
       <Modal
         show={showModalEdicion}
         onHide={handleCloseModalEdicion}
         size="xl"
         centered
+        style={{ zIndex: 1060 }}
       >
-        <Modal.Header closeButton>
+        <Modal.Header
+          closeButton
+          placeholder=""
+          onPointerEnterCapture={undefined}
+          onPointerLeaveCapture={undefined}
+        >
           <Modal.Title>Editar evento</Modal.Title>
         </Modal.Header>
         <Modal.Body>
@@ -1192,24 +1771,29 @@ export const ModificacionEventos: React.FC = () => {
                     label="Usuario"
                     options={usuarioOptionsEdicion}
                     selectedValue={formEdicion.usuario}
-                    onChange={(value) => setFieldEdicion("usuario", value)}
+                    onChange={(v) => setFieldEdicion("usuario", v)}
                   />
                 </Col>
-
                 <Col md={3}>
-                  <Form.Group controlId="cuentaEventoEdicion">
+                  <Form.Group>
                     <Form.Label>Cuenta</Form.Label>
-                    <Form.Control type="text" value={formEdicion.cuenta} readOnly />
+                    <Form.Control
+                      type="text"
+                      value={formEdicion.cuenta}
+                      readOnly
+                    />
                   </Form.Group>
                 </Col>
-
                 <Col md={3}>
-                  <Form.Group controlId="clienteEventoEdicion">
+                  <Form.Group>
                     <Form.Label>Cliente</Form.Label>
-                    <Form.Control type="text" value={formEdicion.cliente} readOnly />
+                    <Form.Control
+                      type="text"
+                      value={formEdicion.cliente}
+                      readOnly
+                    />
                   </Form.Group>
                 </Col>
-
                 <Col md={3}>
                   <SingleSelect
                     label="Tipo de evento"
@@ -1219,51 +1803,43 @@ export const ModificacionEventos: React.FC = () => {
                   />
                 </Col>
               </Row>
-
               <Row className="mt-3">
                 <Col md={3}>
-                  <Form.Group controlId="fechaEventoEdicion">
+                  <Form.Group>
                     <Form.Label>Fecha evento</Form.Label>
                     <Form.Control
                       type="date"
                       value={formEdicion.fechaEvento}
                       disabled={!requiereFechaEdicion}
-                      onChange={(event) =>
-                        setFieldEdicion("fechaEvento", event.target.value)
+                      onChange={(e) =>
+                        setFieldEdicion("fechaEvento", e.target.value)
                       }
                     />
                   </Form.Group>
                 </Col>
-
                 <Col md={3}>
-                  <Form.Group controlId="horaEventoEdicion">
-                    <Form.Label>Hora evento</Form.Label>
-                    <Form.Control
-                      type="time"
-                      value={formEdicion.horaEvento}
-                      disabled={!requiereHoraEdicion}
-                      onChange={(event) =>
-                        setFieldEdicion("horaEvento", event.target.value)
-                      }
+                  <Form.Group>
+                    <HoraSelectorEvento
+                      fecha={requiereHoraEdicion ? formEdicion.fechaEvento : ""}
+                      value={requiereHoraEdicion ? formEdicion.horaEvento || null : null}
+                      onChange={(hora) => setFieldEdicion("horaEvento", hora ?? "")}
+                      horas={horasDisponiblesEdicion}
+                      loading={loadingHoras}
                     />
                   </Form.Group>
                 </Col>
-
                 <Col md={3}>
-                  <Form.Group controlId="montoEventoEdicion">
+                  <Form.Group>
                     <Form.Label>Monto</Form.Label>
                     <Form.Control
                       type="number"
                       value={formEdicion.monto}
                       disabled={!requiereMontoEdicion}
-                      onChange={(event) =>
-                        setFieldEdicion("monto", event.target.value)
-                      }
+                      onChange={(e) => setFieldEdicion("monto", e.target.value)}
                     />
                   </Form.Group>
                 </Col>
               </Row>
-
             </>
           )}
         </Modal.Body>
@@ -1281,16 +1857,122 @@ export const ModificacionEventos: React.FC = () => {
         </Modal.Footer>
       </Modal>
 
+      {/* ---- Add event modal ---- */}
+      <Modal
+        show={showModalAgregar}
+        onHide={handleCloseModalAgregar}
+        size="xl"
+        centered
+        style={{ zIndex: 1060 }}
+      >
+        <Modal.Header
+          closeButton
+          placeholder=""
+          onPointerEnterCapture={undefined}
+          onPointerLeaveCapture={undefined}
+        >
+          <Modal.Title>
+            Agregar evento — Gestion #{drawerGestion?.idGestion}
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <Row>
+            <Col md={3}>
+              <SingleSelect
+                label="Usuario"
+                options={usuarioOptionsEdicion}
+                selectedValue={formAgregar.usuario}
+                onChange={(v) => setFieldAgregar("usuario", v)}
+              />
+            </Col>
+            <Col md={3}>
+              <Form.Group>
+                <Form.Label>Cuenta</Form.Label>
+                <Form.Control type="text" value={formAgregar.cuenta} readOnly />
+              </Form.Group>
+            </Col>
+            <Col md={3}>
+              <Form.Group>
+                <Form.Label>Cliente</Form.Label>
+                <Form.Control
+                  type="text"
+                  value={formAgregar.cliente}
+                  readOnly
+                />
+              </Form.Group>
+            </Col>
+            <Col md={3}>
+              <SingleSelect
+                label="Tipo de evento"
+                options={tipoEventoOptions}
+                selectedValue={formAgregar.tipoEventoId}
+                onChange={handleChangeTipoEventoAgregar}
+              />
+            </Col>
+          </Row>
+          <Row className="mt-3">
+            <Col md={3}>
+              <Form.Group>
+                <Form.Label>Fecha evento</Form.Label>
+                <Form.Control
+                  type="date"
+                  value={formAgregar.fechaEvento}
+                  disabled={!requiereFechaAgregar}
+                  onChange={(e) =>
+                    setFieldAgregar("fechaEvento", e.target.value)
+                  }
+                />
+              </Form.Group>
+            </Col>
+            <Col md={3}>
+              <Form.Group>
+                <HoraSelectorEvento
+                  fecha={requiereHoraAgregar ? formAgregar.fechaEvento : ""}
+                  value={requiereHoraAgregar ? formAgregar.horaEvento || null : null}
+                  onChange={(hora) => setFieldAgregar("horaEvento", hora ?? "")}
+                  horas={horasDisponiblesAgregar}
+                  loading={loadingHoras}
+                />
+              </Form.Group>
+            </Col>
+            <Col md={3}>
+              <Form.Group>
+                <Form.Label>Monto</Form.Label>
+                <Form.Control
+                  type="number"
+                  value={formAgregar.monto}
+                  disabled={!requiereMontoAgregar}
+                  onChange={(e) => setFieldAgregar("monto", e.target.value)}
+                />
+              </Form.Group>
+            </Col>
+          </Row>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={handleCloseModalAgregar}>
+            Cancelar
+          </Button>
+          <Button
+            variant="success"
+            onClick={handleGuardarAgregar}
+            disabled={savingAgregar}
+          >
+            {savingAgregar ? "Guardando..." : "Agregar"}
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* ---- Client modal ---- */}
       <ModalTablaClientes
         show={showModalClientes}
-        onHide={handleCloseModalCliente}
+        onHide={() => setShowModalClientes(false)}
         searchTerm={searchClienteTerm}
         onSearchChange={setSearchClienteTerm}
         columns={columnsClientes}
         rows={tableRowsClientes}
         selectedRows={selectedRowsClientes}
         onSelectRow={handleSelectRowCliente}
-        onPaginationChange={handlePaginationChangeCliente}
+        onPaginationChange={(m) => setPaginationModelClientes(m)}
         paginationModel={paginationModelClientes}
         onRowClick={handleRowClickCliente}
       />

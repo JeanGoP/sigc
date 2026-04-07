@@ -37,6 +37,38 @@ export interface ActualizarModificacionEventoRequest {
   montoCompromiso?: number | null;
 }
 
+export interface CrearEventoGestionRequest {
+  idGestion: number;
+  idUsuarioAsignado: number;
+  idTipoEvento: number;
+  fechaHoraProgramada?: string;
+  montoCompromiso?: number | null;
+}
+
+export interface EliminarEventoGestionRequest {
+  idEvento: number;
+}
+
+export interface EliminarGestionRequest {
+  idGestion: number;
+}
+
+export interface ActualizarDescripcionGestionRequest {
+  idGestion: number;
+  descripcion: string;
+}
+
+export interface ListarGestionesModificacionRequest {
+  fechaInicio: string;
+  fechaFin: string;
+  userId?: number | null;
+  cuenta?: string | null;
+  cliente?: string | null;
+  filtro?: string | null;
+  page: number;
+  pageSize: number;
+}
+
 export function useEventosService() {
   const { loading, error, request } = useApi<any>("/api/v1", {
     timeout: 5000,
@@ -86,6 +118,61 @@ export function useEventosService() {
     [request]
   );
 
+  const crearEventoGestion = useCallback(
+    (data: CrearEventoGestionRequest) => {
+      return request({
+        url: "/modificacion-gestiones/agregar-evento",
+        method: "POST",
+        data,
+      });
+    },
+    [request]
+  );
+
+  const eliminarEventoGestion = useCallback(
+    (data: EliminarEventoGestionRequest) => {
+      return request({
+        url: "/modificacion-gestiones/eliminar-evento",
+        method: "POST",
+        data,
+      });
+    },
+    [request]
+  );
+
+  const eliminarGestion = useCallback(
+    (data: EliminarGestionRequest) => {
+      return request({
+        url: "/modificacion-gestiones/eliminar",
+        method: "POST",
+        data,
+      });
+    },
+    [request]
+  );
+
+  const actualizarDescripcionGestion = useCallback(
+    (data: ActualizarDescripcionGestionRequest) => {
+      return request({
+        url: "/modificacion-gestiones/actualizar-descripcion",
+        method: "POST",
+        data,
+      });
+    },
+    [request]
+  );
+
+  const listarGestionesModificacion = useCallback(
+    (data: ListarGestionesModificacionRequest) => {
+      return request({
+        url: "/modificacion-gestiones/listar",
+        method: "POST",
+        data,
+      });
+    },
+    [request]
+  );
+
   return {
     loading,
     error,
@@ -93,5 +180,10 @@ export function useEventosService() {
     obtenerEventos,
     listarModificacionEventos,
     actualizarModificacionEvento,
+    listarGestionesModificacion,
+    crearEventoGestion,
+    eliminarEventoGestion,
+    eliminarGestion,
+    actualizarDescripcionGestion,
   };
 }

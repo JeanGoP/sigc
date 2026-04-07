@@ -11,6 +11,9 @@ export interface ApiEventoDiario {
   color: string;
   tipo: string;
   cliente: string;
+  identificacionCliente?: string | null;
+  cuenta?: string | null;
+  factura?: string | null;
   fechaHoraProgramada: string;
   fechaCumplimiento: string;
   cumplido: boolean;
