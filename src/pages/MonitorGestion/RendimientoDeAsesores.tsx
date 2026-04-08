@@ -28,7 +28,11 @@ export const RendimientoDeAsesores: React.FC = () => {
     });
 
     if (res?.success) {
-      setData(res.data ?? []);
+      const dataWithDefaults = (res.data ?? []).map(item => ({
+        ...item,
+        whatsApp: item.whatsApp ?? 0
+      }));
+      setData(dataWithDefaults);
     }
   };
 
@@ -56,6 +60,7 @@ export const RendimientoDeAsesores: React.FC = () => {
       align: "right",
       format: (value) => "$ " + StringToMoney(value),
     },
+    { id: "whatsApp", label: "WhatsApp", align: "right" },
   ];
 
   return (

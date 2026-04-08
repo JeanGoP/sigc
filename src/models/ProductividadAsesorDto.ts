@@ -9,4 +9,5 @@ export interface ProductividadAsesorDto {
   numCompromisosdePago: number;
   acumuladoCompromisos: number;
   acumuladoCompromisosCumplidos: number;
+  whatsApp: number;
 }
