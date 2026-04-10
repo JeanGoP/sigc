@@ -222,6 +222,11 @@ const formatFechaHora = (value: string): string => {
   }
 };
 
+const normalizeGestionFilterValue = (value: string): string | null => {
+  const normalized = value.trim();
+  return normalized ? normalized : null;
+};
+
 const normalizeGestionesResponse = (rawData: any) => {
   const rows =
     (Array.isArray(rawData) && rawData) ||
@@ -576,6 +581,39 @@ export const ModificacionEventos: React.FC = () => {
     fetch();
   }, [filtrosConsulta, page, rowsPerPage, listarGestionesModificacion]);
 
+  useEffect(() => {
+    if (!filtrosConsulta) return undefined;
+
+    const nextFiltro = normalizeGestionFilterValue(busquedaGestion);
+    const currentFiltro = normalizeGestionFilterValue(filtrosConsulta.filtro ?? "");
+
+    if (nextFiltro === currentFiltro) {
+      return undefined;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setPage(0);
+      setDrawerGestion(null);
+      setFiltrosConsulta((prev) => {
+        if (!prev) return prev;
+
+        const prevFiltro = normalizeGestionFilterValue(prev.filtro ?? "");
+        if (prevFiltro === nextFiltro) {
+          return prev;
+        }
+
+        return {
+          ...prev,
+          filtro: nextFiltro,
+        };
+      });
+    }, 300);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [busquedaGestion, filtrosConsulta]);
+
   // ---------------------------------------------------------------------------
   // Memos
   // ---------------------------------------------------------------------------
@@ -663,12 +701,6 @@ export const ModificacionEventos: React.FC = () => {
   const requiereMontoAgregar =
     tipoEventoSeleccionadoAgregar?.requiereMonto ?? false;
 
-  const rowsFiltradas = useMemo(() => {
-    const term = busquedaGestion.trim();
-    if (!term) return rows;
-    return rows.filter((g) => String(g.idGestion).includes(term));
-  }, [rows, busquedaGestion]);
-
   // ---------------------------------------------------------------------------
   // Columns for client modal
   // ---------------------------------------------------------------------------
@@ -727,7 +759,7 @@ export const ModificacionEventos: React.FC = () => {
       userId: parseNumberValue(usuarioFiltro),
       cuenta: cuentaFiltro.trim() || null,
       cliente: clienteFiltro.trim() || null,
-      filtro: null,
+      filtro: normalizeGestionFilterValue(busquedaGestion),
     });
     setPage(0);
     setDrawerGestion(null);
@@ -1430,7 +1462,7 @@ export const ModificacionEventos: React.FC = () => {
             <div className="text-center py-5">
               <Spinner animation="border" />
             </div>
-          ) : rowsFiltradas.length === 0 ? (
+          ) : rows.length === 0 ? (
             <div className="text-center py-5 text-muted">
               {filtrosConsulta
                 ? "No se encontraron gestiones."
@@ -1450,7 +1482,7 @@ export const ModificacionEventos: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {rowsFiltradas.map((gestion) => (
+                {rows.map((gestion) => (
                   <tr
                     key={gestion.idGestion}
                     onClick={() => handleOpenDrawer(gestion)}

@@ -262,6 +262,43 @@ function areEquivalentPhoneValues(
   return false;
 }
 
+function buildCombinedApiErrorMessage(
+  response: { message?: string | null; errors?: string[] | null } | null | undefined,
+  fallbackMessage: string
+): string {
+  const parts: string[] = [];
+  const seen = new Set<string>();
+
+  const pushUnique = (value?: string | null) => {
+    const normalizedValue = String(value ?? "").trim();
+    if (!normalizedValue) {
+      return;
+    }
+
+    const normalizedKey = normalizedValue.toLowerCase();
+    if (seen.has(normalizedKey)) {
+      return;
+    }
+
+    seen.add(normalizedKey);
+    parts.push(normalizedValue);
+  };
+
+  pushUnique(response?.message);
+
+  if (Array.isArray(response?.errors)) {
+    response.errors.forEach((error) => {
+      pushUnique(error);
+    });
+  }
+
+  return parts.length > 0 ? parts.join("\n") : fallbackMessage;
+}
+
+function renderMultilineToastMessage(message: string): React.ReactNode {
+  return <span style={{ whiteSpace: "pre-line" }}>{message}</span>;
+}
+
 interface PendingOutboundAlternatePhoneCandidate {
   cliente: string;
   telefonoPrincipalNormalizado: string;
@@ -1721,8 +1758,12 @@ export const ConsultaCartera: React.FC = () => {
 
       if (responseGuardado?.statusCode === 409) {
         toast.warning(
-          responseGuardado.message ||
-            "La gestion ya fue cerrada por otro intento. Inicia una nueva gestion para continuar."
+          renderMultilineToastMessage(
+            buildCombinedApiErrorMessage(
+              responseGuardado,
+              "La gestion ya fue cerrada por otro intento. Inicia una nueva gestion para continuar."
+            )
+          )
         );
 
         const syncResult = await synchronizeGestionSessionAfterSave(
@@ -1744,11 +1785,22 @@ export const ConsultaCartera: React.FC = () => {
       }
 
       console.log("Response de guardar seguimiento: ", responseGuardado);
-      toast.error(responseGuardado?.message || "Error al guardar el seguimiento");
+      toast.error(
+        renderMultilineToastMessage(
+          buildCombinedApiErrorMessage(
+            responseGuardado,
+            "Error al guardar el seguimiento"
+          )
+        )
+      );
       return false;
     } catch (error) {
       console.error("Error al crear el seguimiento:", error);
-      toast.error("Error al guardar el seguimiento");
+      toast.error(
+        error instanceof Error && error.message
+          ? error.message
+          : "Error al guardar el seguimiento"
+      );
       return false;
     } finally {
       isSavingSeguimientoRef.current = false;

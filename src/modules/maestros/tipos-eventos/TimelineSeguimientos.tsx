@@ -39,6 +39,11 @@ import { SingleSelect } from "@app/components/singleSelect/singleSelect";
 import { toast } from "react-toastify";
 import SpeechToText from "@app/components/SpeechToText/SpeechToText";
 import BuscadorTipoContacto from "@app/components/BuscadorGeneral/BuscadorTipoContacto";
+import {
+  EventoCumplidoValue,
+  getEventoCumplidoLabel,
+  getEventoCumplidoState,
+} from "./utils/cumplido";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -56,7 +61,7 @@ export type Evento = {
   fecha?: string;
   hora?: string | null;
   valor?: number;
-  cumplido?: boolean;
+  cumplido?: EventoCumplidoValue;
   color?: string;
   icono?: string;
 };
@@ -716,6 +721,9 @@ export const TimelineSeguimientos: React.FC<TimelineSeguimientosProps> = ({
   };
 
   const renderTooltip = (evento: Evento, idx?: number) => {
+    const cumplidoLabel = getEventoCumplidoLabel(evento.cumplido);
+    const cumplidoState = getEventoCumplidoState(evento.cumplido);
+
     return (
       <Tooltip id={`tooltip-evento-${evento.tipo}-${idx}`}>
         <div style={{ padding: "8px" }}>
@@ -729,26 +737,27 @@ export const TimelineSeguimientos: React.FC<TimelineSeguimientosProps> = ({
           >
             {/* <b>{iconosEventos[evento.tipo]?.label || evento.tipo}</b> */}
             <b>{evento.tipo}</b>
-            {evento.cumplido !== undefined && (
+            {cumplidoLabel && (
               <span
                 style={{
-                  color: evento.cumplido ? "#388e3c" : "#d32f2f",
+                  color:
+                    cumplidoState === "done"
+                      ? "#388e3c"
+                      : cumplidoState === "pending"
+                        ? "#d32f2f"
+                        : "#495057",
                   display: "flex",
                   alignItems: "center",
                   gap: "4px",
                 }}
               >
-                {evento.cumplido ? (
-                  <>
-                    <FontAwesomeIcon icon={faCheck} />
-                    <span>Cumplido</span>
-                  </>
-                ) : (
-                  <>
-                    <FontAwesomeIcon icon={faTimes} />
-                    <span>Pendiente</span>
-                  </>
+                {cumplidoState === "done" && (
+                  <FontAwesomeIcon icon={faCheck} />
                 )}
+                {cumplidoState === "pending" && (
+                  <FontAwesomeIcon icon={faTimes} />
+                )}
+                <span>{cumplidoLabel}</span>
               </span>
             )}
           </div>
@@ -798,6 +807,7 @@ export const TimelineSeguimientos: React.FC<TimelineSeguimientosProps> = ({
                   fecha: getText("Fecha"),
                   hora: getText("Hora") || null,
                   valor: Number.isFinite(valorNum) ? valorNum : undefined,
+                  cumplido: getText("Cumplido") || undefined,
                 } as Evento;
               });
               if (parsedEventos.length > 0) {
@@ -1343,6 +1353,9 @@ export const TimelineSeguimientos: React.FC<TimelineSeguimientosProps> = ({
                   >
                     {seg.eventos &&
                       parseEventos(seg.eventos).map((evento, idx) => {
+                        const cumplidoState = getEventoCumplidoState(
+                          evento.cumplido
+                        );
                         // Si el evento tiene valor, mostrar el icono de compromiso de pago
                         const esCompromisoPago =
                           typeof evento.valor === "number" && evento.valor > 0;
@@ -1367,7 +1380,7 @@ export const TimelineSeguimientos: React.FC<TimelineSeguimientosProps> = ({
                                   color: evento.color,
                                   fontSize: 20,
                                   cursor: "pointer",
-                                  opacity: evento.cumplido ? 0.5 : 1,
+                                  opacity: cumplidoState === "done" ? 0.5 : 1,
                                   marginLeft: 4,
                                 }}
                               >

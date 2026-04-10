@@ -2,12 +2,16 @@ import React from "react";
 import { Modal, Button, ListGroup, Container, Row, Col } from "react-bootstrap";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faTimes, faCheck } from "@fortawesome/free-solid-svg-icons";
+import {
+  getEventoCumplidoLabel,
+  getEventoCumplidoState,
+} from "../utils/cumplido";
 
 interface Props {
   showModal: boolean;
   handleClose: () => void;
   seguimientoActivo: any;
-  parseEventos: (eventosRaw: string) => any[];
+  parseEventos: (eventosRaw: string | any[]) => any[];
   IconMap: any;
   StringToMoney: (val: number) => string;
 }
@@ -66,6 +70,12 @@ const ModalSeguimientoDetalle: React.FC<Props> = ({
                     {seguimientoActivo.eventos &&
                       parseEventos(seguimientoActivo.eventos).map(
                         (evento, idx) => {
+                          const cumplidoLabel = getEventoCumplidoLabel(
+                            evento.cumplido
+                          );
+                          const cumplidoState = getEventoCumplidoState(
+                            evento.cumplido
+                          );
                           const esCompromisoPago =
                             typeof evento.valor === "number" &&
                             evento.valor > 0;
@@ -82,22 +92,26 @@ const ModalSeguimientoDetalle: React.FC<Props> = ({
                                   {' ('+evento.tipo+ ') ' || 'asdasd'}
                                 </span>
 
-                                {evento.cumplido !== undefined && (
+                                {cumplidoLabel && (
                                   <span
                                     className="d-flex align-items-center gap-1 ms-3"
                                     style={{
-                                      color: evento.cumplido
-                                        ? "#388e3c"
-                                        : "#d32f2f",
+                                      color:
+                                        cumplidoState === "done"
+                                          ? "#388e3c"
+                                          : cumplidoState === "pending"
+                                            ? "#d32f2f"
+                                            : "#495057",
                                     }}
                                   >
-                                    <FontAwesomeIcon
-                                      icon={evento.cumplido ? faCheck : faTimes}
-                                    />
+                                    {cumplidoState === "done" && (
+                                      <FontAwesomeIcon icon={faCheck} />
+                                    )}
+                                    {cumplidoState === "pending" && (
+                                      <FontAwesomeIcon icon={faTimes} />
+                                    )}
                                     <span>
-                                      {evento.cumplido
-                                        ? "\n Cumplido"
-                                        : " Pendiente"}
+                                      {cumplidoLabel}
                                     </span>
                                   </span>
                                 )}
