@@ -1,12 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import type { CarteraRow } from "@app/Data/dashboardCarteraData";
-import { SingleSelect } from "@app/components/singleSelect/singleSelect";
 import type {
   DashboardKpiDelta,
   DashboardKpiPanel,
-  DashboardKpiMetric,
 } from "./domain/kpis";
 import { buildDashboardCarteraKpiPanels } from "./domain/kpis";
+import { toggleHiddenDashboardCartera } from "./domain/chartBuilders";
 
 function DeltaBadge({
   pct,
@@ -44,14 +43,14 @@ function DeltaBadge({
 
 function UnifiedMetricPanel({
   panels,
-  accountOptions,
-  selectedAccount,
-  onSelectedAccountChange,
+  rows,
+  ocultas,
+  onToggleCuenta,
 }: {
   panels: DashboardKpiPanel[];
-  accountOptions: Array<{ label: string; value: string | number }>;
-  selectedAccount: string;
-  onSelectedAccountChange: (value: string) => void;
+  rows: CarteraRow[];
+  ocultas: ReadonlySet<string>;
+  onToggleCuenta: (codicta: string) => void;
 }) {
   const metrics = panels.flatMap((panel) =>
     panel.metrics.map((metric) => ({
@@ -126,15 +125,35 @@ function UnifiedMetricPanel({
               Arrastra horizontalmente para ver mas KPIs
             </div>
           </div>
-          <div style={{ maxWidth: 220, minWidth: 170 }}>
-            <SingleSelect
-              options={accountOptions}
-              selectedValue={selectedAccount}
-              onChange={(value) => onSelectedAccountChange(String(value))}
-              compact
-            />
-          </div>
         </div>
+
+        <small className="text-muted d-block mb-2">Chips: oculta/muestra carteras</small>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginBottom: 10 }}>
+          {rows.map((row) => {
+            const hidden = ocultas.has(row.codicta);
+
+            return (
+              <button
+                key={row.codicta}
+                onClick={() => onToggleCuenta(row.codicta)}
+                style={{
+                  padding: "2px 9px",
+                  fontSize: 11,
+                  borderRadius: 12,
+                  border: "1px solid #ccc",
+                  background: hidden ? "#f5f5f5" : "#fff",
+                  color: hidden ? "#bbb" : "#444",
+                  cursor: "pointer",
+                  textDecoration: hidden ? "line-through" : "none",
+                  transition: "all 0.15s",
+                }}
+              >
+                {row.desccta}
+              </button>
+            );
+          })}
+        </div>
+
         <div
           className="kpi-drag-strip"
           style={{
@@ -201,46 +220,23 @@ function UnifiedMetricPanel({
 }
 
 export default function KpisSection({ data }: { data: CarteraRow[] }) {
-  const accountOptions = useMemo(
-    () =>
-      data.map((row) => ({
-        value: row.codicta,
-        label: `${row.codicta} - ${row.desccta}`,
-      })),
-    [data],
+  const [ocultas, setOcultas] = useState<Set<string>>(new Set());
+
+  const visibleData = useMemo(
+    () => data.filter((row) => !ocultas.has(row.codicta)),
+    [data, ocultas],
   );
 
-  const [selectedAccount, setSelectedAccount] = useState<string>("");
-
-  useEffect(() => {
-    if (accountOptions.length === 0) {
-      setSelectedAccount("");
-      return;
-    }
-
-    const stillExists = accountOptions.some(
-      (option) => String(option.value) === String(selectedAccount),
-    );
-    if (!stillExists) {
-      setSelectedAccount(String(accountOptions[0].value));
-    }
-  }, [accountOptions, selectedAccount]);
-
-  const selectedData = useMemo(() => {
-    if (!selectedAccount) {
-      return [];
-    }
-    return data.filter((row) => String(row.codicta) === String(selectedAccount));
-  }, [data, selectedAccount]);
-
-  const panels = buildDashboardCarteraKpiPanels(selectedData);
+  const panels = buildDashboardCarteraKpiPanels(visibleData);
 
   return (
     <UnifiedMetricPanel
       panels={panels}
-      accountOptions={accountOptions}
-      selectedAccount={selectedAccount}
-      onSelectedAccountChange={setSelectedAccount}
+      rows={data}
+      ocultas={ocultas}
+      onToggleCuenta={(codicta) =>
+        setOcultas((current) => toggleHiddenDashboardCartera(current, codicta))
+      }
     />
   );
 }
