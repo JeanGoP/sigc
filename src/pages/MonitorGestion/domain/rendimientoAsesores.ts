@@ -53,6 +53,7 @@ export function buildRendimientoAsesoresColumns(): TableColumn[] {
     { id: "totalGestiones", label: "Total Gestiones", align: "right" },
     { id: "clientesGestionados", label: "Clientes", align: "right" },
     { id: "contactoDirecto", label: "Contacto Directo", align: "right" },
+    { id: "whatsApp", label: "WhatsApp", align: "right" },
     { id: "contactoIndirecto", label: "Contacto Indirecto", align: "right" },
     { id: "noContacto", label: "No Contacto", align: "right" },
     { id: "numCompromisosdePago", label: "# Compromisos", align: "right" },
@@ -68,10 +69,14 @@ export function buildRendimientoAsesoresColumns(): TableColumn[] {
       align: "right",
       format: formatMoneyCell,
     },
-    { id: "whatsApp", label: "WhatsApp", align: "right" },
   ];
 }
 
 function formatMoneyCell(value: unknown): string {
-  return "$ " + StringToMoney(typeof value === "number" || typeof value === "string" ? value : 0);
+  return (
+    "$ " +
+    StringToMoney(
+      typeof value === "number" || typeof value === "string" ? value : 0,
+    )
+  );
 }
