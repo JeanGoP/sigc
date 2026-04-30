@@ -37,7 +37,6 @@ const IconPickerModal: React.FC<IconPickerModalProps> = ({
 
   const handleOpenModal = (val: boolean) => {
     setShow(val);
-    console.log("Selected Color:", selectedColor);
   };
 
   const filteredIcons = iconList.filter(

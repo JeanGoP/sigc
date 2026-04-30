@@ -6,6 +6,7 @@ import {
   subscribeTabOwnershipChanges,
   tryAcquireTabOwnership,
 } from "@app/services/GestionLlamadas";
+import { WEBRTC_OWNER_CHANNEL_KEY } from "@app/services/WebRtc/runtimeContracts";
 
 interface UseWebRtcTabOwnershipOptions {
   channelKey: string;
@@ -17,7 +18,8 @@ interface UseWebRtcTabOwnershipOptions {
 export function useWebRtcTabOwnership(
   options: UseWebRtcTabOwnershipOptions
 ): TabOwnershipSnapshot {
-  const channelKey = String(options.channelKey ?? "").trim() || "webrtc_owner_consulta_cartera";
+  const channelKey =
+    String(options.channelKey ?? "").trim() || WEBRTC_OWNER_CHANNEL_KEY;
   const enabled = Boolean(options.enabled ?? true);
   const ttlSeconds = Math.max(10, options.ttlSeconds ?? 45);
   const debug = Boolean(options.debug);
@@ -38,7 +40,6 @@ export function useWebRtcTabOwnership(
     setSnapshot(firstSnapshot);
 
     if (debug) {
-      console.log("[WebRtcTabOwnership] initial", firstSnapshot);
     }
 
     const heartbeat = window.setInterval(() => {
@@ -51,7 +52,6 @@ export function useWebRtcTabOwnership(
     const unsubscribe = subscribeTabOwnershipChanges(channelKey, (next) => {
       setSnapshot(next);
       if (debug) {
-        console.log("[WebRtcTabOwnership] changed", next);
       }
     });
 

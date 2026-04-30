@@ -17,7 +17,6 @@ export const RecibosCajaTable: React.FC<RecibosCajaTableProps> = ({ rows }) => {
 
   const handler = (row:ReciboCajaListModel) => {
     setSelectedRow(row); setOpenVerAsiento(true);
-    console.log('Row clicked:', selectedRow);
   }
 
   const columns: TableColumn[] = [

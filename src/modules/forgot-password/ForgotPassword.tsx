@@ -19,7 +19,6 @@ const ForgotPassword = () => {
     }),
     onSubmit: (values) => {
       toast.warn('Not yet functional');
-      console.log('values', values);
     },
   });
 

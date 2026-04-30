@@ -1,4 +1,4 @@
-﻿import React, { useState } from "react";
+import React, { useState } from "react";
 import { Card, Row, Col, Form } from "react-bootstrap";
 
 // Tus componentes
@@ -8,13 +8,19 @@ import BuscadorTiposEvento from "@app/components/BuscadorGeneral/BuscadorTiposEv
 import { CustomDatePicker } from "@app/components/DatePicker/DatePickerv2";
 import { SingleSelect } from "@app/components/singleSelect/singleSelect";
 
-// Helpers
-import {
-  saveFiltrosCarteras,
-  loadFiltrosCarteras,
-  clearFiltrosCarteras,
-} from "@app/utils/localStorageHandler";
 import { FiltrosFacturasCarteraModel } from "@app/models/otros/FiltrosFacturasCarteraModel";
+import {
+  clearConsultaCarteraFilters,
+  loadConsultaCarteraFilters,
+  saveConsultaCarteraFilters,
+} from "../../domain/filterStorage";
+import {
+  EDAD_MORA_OPTIONS,
+  normalizeEdadMora,
+  parseEdadMora,
+  serializeEdadMora,
+  SIN_GESTION_DIAS_OPTIONS,
+} from "../../domain/filterOptions";
 
 // Hook
 import { useUnsavedChanges } from "@app/hooks/useUnsavedChanges";
@@ -34,53 +40,13 @@ export type FiltrosCarterasRef = {
   tieneCambiosSinGuardar(): boolean;
 };
 
-const opciones: SelectOption[] = [
-  { label: "Por vencer", value: "PV" },
-  { label: "30", value: "30" },
-  { label: "60", value: "60" },
-  { label: "90", value: "90" },
-  { label: "+90", value: "+90" },
-];
-
-const SIN_GESTION_DIAS_OPTIONS = [
-  { value: 0, label: "⚪ Todos", color: null },
-  { value: 1, label: "🔵 Sin gestión", color: "#0a95b9" },
-  { value: 2, label: "🟢 Gestionado hoy", color: "#1d9540" },
-  { value: 3, label: "🟡 1 a 5 días", color: "#ffbf06" },
-  { value: 4, label: "🔴 Más de 5 días", color: "#e24744" },
-] as const;
-
-const normalizeEdadMora = (raw?: string | null): string => {
-  const trimmed = (raw ?? "").trim();
-  return trimmed.length > 0 ? trimmed : "todos";
-};
-
-const parseEdadMora = (raw?: string | null): SelectOption[] => {
-  const normalized = normalizeEdadMora(raw);
-  if (normalized === "todos") return [];
-  const values = normalized
-    .split(";")
-    .map((v) => v.trim())
-    .filter(Boolean);
-  return opciones.filter((opt) => values.includes(opt.value));
-};
-
-const serializeEdadMora = (items: SelectOption[]): string => {
-  if (!items || items.length === 0) return "todos";
-  return items.map((opt) => opt.value).join(";");
-};
-
 export const FiltrosCarteras: React.FC<FiltrosCarterasProps> = ({
   onApply,
 }: FiltrosCarterasProps) => {
   // ------------------------------------------------------
   // VALOR INICIAL DESDE LOCAL STORAGE
   // ------------------------------------------------------
-  const storedRaw =
-    loadFiltrosCarteras() as Partial<FiltrosFacturasCarteraModel> | null;
-  const initialFiltros = new FiltrosFacturasCarteraModel(
-    storedRaw ?? undefined,
-  );
+  const initialFiltros = loadConsultaCarteraFilters();
 
   initialFiltros.filtroEdadMora = normalizeEdadMora(
     initialFiltros.filtroEdadMora,
@@ -104,8 +70,7 @@ export const FiltrosCarteras: React.FC<FiltrosCarterasProps> = ({
   };
 
   const aplicarFiltros = () => {
-    console.log("Hay cambios?", hasChanges);
-    saveFiltrosCarteras(filtros);
+    saveConsultaCarteraFilters(filtros);
     markAsSaved(); // Marca como guardado
     // Llama al callback del padre para notificar que se aplicaron filtros
     onApply();
@@ -116,7 +81,7 @@ export const FiltrosCarteras: React.FC<FiltrosCarterasProps> = ({
     clean.filtroEdadMora = "todos";
     setFiltros(clean);
     setSelected([]);
-    clearFiltrosCarteras();
+    clearConsultaCarteraFilters();
   };
 
   const handleChangeSinGestionDias = (value: string | number) => {
@@ -125,12 +90,10 @@ export const FiltrosCarteras: React.FC<FiltrosCarterasProps> = ({
   };
 
   const handleChangeFiltroTipoEvento = (value: string | number | null) => {
-    console.log("Tipo Evento cambiado:", value);
     update("tipoEvento", value);
   };
 
   const handleChangeFiltroCuenta = (value: string | number | null) => {
-    console.log("Cuenta cambiada:", value);
     update("cuenta", value);
   };
 
@@ -210,7 +173,7 @@ export const FiltrosCarteras: React.FC<FiltrosCarterasProps> = ({
                   options={SIN_GESTION_DIAS_OPTIONS}
                   selectedValue={filtros.sinGestionDias}
                   onChange={handleChangeSinGestionDias}
-                  label="Días sin gestión"
+                  label="D�as sin gesti�n"
                 />
               </Col>
 
@@ -242,7 +205,7 @@ export const FiltrosCarteras: React.FC<FiltrosCarterasProps> = ({
             </Row>
             <Form.Label>Edad de mora</Form.Label>
             <MultiSelectSimple
-              options={opciones}
+              options={EDAD_MORA_OPTIONS}
               value={selected}
               onChange={(items) => {
                 const nextSelected = [...items];

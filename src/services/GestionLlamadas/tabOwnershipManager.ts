@@ -1,4 +1,10 @@
 import { TabOwnershipSnapshot } from "./contracts";
+import {
+  DEFAULT_WEBRTC_TAB_OWNERSHIP_TTL_SECONDS,
+  WEBRTC_OWNER_BROADCAST_PREFIX,
+  WEBRTC_OWNER_LOCK_STORAGE_PREFIX,
+  WEBRTC_TAB_ID_STORAGE_KEY,
+} from "./storageKeys";
 
 interface StoredOwnershipLock {
   ownerTabId: string;
@@ -10,11 +16,6 @@ interface StoredOwnershipLock {
 interface TabOwnershipOptions {
   ttlSeconds?: number;
 }
-
-const TAB_ID_STORAGE_KEY = "sigc.webrtc.tab.id.v1";
-const LOCK_STORAGE_PREFIX = "sigc.webrtc.owner.lock.v1";
-const OWNERSHIP_BROADCAST_PREFIX = "sigc.webrtc.owner.broadcast.v1";
-const DEFAULT_TTL_SECONDS = 45;
 
 interface OwnershipBroadcastMessage {
   type: "ownership_changed";
@@ -79,11 +80,11 @@ function createTabId(): string {
 }
 
 function lockStorageKey(channelKey: string): string {
-  return `${LOCK_STORAGE_PREFIX}:${normalizeValue(channelKey) || "default"}`;
+  return `${WEBRTC_OWNER_LOCK_STORAGE_PREFIX}:${normalizeValue(channelKey) || "default"}`;
 }
 
 function ownershipBroadcastChannel(channelKey: string): string {
-  return `${OWNERSHIP_BROADCAST_PREFIX}:${normalizeValue(channelKey) || "default"}`;
+  return `${WEBRTC_OWNER_BROADCAST_PREFIX}:${normalizeValue(channelKey) || "default"}`;
 }
 
 function publishOwnershipChanged(channelKey: string): void {
@@ -164,13 +165,13 @@ function toSnapshot(channelKey: string, tabId: string, lock: StoredOwnershipLock
 }
 
 export function getCurrentTabId(): string {
-  const existing = safeSessionStorageGet(TAB_ID_STORAGE_KEY);
+  const existing = safeSessionStorageGet(WEBRTC_TAB_ID_STORAGE_KEY);
   if (existing) {
     return existing;
   }
 
   const created = createTabId();
-  safeSessionStorageSet(TAB_ID_STORAGE_KEY, created);
+  safeSessionStorageSet(WEBRTC_TAB_ID_STORAGE_KEY, created);
   return created;
 }
 
@@ -184,7 +185,10 @@ export function getTabOwnershipSnapshot(channelKey: string): TabOwnershipSnapsho
 export function tryAcquireTabOwnership(channelKey: string, options: TabOwnershipOptions = {}): TabOwnershipSnapshot {
   const normalizedChannel = normalizeValue(channelKey) || "default";
   const tabId = getCurrentTabId();
-  const ttlSeconds = Math.max(10, options.ttlSeconds ?? DEFAULT_TTL_SECONDS);
+  const ttlSeconds = Math.max(
+    10,
+    options.ttlSeconds ?? DEFAULT_WEBRTC_TAB_OWNERSHIP_TTL_SECONDS
+  );
   const nowMs = Date.now();
   const lock = readLock(normalizedChannel);
 
@@ -205,7 +209,10 @@ export function tryAcquireTabOwnership(channelKey: string, options: TabOwnership
 export function renewTabOwnership(channelKey: string, options: TabOwnershipOptions = {}): TabOwnershipSnapshot {
   const normalizedChannel = normalizeValue(channelKey) || "default";
   const tabId = getCurrentTabId();
-  const ttlSeconds = Math.max(10, options.ttlSeconds ?? DEFAULT_TTL_SECONDS);
+  const ttlSeconds = Math.max(
+    10,
+    options.ttlSeconds ?? DEFAULT_WEBRTC_TAB_OWNERSHIP_TTL_SECONDS
+  );
   const nowMs = Date.now();
   const lock = readLock(normalizedChannel);
 

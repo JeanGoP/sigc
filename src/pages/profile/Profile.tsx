@@ -23,6 +23,8 @@ const Profile = () => {
   const [activeTab, setActiveTab] = useState('ACTIVITY');
   const [t] = useTranslation();
   const currentUser = useAppSelector((state) => state.auth.currentUser);
+  const displayName =
+    currentUser?.fullName || currentUser?.username || currentUser?.email || '';
 
   const toggle = (tab: string) => {
     if (activeTab !== tab) setActiveTab(tab);
@@ -42,13 +44,13 @@ const Profile = () => {
                       width={100}
                       height={100}
                       rounded
-                      src={currentUser?.photoURL}
+                      src="/img/default-profile.png"
                       fallbackSrc="/img/default-profile.png"
                       alt="User profile"
                     />
                   </div>
                   <h3 className="profile-username text-center">
-                    {currentUser?.displayName}
+                    {displayName}
                   </h3>
                   <p className="text-muted text-center">Software Engineer</p>
                   <ul className="list-group list-group-unbordered mb-3">

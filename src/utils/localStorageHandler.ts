@@ -2,7 +2,6 @@ export const saveObjectToLocalStorage = (key: string, value: any): void => {
     try {
       const serializedValue = JSON.stringify(value);
       localStorage.setItem(key, serializedValue);
-      console.log(`Objeto guardado con la clave "${key}"`);
     } catch (error) {
       console.error('Error al guardar en localStorage:', error);
     }
@@ -17,7 +16,6 @@ export const saveFiltrosCarteras = (data: any) => {
 
 export const loadFiltrosCarteras = () => {
   const raw = sessionStorage.getItem(STORAGE_KEY);
-  console.log("Cargando filtros desde sessionStorage:", raw);
   return raw ? JSON.parse(raw) : null;
 };
 

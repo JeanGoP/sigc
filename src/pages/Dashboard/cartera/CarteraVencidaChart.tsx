@@ -3,18 +3,24 @@ import { Bar } from "react-chartjs-2";
 import { type Plugin } from "chart.js";
 import type { CarteraRow } from "@app/Data/dashboardCarteraData";
 import { useMaximize } from "./MaximizeContext";
+import { toggleHiddenDashboardCartera } from "./domain/chartBuilders";
+import { buildCarteraVencidaChartData } from "./domain/remainingChartBuilders";
 
-// Plugin inline para dibujar la línea de umbral
 const umbralPlugin: Plugin<"bar"> = {
   id: "umbralLine",
-  afterDraw(chart, _, opts) {
-    const { ctx, chartArea: { top, bottom }, scales: { x } } = chart;
-    const xPos = x.getPixelForValue(opts.value);
+  afterDraw(chart, _args, options: any) {
+    const {
+      ctx,
+      chartArea: { top, bottom },
+      scales: { x },
+    } = chart;
+    const xPos = x.getPixelForValue(options.value);
+
     ctx.save();
     ctx.beginPath();
     ctx.moveTo(xPos, top);
     ctx.lineTo(xPos, bottom);
-    ctx.strokeStyle = opts.color ?? "#BA4A00";
+    ctx.strokeStyle = options.color ?? "#BA4A00";
     ctx.lineWidth = 2;
     ctx.setLineDash([6, 4]);
     ctx.stroke();
@@ -24,39 +30,18 @@ const umbralPlugin: Plugin<"bar"> = {
 
 export default function CarteraVencidaChart({ data }: { data: CarteraRow[] }) {
   const maximized = useMaximize();
-  const [ocultas, setOcultas]   = useState<Set<string>>(new Set());
-  const [umbral, setUmbral]     = useState(15);
+  const [ocultas, setOcultas] = useState<Set<string>>(new Set());
+  const [umbral, setUmbral] = useState(15);
   const [inputVal, setInputVal] = useState("15");
+  const chartModel = buildCarteraVencidaChartData(data, ocultas, umbral);
 
-  const toggleCartera = (codicta: string) =>
-    setOcultas((prev) => {
-      const next = new Set(prev);
-      next.has(codicta) ? next.delete(codicta) : next.add(codicta);
-      return next;
-    });
+  const handleUmbralChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setInputVal(event.target.value);
+    const value = parseFloat(event.target.value);
 
-  const handleUmbralChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setInputVal(e.target.value);
-    const n = parseFloat(e.target.value);
-    if (!isNaN(n) && n >= 0 && n <= 100) setUmbral(n);
-  };
-
-  const sorted = [...data]
-    .filter((r) => !ocultas.has(r.codicta))
-    .sort((a, b) => b.carteraVencidaPorc - a.carteraVencidaPorc);
-
-  const chartData = {
-    labels: sorted.map((r) => r.desccta),
-    datasets: [{
-      label: "% Cartera vencida",
-      data: sorted.map((r) => r.carteraVencidaPorc),
-      backgroundColor: sorted.map((r) =>
-        r.carteraVencidaPorc >= 50     ? "#BA4A00" :
-        r.carteraVencidaPorc >= umbral ? "#CA6F1E" :
-        r.carteraVencidaPorc >= 8      ? "#D68910" : "#28B463"
-      ),
-      borderRadius: 3,
-    }],
+    if (!Number.isNaN(value) && value >= 0 && value <= 100) {
+      setUmbral(value);
+    }
   };
 
   const options = {
@@ -67,7 +52,7 @@ export default function CarteraVencidaChart({ data }: { data: CarteraRow[] }) {
       legend: { display: false },
       tooltip: {
         callbacks: {
-          label: (ctx: any) => ` ${(ctx.raw as number).toFixed(2)}%`,
+          label: (context: any) => ` ${(context.raw as number).toFixed(2)}%`,
         },
       },
       umbralLine: { value: umbral, color: "#BA4A00" },
@@ -76,7 +61,7 @@ export default function CarteraVencidaChart({ data }: { data: CarteraRow[] }) {
       x: {
         beginAtZero: true,
         max: 100,
-        ticks: { callback: (v: any) => `${v}%` },
+        ticks: { callback: (value: any) => `${value}%` },
       },
       y: { ticks: { font: { size: 11 } } },
     },
@@ -85,14 +70,18 @@ export default function CarteraVencidaChart({ data }: { data: CarteraRow[] }) {
   return (
     <div className="card">
       <div className="card-body">
-
-        {/* Header */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            marginBottom: 8,
+          }}
+        >
           <h6 className="card-title text-muted mb-0">% Cartera vencida por cartera</h6>
 
-          {/* Input umbral */}
           <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
-            <span style={{ color: "#aaa" }}>Umbral crítico:</span>
+            <span style={{ color: "#aaa" }}>Umbral critico:</span>
             <input
               type="number"
               min={0}
@@ -114,14 +103,18 @@ export default function CarteraVencidaChart({ data }: { data: CarteraRow[] }) {
 
         <small className="text-muted d-block mb-2">Chips: oculta/muestra carteras</small>
 
-        {/* Chips */}
         <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginBottom: 12 }}>
-          {data.map((r) => {
-            const hidden = ocultas.has(r.codicta);
+          {chartModel.chipRows.map((row) => {
+            const hidden = ocultas.has(row.codicta);
+
             return (
               <button
-                key={r.codicta}
-                onClick={() => toggleCartera(r.codicta)}
+                key={row.codicta}
+                onClick={() =>
+                  setOcultas((current) =>
+                    toggleHiddenDashboardCartera(current, row.codicta),
+                  )
+                }
                 style={{
                   padding: "2px 9px",
                   fontSize: 11,
@@ -134,16 +127,28 @@ export default function CarteraVencidaChart({ data }: { data: CarteraRow[] }) {
                   transition: "all 0.15s",
                 }}
               >
-                {r.desccta}
+                {row.desccta}
               </button>
             );
           })}
         </div>
 
-        <div style={{ height: maximized ? "calc(100vh - 320px)" : sorted.length * 28 + 40 }}>
-          <Bar data={chartData} options={options} plugins={[umbralPlugin]} />
+        <div
+          style={{
+            height: maximized
+              ? "calc(100vh - 320px)"
+              : chartModel.rowCount * 28 + 40,
+          }}
+        >
+          <Bar
+            data={{
+              labels: chartModel.labels,
+              datasets: chartModel.datasets,
+            }}
+            options={options}
+            plugins={[umbralPlugin]}
+          />
         </div>
-
       </div>
     </div>
   );

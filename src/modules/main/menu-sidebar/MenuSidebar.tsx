@@ -17,11 +17,21 @@ export interface IMenuItem {
 export const mapSecurityMenuToMenuItems = (
   menuTree: SecurityMenuItem[]
 ): IMenuItem[] => {
-  const hiddenMenuKeys = new Set(["llamadas_webrtc"]);
+  const hiddenMenuKeys = new Set([
+    "llamadas_webrtc",
+    "monitor_seguimientos",
+    "campanas",
+  ]);
+  const hiddenMenuPaths = new Set(["/monitor_seguimientos", "/campanas"]);
 
   const mapNode = (node: SecurityMenuItem): IMenuItem | null => {
     const normalizedMenuKey = String(node.menuKey ?? "").trim().toLowerCase();
-    if (hiddenMenuKeys.has(normalizedMenuKey)) {
+    const normalizedMenuPath = String(node.menuPath ?? "").trim().toLowerCase();
+
+    if (
+      hiddenMenuKeys.has(normalizedMenuKey) ||
+      hiddenMenuPaths.has(normalizedMenuPath)
+    ) {
       return null;
     }
 

@@ -2,6 +2,14 @@ import { useCallback } from "react";
 import { useApi } from "@app/hooks/useApi";
 import { ApiResponse } from "@app/models/apiResponse";
 import { User } from "@app/models/auth/User.model";
+import {
+  AUTH_STORAGE_KEY,
+  AuthUserLike,
+  buildUserFromSessionData,
+  buildUserFromTokenPayload,
+  buildUserFromUserAccess,
+  parseStoredUserAccess,
+} from "@app/services/Auth/authStorage";
 
 export type TokenPayload = {
   creado: string;
@@ -43,17 +51,7 @@ export const useSessionService = () => {
   });
 
   const validateToken = useCallback(
-    async (currentUser?: {
-      id: string;
-      username: string;
-      fullName: string;
-      email: string;
-      role: string;
-      token: string;
-      tenantId?: string;
-      mustChangePassword?: boolean;
-      telephonyEnabled?: boolean;
-    }): Promise<{
+    async (currentUser?: AuthUserLike): Promise<{
       valid: boolean;
       api: ApiResponse<ValidateTokenData> | null;
       user: User | null;
@@ -71,70 +69,24 @@ export const useSessionService = () => {
 
       const tk = res.data && "token" in res.data ? res.data.token : undefined;
       if (tk) {
-        finalUser = new User(
-          tk.userId.toString(),
-          tk.username,
-          "",
-          tk.fullName || "",
-          tk.email,
-          tk.role,
-          tk.token,
-          tk.tenantId || "",
-          Boolean(tk.mustChangePassword),
-          Boolean(tk.telephonyEnabled)
-        );
+        finalUser = buildUserFromTokenPayload(tk);
 
         return { valid: true, api: res, user: finalUser };
       }
 
       if (res.data && "userId" in res.data && "username" in res.data && res.data.userId && res.data.username) {
-        finalUser = new User(
-          String(res.data.userId),
-          String(res.data.username),
-          "",
-          String(res.data.fullName || currentUser?.fullName || ""),
-          String(res.data.email || currentUser?.email || res.data.username),
-          String(res.data.role || currentUser?.role || ""),
-          currentUser?.token,
-          String(res.data.tenantId || currentUser?.tenantId || ""),
-          Boolean(res.data.mustChangePassword),
-          Boolean(res.data.telephonyEnabled ?? currentUser?.telephonyEnabled)
-        );
+        finalUser = buildUserFromSessionData(res.data, currentUser);
 
         return { valid: true, api: res, user: finalUser };
       }
 
       if (currentUser) {
-        finalUser = new User(
-          currentUser.id,
-          currentUser.username,
-          "",
-          currentUser.fullName || "",
-          currentUser.email,
-          currentUser.role,
-          currentUser.token,
-          currentUser.tenantId || "",
-          Boolean(currentUser.mustChangePassword),
-          Boolean(currentUser.telephonyEnabled)
-        );
+        finalUser = buildUserFromUserAccess(currentUser);
       } else {
         try {
-          const raw = localStorage.getItem("userAccess");
-          if (raw) {
-            const u = JSON.parse(raw);
-            finalUser = new User(
-              u.id,
-              u.username,
-              "",
-              u.fullName || "",
-              u.email || u.username,
-              u.role,
-              u.token,
-              u.tenantId || "",
-              Boolean(u.mustChangePassword),
-              Boolean(u.telephonyEnabled)
-            );
-          }
+          finalUser = buildUserFromUserAccess(
+            parseStoredUserAccess(localStorage.getItem(AUTH_STORAGE_KEY))
+          );
         } catch {
           // ignore
         }

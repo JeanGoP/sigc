@@ -1,4 +1,5 @@
 // src/services/tiposContactoService.ts
+import { useCallback } from "react";
 import { useApi } from "@app/hooks/useApi";
 
 export type TipoContactoPayload = {
@@ -16,13 +17,16 @@ export function useGuardarTipoContacto() {
     retryDelay: 3000,
   });
 
-  const guardarTipoContacto = (payload: TipoContactoPayload) => {
-    return request({
-      url: "/Guardar",
-      method: "POST",
-      data: payload,
-    });
-  };
+  const guardarTipoContacto = useCallback(
+    (payload: TipoContactoPayload) => {
+      return request({
+        url: "/Guardar",
+        method: "POST",
+        data: payload,
+      });
+    },
+    [request],
+  );
 
   return { loading, error, guardarTipoContacto };
 }

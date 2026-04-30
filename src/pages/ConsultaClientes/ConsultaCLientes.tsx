@@ -1,149 +1,47 @@
-import { useState, useEffect, useRef } from "react";
+import { useMemo } from "react";
 import { ContentHeader } from "@components";
 import BuscadoClientes from "./components/BuscadoClientes";
 import ModalTablaClientes from "./components/ModalTablaClientes";
-import { Checkbox } from "@mui/material";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faCircleCheck } from "@fortawesome/free-solid-svg-icons";
-import { GridColDef, GridPaginationModel, GridRowParams } from "@mui/x-data-grid";
 import { CustomDatePicker } from "@app/components/DatePicker/DatePickerv2";
 import { NumericField } from "@app/components/InputFields/NumericField";
-import { ClienteEstadoCuenta, FetchFacturasRef } from "./components/EstadoClienteCompleto";
-import { useClientesService } from "@app/services/GestionCartera/ConsultaClientes/clientesService";
-import { useNavigate } from "react-router-dom";
-import { buildConsultaCarteraUrl } from "@app/utils/consultaCarteraNavigation";
+import { ClienteEstadoCuenta } from "./components/EstadoClienteCompleto";
+import { buildConsultaClientesColumns } from "./domain/columns";
+import { useConsultaClientesPage } from "./hooks/useConsultaClientesPage";
 
 const ConsultaClientes = () => {
-  const [selectedValue, setSelectedValue] = useState("");
-  const [showModal, setShowModal] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [TableRowsClientes, setTableRowsClientes] = useState<any[]>([]);
-  const [fechaConsultaFacturas, setFechaConsultaFacturas] = useState(new Date().toISOString().split("T")[0]);
-  const [selectedRows, setSelectedRows] = useState<string[]>([]);
-  const [intMora, setIntMora] = useState<string>("3.00");
-  const tablaFacturasRef = useRef<FetchFacturasRef>(null);
-  const [facturaSeleccionada, setFacturaSeleccionada] = useState<{
-    cuenta: string;
-    factura: string;
-    identificacionCliente: string;
-  } | null>(null);
-  const [paginationModel, setPaginationModel] = useState<GridPaginationModel>({
-    page: 0,
-    pageSize: 20,
-  });
-  const navigate = useNavigate();
+  const {
+    facturaSeleccionada,
+    fechaConsultaFacturas,
+    intMora,
+    paginationModel,
+    searchTerm,
+    selectedRows,
+    selectedValue,
+    seguimientoTitle,
+    showModal,
+    tablaFacturasRef,
+    tableRowsClientes,
+    handleBuscarFacturas,
+    handleClearSelection,
+    handleCloseModal,
+    handleIrConsultaCartera,
+    handleOpenModal,
+    handlePaginationChange,
+    handleRowClick,
+    handleSelectFactura,
+    handleSelectRow,
+    setFechaConsultaFacturas,
+    setIntMora,
+    setSearchTerm,
+  } = useConsultaClientesPage();
 
-  const { loading, error, listarClientes } = useClientesService();
-
-  const handleSelectRow = (id: string) => {
-    setSelectedRows((prev) =>
-      prev.includes(id) ? prev.filter((rowId) => rowId !== id) : [...prev, id]
-    );
-  };
-
-  const handleRowClick = (params: GridRowParams) => {
-    setSelectedValue(params.row.id.toString());
-    setShowModal(false);
-    setSelectedRows([]);
-  };
-
-  const handleClearSelection = () => {
-    setSelectedValue("");
-    setFacturaSeleccionada(null);
-  };
-  const handleOpenModal = () => {
-    setSearchTerm("");
-    setShowModal(true);
-    searchClientes();
-  };
-  const handleCloseModal = () => setShowModal(false);
-
-  const handlePaginationChange = (model: GridPaginationModel) => {
-    setPaginationModel(model);
-  };
-
-  const manejarClick = () => {
-    setFacturaSeleccionada(null);
-    tablaFacturasRef.current?.fetchFacturas({ force: true });
-  };
-
-  const handleSelectFactura = (row: any) => {
-    const cuenta = row?.CUENTA ?? row?.cuenta ?? "";
-    const factura = row?.NUMEFAC ?? row?.factura ?? "";
-    const identificacionCliente =
-      row?.cliente ?? row?.identificacionCliente ?? selectedValue ?? "";
-
-    if (!cuenta || !factura || !identificacionCliente) {
-      setFacturaSeleccionada(null);
-      return;
-    }
-
-    setFacturaSeleccionada({
-      cuenta: String(cuenta),
-      factura: String(factura),
-      identificacionCliente: String(identificacionCliente),
-    });
-  };
-
-  const handleIrConsultaCartera = () => {
-    if (!facturaSeleccionada) return;
-    const url = buildConsultaCarteraUrl(facturaSeleccionada);
-    navigate(url);
-  };
-
-  const searchClientes = async (filter = "") => {
-    const params = {
-      page: paginationModel.page + 1,
-      numpage: paginationModel.pageSize,
-      filter,
-      intmora: intMora,
-    };
-    if (params.filter.length > 2) {
-      const res: any = await listarClientes(params);
-      if (res?.success) {
-        setTableRowsClientes(res.data || []);
-      } else {
-        setTableRowsClientes([]);
-      }
-    }
-  };
-
-  useEffect(() => {
-    searchClientes(searchTerm);
-  }, [paginationModel.page, paginationModel.pageSize]);
-
-  useEffect(() => {
-    setFacturaSeleccionada(null);
-  }, [selectedValue]);
-
-  useEffect(() => {
-    const timeout = setTimeout(() => {
-      searchClientes(searchTerm);
-    }, 400);
-    return () => clearTimeout(timeout);
-  }, [searchTerm]);
-
-  const columns: GridColDef[] = [
-    {
-      field: "select",
-      headerName: "",
-      width: 40,
-      minWidth: 20,
-      sortable: false,
-      filterable: false,
-      renderCell: (params) => (
-        <Checkbox
-          checked={params.row.selected || false}
-          onChange={() => handleSelectRow(params.row.id)}
-          icon={<FontAwesomeIcon icon={faCircleCheck} style={{ color: "#63E6BE" }} />}
-        />
-      ),
-    },
-    { field: "id", headerName: "Identificación", width: 150 },
-    { field: "nombre", headerName: "Nombre", flex: 1, maxWidth: 550 },
-    { field: "telefono", headerName: "Teléfono", width: 150 },
-    { field: "codIcta", headerName: "Código ICTA", width: 150 },
-  ];
+  const columns = useMemo(
+    () =>
+      buildConsultaClientesColumns({
+        onSelectRow: handleSelectRow,
+      }),
+    [handleSelectRow]
+  );
 
   return (
     <div>
@@ -175,7 +73,7 @@ const ConsultaClientes = () => {
                 </div>
                 <div className="col-md-2 mt-2">
                   <br />
-                  <button type="button" className="btn btn-primary" onClick={manejarClick}>
+                  <button type="button" className="btn btn-primary" onClick={handleBuscarFacturas}>
                     Buscar
                   </button>
                   <button
@@ -183,12 +81,8 @@ const ConsultaClientes = () => {
                     className="btn btn-outline-primary ms-2"
                     onClick={handleIrConsultaCartera}
                     disabled={!facturaSeleccionada}
-                    style={{marginLeft:"15px"}}
-                    title={
-                      facturaSeleccionada
-                        ? "Ir a consulta de cartera"
-                        : "Seleccione una factura con el ícono del ojo"
-                    }
+                    style={{ marginLeft: "15px" }}
+                    title={seguimientoTitle}
                   >
                     Seguimiento
                   </button>
@@ -211,7 +105,7 @@ const ConsultaClientes = () => {
                 searchTerm={searchTerm}
                 onSearchChange={setSearchTerm}
                 columns={columns}
-                rows={TableRowsClientes}
+                rows={tableRowsClientes}
                 selectedRows={selectedRows}
                 onSelectRow={handleSelectRow}
                 onPaginationChange={handlePaginationChange}

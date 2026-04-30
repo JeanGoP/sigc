@@ -41,7 +41,6 @@ export const TablaFacturas = (props: Props) => {
     const response: any = await FetchEstadoCuentaClienteFactura(request);
 
     // Log para validar la forma real del payload
-    console.log("GetEstadoCuenta response =>", response);
 
     // Normalizar payload: aceptar array plano o ApiResponse con data
     let dataArray: any[] = [];

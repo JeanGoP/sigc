@@ -8,6 +8,7 @@ interface ColorPickerModalProps {
 }
 
 // Importa tu variable original
+const modalHeaderCloseButtonProps = { closeButton: true } as any;
 
 const ColorPickerModal: React.FC<ColorPickerModalProps> = ({
   value,
@@ -25,7 +26,6 @@ const ColorPickerModal: React.FC<ColorPickerModalProps> = ({
   } | null>(null);
 
   const handleSelectColor = (hex: string) => {
-    console.log("ColorPicker - Color seleccionado:", hex);
     onChange(hex);
     setShow(false);
     setFilter("");
@@ -84,7 +84,7 @@ const ColorPickerModal: React.FC<ColorPickerModalProps> = ({
       </Button>
 
       <Modal show={show} onHide={() => setShow(false)} size="xl" centered>
-        <Modal.Header closeButton>
+        <Modal.Header {...modalHeaderCloseButtonProps}>
           <Modal.Title>Seleccionar color</Modal.Title>
         </Modal.Header>
         <Modal.Body>

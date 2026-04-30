@@ -38,8 +38,6 @@ const Login = () => {
       setAuthLoading(true);
 
       const user = await loginWithEmail(username, password);
-      console.log("usuario logeado:", user);
-      console.log(user);
       dispatch(setCurrentUser(user));
       if (user != null) toast.success("Login is succeed!");
 
@@ -76,7 +74,6 @@ const Login = () => {
   //   }
   // };
 
-  console.log(listadoEmpresas);
 
   const loginByFacebook = async () => {
     try {

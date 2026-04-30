@@ -1,4 +1,5 @@
 // src/services/tiposContactoService.ts
+import { useCallback } from "react";
 import { useApi } from "@app/hooks/useApi";
 
 export function useEliminarTipoContacto() {
@@ -8,12 +9,15 @@ export function useEliminarTipoContacto() {
     retryDelay: 3000,
   });
 
-  const eliminarTipoContacto = (id: number) => {
-    return request({
-      url: `/id?id=${id}`,
-      method: "DELETE",
-    });
-  };
+  const eliminarTipoContacto = useCallback(
+    (id: number) => {
+      return request({
+        url: `/id?id=${id}`,
+        method: "DELETE",
+      });
+    },
+    [request],
+  );
 
   return { loading, error, eliminarTipoContacto };
 }

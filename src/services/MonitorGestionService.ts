@@ -1,4 +1,5 @@
 import { handleApiResponse } from '@app/utils/handleApiResponse';
+import type { ApiResponse } from '@app/models/apiResponse';
 
 
 const API_URL = import.meta.env.VITE_API_URL;
@@ -27,16 +28,12 @@ export interface Evento {
   fechaCumplimiento: string | null;
 }
 
-export interface MonitorGestionResponse {
-  success: boolean;
-  message: string;
-  data: {
-    gestiones: Gestion[];
-    eventos: Evento[];
-  };
-  statusCode: number;
-  errors: string[];
+export interface MonitorGestionData {
+  gestiones: Gestion[];
+  eventos: Evento[];
 }
+
+export type MonitorGestionResponse = ApiResponse<MonitorGestionData>;
 
 export const obtenerGestionesEventos = async (pageNumber: number, pageSize: number): Promise<MonitorGestionResponse> => {
   try {
@@ -47,9 +44,9 @@ export const obtenerGestionesEventos = async (pageNumber: number, pageSize: numb
       }
     });
 
-    return await handleApiResponse<MonitorGestionResponse>(response);
+    return await handleApiResponse<MonitorGestionData>(response);
   } catch (error) {
     console.error('Error al obtener gestiones y eventos:', error);
     throw error;
   }
-}; 
+};

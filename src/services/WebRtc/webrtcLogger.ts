@@ -117,7 +117,6 @@ function logGrouped(
   const logFn = level === "error" ? console.error : level === "warn" ? console.warn : console.log;
 
   groupStart(title);
-  console.log("timestamp", toIsoNow());
   logFn(safePayload);
   console.groupEnd();
 }

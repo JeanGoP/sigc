@@ -1,8 +1,8 @@
 import { ReactNode } from "react";
 import { Navigate } from "react-router-dom";
-import { Loading } from "@app/components/Loading";
-import { useAppSelector } from "@app/store/store";
-import { can } from "@app/utils/security";
+import { Loading } from "../components/Loading";
+import { useAppSelector } from "../store/store";
+import { can } from "../utils/security";
 
 interface PermissionRouteProps {
   permission: string;

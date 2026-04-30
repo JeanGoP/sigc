@@ -1,3 +1,8 @@
+import {
+  WEBRTC_PENDING_INBOUND_LOCAL_EVENT_NAME,
+  WEBRTC_PENDING_INBOUND_STORAGE_KEY,
+} from "./storageKeys";
+
 export interface PendingInboundCallSnapshot {
   callSid: string;
   direction: string | null;
@@ -26,8 +31,6 @@ interface UpsertPendingInboundCallInput {
 
 type PendingInboundListener = (calls: PendingInboundCallSnapshot[]) => void;
 
-const STORAGE_KEY = "sigc.gestion.inbound.pending.v1";
-const LOCAL_EVENT_NAME = "sigc.gestion.inbound.pending.changed";
 const MAX_ITEMS = 20;
 const MAX_AGE_MS = 48 * 60 * 60 * 1000;
 
@@ -57,7 +60,9 @@ function notifyChanged(): void {
     return;
   }
 
-  window.dispatchEvent(new CustomEvent(LOCAL_EVENT_NAME));
+  window.dispatchEvent(
+    new CustomEvent(WEBRTC_PENDING_INBOUND_LOCAL_EVENT_NAME)
+  );
 }
 
 function normalizeCall(value: unknown): PendingInboundCallSnapshot | null {
@@ -84,7 +89,7 @@ function normalizeCall(value: unknown): PendingInboundCallSnapshot | null {
 }
 
 function readState(): StoredPendingInboundState {
-  const raw = safeGet(STORAGE_KEY);
+  const raw = safeGet(WEBRTC_PENDING_INBOUND_STORAGE_KEY);
   if (!raw) {
     return {
       calls: [],
@@ -139,7 +144,7 @@ function cleanupCalls(calls: PendingInboundCallSnapshot[]): PendingInboundCallSn
 
 function writeState(state: StoredPendingInboundState): void {
   const sanitized = cleanupCalls(state.calls);
-  safeSet(STORAGE_KEY, JSON.stringify({
+  safeSet(WEBRTC_PENDING_INBOUND_STORAGE_KEY, JSON.stringify({
     calls: sanitized,
     updatedAt: new Date().toISOString(),
   }));
@@ -232,7 +237,7 @@ export function subscribePendingInboundCalls(listener: PendingInboundListener): 
   };
 
   const onStorage = (event: StorageEvent) => {
-    if (event.key !== STORAGE_KEY) {
+    if (event.key !== WEBRTC_PENDING_INBOUND_STORAGE_KEY) {
       return;
     }
 
@@ -245,10 +250,16 @@ export function subscribePendingInboundCalls(listener: PendingInboundListener): 
 
   listener(getPendingInboundCalls());
   window.addEventListener("storage", onStorage);
-  window.addEventListener(LOCAL_EVENT_NAME, onLocalChange as EventListener);
+  window.addEventListener(
+    WEBRTC_PENDING_INBOUND_LOCAL_EVENT_NAME,
+    onLocalChange as EventListener
+  );
 
   return () => {
     window.removeEventListener("storage", onStorage);
-    window.removeEventListener(LOCAL_EVENT_NAME, onLocalChange as EventListener);
+    window.removeEventListener(
+      WEBRTC_PENDING_INBOUND_LOCAL_EVENT_NAME,
+      onLocalChange as EventListener
+    );
   };
 }

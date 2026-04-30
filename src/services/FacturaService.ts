@@ -35,9 +35,8 @@ export const obtenerFacturas = async (idCliente: string): Promise<ApiResponse<Fa
     return {
       success: false,
       message: 'Error al obtener las facturas',
-      data: null,
       statusCode: 500,
       errors: [error.message || 'Error desconocido']
     };
   }
-}; 
+};

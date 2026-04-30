@@ -16,11 +16,9 @@ export async function handleApiResponse<T>(response: Response): Promise<ApiRespo
         toast.error(data.message || 'Ocurrió un error inesperado');
       }
 
-      console.log('Error en la respuesta del servidor:', data);
       return {
         success: false,
         message: data.message,
-        data: [],
         statusCode: data.statusCode,
         errors: data.errors || [],
       };
@@ -32,7 +30,6 @@ export async function handleApiResponse<T>(response: Response): Promise<ApiRespo
     return {
       success: false,
       message: 'Error inesperado al interpretar la respuesta',
-      data: [],
       statusCode: 500,
       errors: ['Respuesta malformada del servidor'],
     };

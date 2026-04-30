@@ -9,8 +9,11 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "format": "prettier-eslint $PWD/'src/**/*.{js,json}' --write",
-    "lint": "eslint src/**/*.js",
+    "typecheck": "tsc --noEmit",
+    "test": "react-scripts test --watchAll=false",
+    "test:ci": "react-scripts test --watchAll=false --runInBand",
+    "format": "prettier-eslint $PWD/'src/**/*.{ts,tsx,js,json}' --write",
+    "lint": "eslint \"src/**/*.{ts,tsx}\"",
     "firebase:start": "firebase emulators:start",
     "release:patch": "standard-version --release-as patch",
     "release:minor": "standard-version --release-as minor",
@@ -110,7 +113,7 @@
     "typescript": "5.4.5"
   },
   "lint-staged": {
-    "**/*.js": [
+    "src/**/*.{ts,tsx,js}": [
       "eslint --fix",
       "prettier-eslint --write"
     ]

@@ -76,7 +76,6 @@ export const loginWithEmailx = async (
     });
 
     const data: LoginResponse = await response.json();
-    console.log("Login exitoso:", data);
 
     if (data.success) {
       localStorage.setItem(

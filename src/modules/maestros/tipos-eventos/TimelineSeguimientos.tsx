@@ -1,18 +1,7 @@
 import React from "react";
-import { Button, Modal, Form, Row, Col } from "react-bootstrap";
+import { Button } from "react-bootstrap";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import {
-  faPhone,
-  faHandHoldingUsd,
-  faExclamationTriangle,
-  faHome,
-  faBuilding,
-  faMicrophone,
-  faCheck,
-  faTimes,
-  faWarning,
-} from "@fortawesome/free-solid-svg-icons";
-import OverlayTrigger from "react-bootstrap/OverlayTrigger";
+import { faCheck, faTimes } from "@fortawesome/free-solid-svg-icons";
 import Tooltip from "react-bootstrap/Tooltip";
 // import {
 //   obtenerTiposEvento,
@@ -23,131 +12,53 @@ import {
   useListarTiposEvento,
   TipoEvento,
 } from "@app/services/ConsultaCartera/TipoEventoService";
-import { useValidarEvento } from "@app/services/ConsultaCartera/ValidarEventoNuevoService";
 import {
   useHorasDispDia,
   HoraDispItem,
 } from "@app/services/ConsultaCartera/HorasDispDiaService";
-import { HoraSelectorEvento } from "./components/HoraSelectorEvento";
 
-import { convertirEventoAXml } from "@app/pages/ConsultaCartera/functions/convertEventoToXML";
 import { IconMap } from "@app/services/IconMap";
-import { RenderTooltip } from "./components/RenderTooltip";
 import { StringToMoney } from "@app/utils/formattersFunctions";
-import ModalSeguimientoDetalle from "./components/VerMasComponent";
-import { SingleSelect } from "@app/components/singleSelect/singleSelect";
-import { toast } from "react-toastify";
-import SpeechToText from "@app/components/SpeechToText/SpeechToText";
-import BuscadorTipoContacto from "@app/components/BuscadorGeneral/BuscadorTipoContacto";
 import {
-  EventoCumplidoValue,
+  aplicarReseteosPorRequerimientosEvento,
+  estaHoraOcupada,
+} from "@app/utils/eventosCompartidos";
+import ModalSeguimientoDetalle from "./components/VerMasComponent";
+import { NuevoSeguimientoModal } from "./components/NuevoSeguimientoModal";
+import { SeguimientosTimelineList } from "./components/SeguimientosTimelineList";
+import { toast } from "react-toastify";
+import {
   getEventoCumplidoLabel,
   getEventoCumplidoState,
 } from "./utils/cumplido";
+import type {
+  Evento,
+  Seguimiento,
+  SeguimientoDraftState,
+  SeguimientoEventoContext,
+} from "./domain/types";
+import {
+  buildDefaultFormEvento,
+  buildDraftFormEvento,
+  createEmptyEvento,
+  ensureEventosHaveIds,
+  hasMeaningfulSeguimientoDraftContent,
+  parseEventos,
+} from "./domain/helpers";
+import {
+  clearSeguimientoDraft,
+  readSeguimientoDraft,
+  writeSeguimientoDraft,
+} from "./domain/draftStorage";
+import { useEventoProgramadoValidation } from "./hooks/useEventoProgramadoValidation";
+import {
+  buildEventoForValidation,
+  buildGuardarSeguimientoBlockedMessage,
+  EVENTO_VALIDATION_IN_PROGRESS_MESSAGE,
+  type EventoValidationResult,
+} from "./domain/validation";
 
-const API_URL = import.meta.env.VITE_API_URL;
-
-interface EventoXML {
-  id: number;
-  tipo: string;
-  fecha: string;
-  hora: string | null;
-  valor?: number;
-}
-
-export type Evento = {
-  id: number;
-  tipo: string;
-  fecha?: string;
-  hora?: string | null;
-  valor?: number;
-  cumplido?: EventoCumplidoValue;
-  color?: string;
-  icono?: string;
-};
-
-export type Seguimiento = {
-  id: number;
-  usuario: string;
-  fecha: string;
-  hora: string;
-  texto: string;
-  detalle: string;
-  eventos: Evento[];
-  tipoContacto?: string | number;
-  grabacion: string | null;
-};
-
-type SeguimientoDraftState = {
-  texto: string;
-  eventos: Evento[];
-  tipoContacto: string | number;
-  formEvento: Evento;
-  editIndex: number | null;
-  updatedAt: string;
-};
-
-function readSeguimientoDraft(key?: string): SeguimientoDraftState | null {
-  const storageKey = String(key ?? "").trim();
-  if (!storageKey) {
-    return null;
-  }
-
-  try {
-    const raw = window.localStorage.getItem(storageKey);
-    if (!raw) {
-      return null;
-    }
-
-    const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== "object") {
-      return null;
-    }
-
-    return {
-      texto: String(parsed.texto ?? ""),
-      eventos: Array.isArray(parsed.eventos) ? parsed.eventos : [],
-      tipoContacto: parsed.tipoContacto ?? 0,
-      formEvento: parsed.formEvento && typeof parsed.formEvento === "object"
-        ? parsed.formEvento
-        : { id: 0, tipo: "", fecha: "", hora: null, valor: undefined },
-      editIndex:
-        typeof parsed.editIndex === "number" && Number.isInteger(parsed.editIndex)
-          ? parsed.editIndex
-          : null,
-      updatedAt: String(parsed.updatedAt ?? ""),
-    };
-  } catch (error) {
-    console.error("Error leyendo borrador de seguimiento:", error);
-    return null;
-  }
-}
-
-function writeSeguimientoDraft(key: string, draft: SeguimientoDraftState): void {
-  const storageKey = String(key ?? "").trim();
-  if (!storageKey) {
-    return;
-  }
-
-  try {
-    window.localStorage.setItem(storageKey, JSON.stringify(draft));
-  } catch (error) {
-    console.error("Error guardando borrador de seguimiento:", error);
-  }
-}
-
-function clearSeguimientoDraft(key?: string): void {
-  const storageKey = String(key ?? "").trim();
-  if (!storageKey) {
-    return;
-  }
-
-  try {
-    window.localStorage.removeItem(storageKey);
-  } catch (error) {
-    console.error("Error eliminando borrador de seguimiento:", error);
-  }
-}
+export type { Evento, Seguimiento } from "./domain/types";
 
 interface TimelineSeguimientosProps {
   seguimientos: Seguimiento[];
@@ -160,12 +71,7 @@ interface TimelineSeguimientosProps {
   ocultarBotonNuevo?: boolean;
   disableGuardarSeguimiento?: boolean;
   disableGuardarSeguimientoReason?: string;
-  contextoEvento?: {
-    idUsuario?: string | number;
-    cliente?: string;
-    factura?: string;
-    cuenta?: string;
-  };
+  contextoEvento?: SeguimientoEventoContext;
   draftStorageKey?: string;
 }
 
@@ -182,7 +88,6 @@ export const TimelineSeguimientos: React.FC<TimelineSeguimientosProps> = ({
   draftStorageKey,
 }) => {
   const [showModal, setShowModal] = React.useState(false);
-  const [showAudio, setShowAudio] = React.useState(false);
   const [seguimientoActivo, setSeguimientoActivo] =
     React.useState<Seguimiento | null>(null);
   const [nuevoAbiertoInterno, setNuevoAbiertoInterno] = React.useState(false);
@@ -194,29 +99,27 @@ export const TimelineSeguimientos: React.FC<TimelineSeguimientosProps> = ({
     string | number
   >(0);
 
-  const { loading: loadingEventos, listarTiposEvento } = useListarTiposEvento();
-  const { validarEvento, loading } = useValidarEvento();
+  const { listarTiposEvento } = useListarTiposEvento();
+  const {
+    loadingEvento,
+    isValidatingEvent,
+    isValidatingEventRef,
+    validateEventoProgramado,
+  } = useEventoProgramadoValidation();
   const { obtenerHoras, loading: loadingHoras } = useHorasDispDia();
   const [horasDisponibles, setHorasDisponibles] = React.useState<HoraDispItem[]>([]);
   const horasFechaRef = React.useRef<string>("");
+  const listarTiposEventoRef = React.useRef(listarTiposEvento);
 
-  const emptyFormEvento: Evento = {
-    id: 0,
-    tipo: "",
-    fecha: "",
-    hora: null,
-    valor: undefined,
-  };
+  const emptyFormEvento: Evento = createEmptyEvento();
   const [formEvento, setFormEvento] = React.useState<Evento>(emptyFormEvento);
   const [editIndex, setEditIndex] = React.useState<number | null>(null);
   const [errorValidacion, setErrorValidacion] = React.useState<string | null>(
     null
   );
-  const [isValidatingEvent, setIsValidatingEvent] = React.useState(false);
-  const isValidatingEventRef = React.useRef(false);
   const initializedDraftKeyRef = React.useRef<string | null>(null);
   const internalSaveBlockedReason = isValidatingEvent
-    ? "Se esta validando el evento. Espera a que finalice antes de guardar."
+    ? EVENTO_VALIDATION_IN_PROGRESS_MESSAGE
     : "";
   const isGuardarSeguimientoDisabled =
     disableGuardarSeguimiento || isValidatingEvent;
@@ -237,17 +140,11 @@ export const TimelineSeguimientos: React.FC<TimelineSeguimientosProps> = ({
     },
     [nuevoAbiertoControlado, onNuevoAbiertoChange]
   );
-  const getDefaultFormEvento = (preferNombre?: string): Evento => {
-    const preferred =
-      (preferNombre
-        ? tiposEvento.find((t) => t.nombre === preferNombre)
-        : undefined) ?? tiposEvento[0];
-    return {
-      ...emptyFormEvento,
-      tipo: preferred?.nombre ?? "",
-      id: preferred?.id ?? 0,
-    };
-  };
+  const getDefaultFormEvento = React.useCallback(
+    (preferNombre?: string): Evento =>
+      buildDefaultFormEvento(tiposEvento, preferNombre),
+    [tiposEvento]
+  );
 
   const resetDraftState = React.useCallback(() => {
     setNuevoTexto("");
@@ -257,7 +154,7 @@ export const TimelineSeguimientos: React.FC<TimelineSeguimientosProps> = ({
     setEditIndex(null);
     setErrorValidacion(null);
     setFormEvento(getDefaultFormEvento());
-  }, [tiposEvento]);
+  }, [getDefaultFormEvento]);
 
   const applyDraftState = React.useCallback(
     (draft: SeguimientoDraftState | null) => {
@@ -266,13 +163,7 @@ export const TimelineSeguimientos: React.FC<TimelineSeguimientosProps> = ({
         return;
       }
 
-      const draftFormEvento =
-        draft.formEvento && typeof draft.formEvento === "object"
-          ? {
-              ...getDefaultFormEvento(String(draft.formEvento.tipo ?? "").trim() || undefined),
-              ...draft.formEvento,
-            }
-          : getDefaultFormEvento();
+      const draftFormEvento = buildDraftFormEvento(draft, tiposEvento);
 
       setNuevoTexto(String(draft.texto ?? ""));
       setNuevoEventos(Array.isArray(draft.eventos) ? draft.eventos : []);
@@ -290,62 +181,49 @@ export const TimelineSeguimientos: React.FC<TimelineSeguimientosProps> = ({
   );
 
   const hasMeaningfulDraftContent = React.useCallback((): boolean => {
-    const defaultTipo = String(getDefaultFormEvento().tipo ?? "").trim();
-    const currentTipo = String(formEvento.tipo ?? "").trim();
-
-    return Boolean(
-      nuevoTexto.trim()
-      || nuevoEventos.length > 0
-      || Number(nuevoTipoContacto || 0) > 0
-      || editIndex !== null
-      || String(formEvento.fecha ?? "").trim()
-      || String(formEvento.hora ?? "").trim()
-      || typeof formEvento.valor === "number"
-      || (currentTipo && currentTipo !== defaultTipo)
-    );
+    return hasMeaningfulSeguimientoDraftContent({
+      defaultEvento: getDefaultFormEvento(),
+      editIndex,
+      eventos: nuevoEventos,
+      formEvento,
+      texto: nuevoTexto,
+      tipoContacto: nuevoTipoContacto,
+    });
   }, [
     editIndex,
-    formEvento.fecha,
-    formEvento.hora,
-    formEvento.tipo,
-    formEvento.valor,
+    formEvento,
+    getDefaultFormEvento,
     nuevoEventos,
     nuevoTexto,
     nuevoTipoContacto,
-    tiposEvento,
   ]);
 
-  const buildEventoKey = (evento: Evento): string => {
-    const tipoKey = evento.id
-      ? String(evento.id)
-      : (evento.tipo || "").trim().toLowerCase();
-    const fechaKey = (evento.fecha || "").trim();
-    const horaKey = evento.hora ? String(evento.hora).trim() : "";
-    const valorKey = typeof evento.valor === "number" ? String(evento.valor) : "";
-    return `${tipoKey}|${fechaKey}|${horaKey}|${valorKey}`;
-  };
-
-  const isDuplicateEvento = (evento: Evento, excludeIndex?: number): boolean => {
-    const key = buildEventoKey(evento);
-    return nuevoEventos.some((evt, idx) => {
-      if (excludeIndex !== undefined && idx === excludeIndex) return false;
-      return buildEventoKey(evt) === key;
-    });
-  };
+  React.useEffect(() => {
+    listarTiposEventoRef.current = listarTiposEvento;
+  }, [listarTiposEvento]);
 
   React.useEffect(() => {
+    let isMounted = true;
+
     const cargarTipos = async () => {
       try {
-        const resEventos = await listarTiposEvento();
-        if (resEventos?.success && resEventos.data) {
+        const resEventos = await listarTiposEventoRef.current();
+        if (isMounted && resEventos?.success && resEventos.data) {
           setTiposEvento(resEventos.data);
         }
       } catch (error) {
-        console.error("Error cargando tipos:", error);
+        if (isMounted) {
+          console.error("Error cargando tipos:", error);
+        }
       }
     };
-    cargarTipos();
-  }, [listarTiposEvento]);
+
+    void cargarTipos();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   React.useEffect(() => {
     if (tiposEvento.length === 0) {
@@ -419,151 +297,95 @@ export const TimelineSeguimientos: React.FC<TimelineSeguimientosProps> = ({
       setHorasDisponibles(horasData);
       // Si la hora/minuto actual está ocupada en la nueva fecha, la blanqueamos
       setFormEvento((prev) => {
-        if (!prev.hora) return prev;
-        const [h, m] = prev.hora.split(":").map(Number);
-        const minItem = horasData.find((x) => x.hora === h && x.minuto === m);
-        if (minItem?.ocupado) return { ...prev, hora: null };
+        if (!estaHoraOcupada(prev.hora, horasData)) return prev;
+        if (prev.hora) return { ...prev, hora: null };
         return prev;
       });
     });
   }, [formEvento.fecha, formEvento.tipo, tiposEvento, contextoEvento?.idUsuario, obtenerHoras]);
 
-  function setFormCampo<K extends keyof Evento>(campo: K, valor: Evento[K]) {
-    setFormEvento((prev) => ({ ...prev, [campo]: valor }));
-  }
+  const handleFormCampoChange = React.useCallback(
+    (campo: keyof Evento, valor: Evento[keyof Evento]) => {
+      setFormEvento((prev) => ({ ...prev, [campo]: valor }));
+    },
+    []
+  );
 
-  // async function validarEventoBackend(
-  //   e: Evento
-  // ): Promise<{ ok: boolean; message?: string }> {
-  //   const url = `${API_URL}/api/v1/validar-evento`;
-  //   const tipoObj = tiposEvento.find(
-  //     (t) => t.nombre === e.tipo || t.id === e.id
-  //   );
-  //   // normalizar fecha a YYYY/MM/DD
-  //   const fechaApi = e.fecha; //? e.fecha.replace(/-/g, "/") : "";
-  //   const payload = {
-  //     tipo: tipoObj?.id ?? e.id ?? 0,
-  //     fecha: fechaApi || null,
-  //     hora: e.hora ?? null,
-  //     monto: typeof e.valor === "number" ? e.valor : 0,
-  //     idUsuario: contextoEvento?.idUsuario ?? null,
-  //     cliente: contextoEvento?.cliente ?? null,
-  //     factura: contextoEvento?.factura ?? null,
-  //     cuenta: contextoEvento?.cuenta ?? null,
-  //   };
-
-  //   try {
-  //     const resp = await fetch(url, {
-  //       method: "POST",
-  //       headers: { "Content-Type": "application/json" },
-  //       body: JSON.stringify(payload),
-  //     });
-  //     const json = await resp.json();
-  //     if (json?.success) return { ok: true };
-  //     toast.error(json.message || "Error, valide los campos.");
-  //     return { ok: false, message: json?.message || "Validación fallida." };
-  //   } catch (err: any) {
-  //     toast.error(err?.message || "Error, valide los campos.");
-  //     return { ok: false, message: err?.message || "Error de red al validar." };
-  //   }
-  // }
+  const handleTipoEventoChange = React.useCallback(
+    (value: string | number) => {
+      const selectedTipo = tiposEvento.find((tipo) => tipo.nombre === value);
+      setFormEvento((prev) =>
+        aplicarReseteosPorRequerimientosEvento({
+          state: {
+            ...prev,
+            tipo: value as string,
+            id: selectedTipo ? selectedTipo.id : prev.id,
+          },
+          requerimientos: selectedTipo,
+          fechaKey: "fecha",
+          fechaVacia: "",
+          horaKey: "hora",
+          horaVacia: null,
+          montoKey: "valor",
+          montoVacio: undefined,
+        })
+      );
+      setErrorValidacion(null);
+    },
+    [tiposEvento]
+  );
 
   const handleVerMas = (seguimiento: Seguimiento) => {
     setSeguimientoActivo(seguimiento);
     setShowModal(true);
-    setShowAudio(false);
   };
 
   const handleAudio = (seguimiento: Seguimiento) => {
     setSeguimientoActivo(seguimiento);
-    setShowAudio(true);
     setShowModal(false);
   };
 
   const handleClose = () => {
     setShowModal(false);
-    setShowAudio(false);
     setSeguimientoActivo(null);
   };
 
-  const handleNuevoEventoChange = (
-    idx: number,
-    key: keyof Evento,
-    value: any
-  ) => {
-    setNuevoEventos((evts) =>
-      evts.map((evt, i) => (i === idx ? { ...evt, [key]: value } : evt))
-    );
-  };
+  const handleEventoValidationResult = React.useCallback(
+    (result: EventoValidationResult) => {
+      if (result.ok || !result.message) {
+        return;
+      }
 
-  // const handleAgregarEvento = () => {
-  //   if (tiposEvento.length > 0) {
-  //     setNuevoEventos((evts) => [
-  //       ...evts,
-  //       {
-  //         id: tiposEvento[0].id,
-  //         tipo: tiposEvento[0].nombre,
-  //         hora: null,
-  //         fecha: "",
-  //         valor: undefined,
-  //       },
-  //     ]);
-  //   }
-  // };
+      setErrorValidacion(result.message);
+
+      if (result.toastType === "warn") {
+        toast.warn(result.toastMessage || result.message);
+        return;
+      }
+
+      if (result.toastType === "error") {
+        toast.error(result.toastMessage || result.message);
+      }
+    },
+    []
+  );
 
   const handleAgregarEventoValidado = async () => {
     if (isValidatingEventRef.current) return;
-    isValidatingEventRef.current = true;
-    setIsValidatingEvent(true);
     setErrorValidacion(null);
-    const eventoEnviar = { ...formEvento };
 
-    // Si aún no se seleccionó tipo, usamos el primero (como hacías antes)
-    if (!eventoEnviar.tipo && tiposEvento.length > 0) {
-      eventoEnviar.id = tiposEvento[0].id;
-      eventoEnviar.tipo = tiposEvento[0].nombre;
-    }
-    console.log("Evento a validar:", contextoEvento);
+    const eventoEnviar = buildEventoForValidation(formEvento, tiposEvento);
+    const validationResult = await validateEventoProgramado({
+      evento: eventoEnviar,
+      eventos: nuevoEventos,
+      contextoEvento,
+    });
 
-    try {
-      const duplicateMessage = "Este evento ya fue agregado.";
-      if (isDuplicateEvento(eventoEnviar)) {
-        setErrorValidacion(duplicateMessage);
-        toast.warn(duplicateMessage);
-        return;
-      }
-
-      const resp = await validarEvento({
-        tipo: eventoEnviar.id,
-        fecha: eventoEnviar.fecha || null,
-        hora: eventoEnviar.hora ?? null,
-        monto: typeof eventoEnviar.valor === "number" ? eventoEnviar.valor : 0,
-        idUsuario: contextoEvento?.idUsuario ?? null,
-        cliente: contextoEvento?.cliente ?? null,
-        factura: contextoEvento?.factura ?? null,
-        cuenta: contextoEvento?.cuenta ?? null,
-      });
-
-      if (!resp || !resp.success) {
-        setErrorValidacion(resp?.message || "No se pudo validar el evento.");
-        toast.error(resp?.message || "Error, valide los campos.");
-        return;
-      }
-    } catch (err: any) {
-      setErrorValidacion(err?.message || "Error al validar.");
-      toast.error(err?.message || "Error al validar.");
+    if (!validationResult.ok) {
+      handleEventoValidationResult(validationResult);
       return;
-    } finally {
-      isValidatingEventRef.current = false;
-      setIsValidatingEvent(false);
     }
 
-    // if (!ok) {
-    //   setErrorValidacion(message || "No se pudo validar el evento.");
-    //   return;
-    // }
-
-    // Validado: agregamos
     setNuevoEventos((evts) => [...evts, eventoEnviar]);
     setFormEvento(getDefaultFormEvento(eventoEnviar.tipo));
   };
@@ -571,50 +393,20 @@ export const TimelineSeguimientos: React.FC<TimelineSeguimientosProps> = ({
   const handleActualizarEventoValidado = async () => {
     if (editIndex === null) return;
     if (isValidatingEventRef.current) return;
-    isValidatingEventRef.current = true;
-    setIsValidatingEvent(true);
     setErrorValidacion(null);
 
-    const eventoEnviar = { ...formEvento };
+    const eventoEnviar = buildEventoForValidation(formEvento, tiposEvento);
+    const validationResult = await validateEventoProgramado({
+      evento: eventoEnviar,
+      eventos: nuevoEventos,
+      contextoEvento,
+      excludeIndex: editIndex,
+    });
 
-    try {
-      const duplicateMessage = "Este evento ya fue agregado.";
-      if (isDuplicateEvento(eventoEnviar, editIndex)) {
-        setErrorValidacion(duplicateMessage);
-        toast.warn(duplicateMessage);
-        return;
-      }
-
-      const resp = await validarEvento({
-        tipo: eventoEnviar.id,
-        fecha: eventoEnviar.fecha || null,
-        hora: eventoEnviar.hora ?? null,
-        monto: typeof eventoEnviar.valor === "number" ? eventoEnviar.valor : 0,
-        idUsuario: contextoEvento?.idUsuario ?? null,
-        cliente: contextoEvento?.cliente ?? null,
-        factura: contextoEvento?.factura ?? null,
-        cuenta: contextoEvento?.cuenta ?? null,
-      });
-
-      if (!resp || !resp.success) {
-        setErrorValidacion(resp?.message || "No se pudo validar el evento.");
-        toast.error(resp?.message || "Error, valide los campos.");
-        return;
-      }
-    } catch (err: any) {
-      setErrorValidacion(err?.message || "Error al validar.");
-      toast.error(err?.message || "Error al validar.");
+    if (!validationResult.ok) {
+      handleEventoValidationResult(validationResult);
       return;
-    } finally {
-      isValidatingEventRef.current = false;
-      setIsValidatingEvent(false);
     }
-
-
-    // if (!ok) {
-    //   setErrorValidacion(message || "No se pudo validar el evento.");
-    //   return;
-    // }
 
     setNuevoEventos((evts) =>
       evts.map((evt, i) => (i === editIndex ? eventoEnviar : evt))
@@ -640,63 +432,19 @@ export const TimelineSeguimientos: React.FC<TimelineSeguimientosProps> = ({
     setNuevoEventos((evts) => evts.filter((_, i) => i !== idx));
   };
 
-  // Función para convertir hora 12h a 24h
-  function convertirHoraA24(hora12: string): string | null {
-    const horaLimpia = hora12.trim().toLowerCase().replace(/\s+/g, " ");
-    const match = horaLimpia.match(
-      /^(\d{1,2}):(\d{2})\s*(a\.?\s?m\.?|p\.?\s?m\.?)$/i
-    );
-    if (!match) return null;
-    let horas = parseInt(match[1], 10);
-    const minutos = match[2];
-    const periodo = match[3];
-    if (periodo.startsWith("p") && horas !== 12) {
-      horas += 12;
-    }
-    if (periodo.startsWith("a") && horas === 12) {
-      horas = 0;
-    }
-    return `${horas.toString().padStart(2, "0")}:${minutos}`;
-  }
-
   const handleGuardarNuevo = async () => {
-    if (isValidatingEventRef.current || isValidatingEvent) {
-      toast.warning(
-        "Se esta validando el evento. Espera a que finalice antes de guardar."
-      );
-      return;
-    }
-
-    if (disableGuardarSeguimiento) {
-      toast.warning(
-        disableGuardarSeguimientoReason ||
-          "No se puede guardar seguimiento en este momento."
-      );
-      return;
-    }
-
-    // Asegurar que todos los eventos tengan el id correcto
-    const eventosConId = nuevoEventos.map((evt) => {
-      if (!evt.id) {
-        const tipo = tiposEvento.find((t) => t.nombre === evt.tipo);
-        return { ...evt, id: tipo ? tipo.id : 0 };
-      }
-      return evt;
+    const guardarBlockedMessage = buildGuardarSeguimientoBlockedMessage({
+      isValidatingEvent: isValidatingEventRef.current || isValidatingEvent,
+      disableGuardarSeguimiento,
+      disableGuardarSeguimientoReason,
     });
 
-    // Convertir los eventos a XML
-    const eventosXml = eventosConId
-      .map((evt) => {
-        const eventoXML: EventoXML = {
-          id: evt.id,
-          tipo: evt.tipo,
-          fecha: evt.fecha || "",
-          hora: evt.hora ? convertirHoraA24(evt.hora) ?? evt.hora : null,
-          valor: evt.valor ? Number(evt.valor) : undefined,
-        };
-        return convertirEventoAXml(eventoXML);
-      })
-      .join("\n");
+    if (guardarBlockedMessage) {
+      toast.warning(guardarBlockedMessage);
+      return;
+    }
+
+    const eventosConId = ensureEventosHaveIds(nuevoEventos, tiposEvento);
 
     const grabacionUrl = nuevoGrabacion
       ? URL.createObjectURL(nuevoGrabacion)
@@ -775,74 +523,6 @@ export const TimelineSeguimientos: React.FC<TimelineSeguimientosProps> = ({
     setNuevoAbierto(true);
   }
 
-  const parseEventos = (eventos: string | Evento[]): Evento[] => {
-    if (Array.isArray(eventos)) {
-      return eventos;
-    }
-    if (typeof eventos === "string") {
-      const raw = eventos.trim();
-      if (!raw) return [];
-      try {
-        // Intentar parsear como JSON primero
-        return JSON.parse(raw);
-      } catch (e) {
-        // Si falla, intentar parsear como XML
-        if (raw.startsWith("<")) {
-          try {
-            const parser = new DOMParser();
-            const xmlSource = raw.includes("<Eventos")
-              ? raw
-              : `<Eventos>${raw}</Eventos>`;
-            const xmlDoc = parser.parseFromString(xmlSource, "text/xml");
-            if (xmlDoc.getElementsByTagName("parsererror").length === 0) {
-              const nodes = Array.from(xmlDoc.getElementsByTagName("Evento"));
-              const parsedEventos = nodes.map((node) => {
-                const getText = (tag: string) =>
-                  node.getElementsByTagName(tag)[0]?.textContent ?? "";
-                const valorText = getText("Valor");
-                const valorNum = Number(valorText);
-                return {
-                  id: Number(getText("Id")) || 0,
-                  tipo: getText("Tipo"),
-                  fecha: getText("Fecha"),
-                  hora: getText("Hora") || null,
-                  valor: Number.isFinite(valorNum) ? valorNum : undefined,
-                  cumplido: getText("Cumplido") || undefined,
-                } as Evento;
-              });
-              if (parsedEventos.length > 0) {
-                return parsedEventos;
-              }
-            }
-          } catch (err) {
-            console.error("Error al parsear XML de eventos:", err);
-          }
-        }
-        return raw
-          .split("\n")
-          .filter((evento) => evento.trim())
-          .map((eventoStr) => {
-            try {
-              const parsed = JSON.parse(eventoStr);
-              return {
-                id: parsed.id,
-                tipo: parsed.tipo,
-                fecha: parsed.fecha,
-                hora: parsed.hora,
-                valor: parsed.valor,
-                cumplido: parsed.cumplido,
-              } as Evento;
-            } catch (e) {
-              console.error("Error al parsear evento:", e);
-              return null;
-            }
-          })
-          .filter((evento): evento is Evento => evento !== null);
-      }
-    }
-    return [];
-  };
-
   return (
     <div style={{ padding: 24 }}>
       {!ocultarBotonNuevo && (
@@ -860,592 +540,42 @@ export const TimelineSeguimientos: React.FC<TimelineSeguimientosProps> = ({
         </Button>
       )}
 
-      <Modal
+      <NuevoSeguimientoModal
         show={nuevoAbierto}
-        onHide={() => setNuevoAbierto(false)}
-        centered
-        size="xl"
-        scrollable
-        backdrop="static"
-      >
-        <Modal.Body style={{ padding: 24 }}>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "flex-start",
-              justifyContent: "space-between",
-              gap: 16,
-              marginBottom: 16,
-            }}
-          >
-            <div>
-              <div
-                style={{
-                  fontWeight: "bold",
-                  fontSize: 20,
-                  color: "#1565c0",
-                }}
-              >
-                Nuevo seguimiento
-              </div>
-              <div
-                style={{
-                  fontSize: 13,
-                  color: "#5f6b7a",
-                  marginTop: 4,
-                }}
-              >
-                El borrador se conserva por gestion activa mientras no guardes.
-              </div>
-            </div>
-            <Button
-              variant="light"
-              onClick={() => setNuevoAbierto(false)}
-              style={{ borderRadius: 999, padding: "4px 12px" }}
-            >
-              Cerrar
-            </Button>
-          </div>
-
-          <div
-            style={{
-              background: "#e3f2fd",
-              borderRadius: 12,
-              padding: 24,
-              boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-              border: "1px solid #bbdefb",
-            }}
-          >
-          <div className="mb-3">
-            <label style={{ fontWeight: 500, marginBottom: 8 }}>
-              Texto del seguimiento
-            </label>
-            {/* <div className="p-4"> */}
-            <Row>
-              <Col xs={12} sm={12} md={12} lg={12} xl={1}>
-                <SpeechToText
-                  value={nuevoTexto}
-                  onResult={(nuevoTexto) => setNuevoTexto(nuevoTexto)}
-                />
-              </Col>
-              <Col xs={12} sm={12} md={12} lg={12} xl={1}>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={() => setNuevoTexto("")}
-                >
-                  Limpiar
-                </Button>
-              </Col>
-            </Row>
-            <br />
-
-            {/* <p className="mt-4 border p-2 rounded">📝 {nuevoTexto}</p> */}
-            {/*</div>*/}
-            <textarea
-              id="textoSeguimiento"
-              className="form-control"
-              rows={3}
-              value={nuevoTexto}
-              onChange={(e) => setNuevoTexto(e.target.value)}
-              style={{
-                borderRadius: 8,
-                border: "1px solid #bbdefb",
-                padding: 12,
-              }}
-            />
-          </div>
-          <div>
-            {/* <label style={{ fontWeight: 500, marginBottom: 8 }}>
-              Tipo de contacto
-            </label> */}
-            <div
-              style={{
-                // display: "flex",
-                alignItems: "center",
-                // gap: 12,
-                marginBottom: 12,
-                background: "#fff",
-                borderRadius: 8,
-                padding: 12,
-                boxShadow: "0 2px 4px rgba(0,0,0,0.05)",
-              }}
-            >
-              <Row>
-                <Col xs={12} lg={3} md={3} xl={3}>
-                  <BuscadorTipoContacto
-                    
-                    label="Tipo de contacto"
-                    value={nuevoTipoContacto}
-                    onChange={(val) => setNuevoTipoContacto(val ?? 0)}
-                  />
-                </Col>
-              </Row>
-            </div>
-          </div>
-
-          <div className="mb-3" style={{ padding: 0 }}>
-            <label style={{ fontWeight: 500, marginBottom: 8 }}>
-              Eventos programados
-            </label>
-
-            {/* --- Formulario fijo de captura/edición --- */}
-            <div
-              style={{
-                display: "flex",
-                alignItems: "end",
-                flexWrap: "wrap",
-                gap: 12,
-                marginBottom: 16,
-                background: "#fff",
-                borderRadius: 8,
-                padding: 12,
-                boxShadow: "0 2px 4px rgba(0,0,0,0.05)",
-              }}
-            >
-              <SingleSelect
-                options={tiposEvento.map((tipo) => ({
-                  label: tipo.nombre,
-                  value: tipo.nombre, // seguimos usando nombre para no romper nada
-                }))}
-                selectedValue={formEvento.tipo}
-                label="Tipo de evento"
-                onChange={(val) => {
-                  const selectedTipo = tiposEvento.find(
-                    (t) => t.nombre === val
-                  );
-                  setFormEvento((prev) => {
-                    const next = {
-                      ...prev,
-                      tipo: val as any,
-                      id: selectedTipo ? selectedTipo.id : prev.id,
-                    };
-                    if (!selectedTipo?.requiereFecha) {
-                      next.fecha = "";
-                    }
-                    if (!selectedTipo?.requiereHora) {
-                      next.hora = null;
-                    }
-                    if (!selectedTipo?.requiereMonto) {
-                      next.valor = undefined;
-                    }
-                    return next;
-                  });
-                  setErrorValidacion(null);
-                }}
-              />
-
-              {/* Campos condicionales como en la versión actual */}
-              {(() => {
-                const t = tiposEvento.find(
-                  (tt) => tt.nombre === formEvento.tipo
-                );
-                return (
-                  <>
-                    {t?.requiereFecha && (
-                      <Form.Group>
-                        <Form.Label>Fecha</Form.Label>
-                        <input
-                          type="date"
-                          className="form-control"
-                          style={{ width: 140, borderRadius: 6, margin: 0 }}
-                          value={formEvento.fecha || ""}
-                          onChange={(e) =>
-                            setFormCampo("fecha", e.target.value as any)
-                          }
-                        />
-                      </Form.Group>
-                    )}
-
-                    {t?.requiereHora && (
-                      <Form.Group>
-                        <HoraSelectorEvento
-                          fecha={formEvento.fecha || ""}
-                          value={formEvento.hora ?? null}
-                          onChange={(hora) => setFormCampo("hora", hora as any)}
-                          horas={horasDisponibles}
-                          loading={loadingHoras}
-                        />
-                      </Form.Group>
-                    )}
-
-                    {t?.requiereMonto && (
-                      <Form.Group>
-                        <Form.Label>Monto</Form.Label>
-                        <input
-                          type="number"
-                          className="form-control"
-                          style={{ width: 120, borderRadius: 6 }}
-                          placeholder="Valor"
-                          value={formEvento.valor ?? ""}
-                          onChange={(e) =>
-                            setFormCampo(
-                              "valor",
-                              e.target.value === ""
-                                ? undefined
-                                : (Number(e.target.value) as any)
-                            )
-                          }
-                        />
-                      </Form.Group>
-                    )}
-                  </>
-                );
-              })()}
-
-              {/* Botones Agregar / Actualizar */}
-              <Form.Group>
-                {editIndex === null ? (
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={handleAgregarEventoValidado}
-                    style={{ borderRadius: 6 }}
-                    disabled={loading || isValidatingEvent}
-                  >
-                    + Agregar
-                  </Button>
-                ) : (
-                  <>
-                    <Button
-                      size="sm"
-                      variant="success"
-                      onClick={handleActualizarEventoValidado}
-                      style={{ borderRadius: 6, marginRight: 4 }}
-                      disabled={loading || isValidatingEvent}
-                    >
-                      Actualizar
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline-secondary"
-                      onClick={handleCancelarEdicionEvento}
-                      style={{ borderRadius: 6 }}
-                    >
-                      Cancelar
-                    </Button>
-                  </>
-                )}
-              </Form.Group>
-            </div>
-
-            {/* Mensaje de validación backend */}
-            {errorValidacion && (
-              <div style={{ color: "#d32f2f", fontSize: 12, marginBottom: 8 }}>
-                {errorValidacion}
-              </div>
-            )}
-
-            {/* --- Lista de eventos agregados (solo lectura) --- */}
-            {nuevoEventos.map((evt, idx) => {
-              const t = tiposEvento.find((tt) => tt.nombre === evt.tipo);
-              return (
-                <div
-                  key={idx}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    flexWrap: "wrap",
-                    gap: 12,
-                    marginBottom: 8,
-                    background: "#fff",
-                    borderRadius: 8,
-                    padding: 12,
-                    boxShadow: "0 2px 4px rgba(0,0,0,0.05)",
-                    opacity: editIndex === idx ? 0.6 : 1,
-                  }}
-                >
-                  <div style={{ minWidth: 160, fontWeight: 500 }}>
-                    {evt.tipo}
-                  </div>
-                  {t?.requiereFecha && (
-                    <div style={{ minWidth: 100 }}>
-                      Fecha: {evt.fecha || "-"}
-                    </div>
-                  )}
-                  {t?.requiereHora && (
-                    <div style={{ minWidth: 80 }}>Hora: {evt.hora || "-"}</div>
-                  )}
-                  {t?.requiereMonto && (
-                    <div style={{ minWidth: 100 }}>
-                      Monto: {evt.valor ?? "-"}
-                    </div>
-                  )}
-
-                  <div style={{ marginLeft: "auto", display: "flex", gap: 4 }}>
-                    <Button
-                      size="sm"
-                      variant="outline-primary"
-                      onClick={() => handleEditarEvento(idx)}
-                      style={{ borderRadius: 6 }}
-                    >
-                      Editar
-                    </Button>
-                    <Button
-                      size="sm"
-                      // variant="danger"
-                      onClick={() => handleEliminarEvento(idx)}
-                      style={{ borderRadius: 6 }}
-                      title="Eliminar evento"
-                    >
-                      &times;
-                    </Button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-          {/*<div className="mb-3">
-            <label style={{ fontWeight: 500, marginBottom: 8 }}>
-              Adjuntar grabación (opcional)
-            </label>
-            <input
-              type="file"
-              accept="audio/*"
-              className="form-control"
-              style={{ borderRadius: 6 }}
-              onChange={(e) =>
-                setNuevoGrabacion(
-                  e.target.files && e.target.files[0] ? e.target.files[0] : null
-                )
-              }
-            />
-          </div>*/}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: 12,
-              flexWrap: "wrap",
-            }}
-          >
-            <span style={{ fontSize: 12, color: "#5f6b7a" }}>
-              Cerrar conserva el borrador de esta gestion.
-            </span>
-            <div style={{ display: "flex", gap: 12 }}>
-              {isGuardarSeguimientoDisabled ? (
-                <OverlayTrigger
-                  placement="top"
-                  overlay={
-                    <Tooltip id="tooltip-guardar-seguimiento-bloqueado">
-                      {guardarSeguimientoBlockedReason ||
-                        "No se puede guardar seguimiento en este momento."}
-                    </Tooltip>
-                  }
-                >
-                  <span className="d-inline-block">
-                    <Button
-                      variant="success"
-                      onClick={handleGuardarNuevo}
-                      style={{ borderRadius: 6 }}
-                      disabled
-                    >
-                      Guardar
-                    </Button>
-                  </span>
-                </OverlayTrigger>
-              ) : (
-                <Button
-                  variant="success"
-                  onClick={handleGuardarNuevo}
-                  style={{ borderRadius: 6 }}
-                >
-                  Guardar
-                </Button>
-              )}
-              <Button
-                variant="secondary"
-                onClick={() => setNuevoAbierto(false)}
-                style={{ borderRadius: 6 }}
-              >
-                Cerrar
-              </Button>
-            </div>
-          </div>
-        </div>
-        </Modal.Body>
-      </Modal>
+        texto={nuevoTexto}
+        tipoContacto={nuevoTipoContacto}
+        eventos={nuevoEventos}
+        tiposEvento={tiposEvento}
+        formEvento={formEvento}
+        editIndex={editIndex}
+        errorValidacion={errorValidacion}
+        horasDisponibles={horasDisponibles}
+        loadingHoras={loadingHoras}
+        loadingEvento={loadingEvento}
+        isValidatingEvent={isValidatingEvent}
+        isGuardarDisabled={isGuardarSeguimientoDisabled}
+        guardarBlockedReason={guardarSeguimientoBlockedReason}
+        onTextoChange={setNuevoTexto}
+        onTipoContactoChange={(value) => setNuevoTipoContacto(value)}
+        onTipoEventoChange={handleTipoEventoChange}
+        onFormCampoChange={handleFormCampoChange}
+        onAgregarEvento={handleAgregarEventoValidado}
+        onActualizarEvento={handleActualizarEventoValidado}
+        onCancelarEdicion={handleCancelarEdicionEvento}
+        onEditarEvento={handleEditarEvento}
+        onEliminarEvento={handleEliminarEvento}
+        onGuardar={handleGuardarNuevo}
+        onCerrar={() => setNuevoAbierto(false)}
+      />
 
       {/* Timeline */}
-      <div style={{ height: "75vh", overflowY: "auto", paddingRight: 12 }}>
-        <div style={{ position: "relative" }}>
-          {seguimientos.map((seg, index) => (
-            <div
-              key={seg.id}
-              style={{ marginBottom: 32, position: "relative" }}
-            >
-              {/* Línea conectora */}
-              {index < seguimientos.length - 1 && (
-                <div
-                  style={{
-                    position: "absolute",
-                    left: 7,
-                    top: 24,
-                    bottom: -32,
-                    width: 2,
-                    background: "#e0e0e0",
-                    zIndex: 0,
-                  }}
-                />
-              )}
-              {/* Punto del timeline */}
-              <div
-                style={{
-                  position: "absolute",
-                  left: 0,
-                  top: 0,
-                  zIndex: 1,
-                }}
-              >
-                <span
-                  style={{
-                    background: "#1565c0",
-                    borderRadius: "50%",
-                    width: 16,
-                    height: 16,
-                    display: "inline-block",
-                    border: "2px solid #fff",
-                    boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
-                  }}
-                ></span>
-              </div>
-              <div
-                style={{
-                  background: "#fff",
-                  borderRadius: 12,
-                  padding: 20,
-                  boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-                  minWidth: 250,
-                  position: "relative",
-                  marginLeft: 24,
-                  border: "1px solid #e0e0e0",
-                }}
-              >
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    marginBottom: 8,
-                  }}
-                >
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <div
-                      style={{
-                        fontWeight: "bold",
-                        color: "#1565c0",
-                        fontSize: 16,
-                      }}
-                    >
-                      {seg.usuario}
-                    </div>
-                    <span style={{ fontSize: 13, color: "#adb5bd", fontWeight: 400 }}>
-                      #{seg.id}
-                    </span>
-                  </div>
-                  <div
-                    style={{
-                      display: "flex",
-                      gap: 12,
-                      marginLeft: 16,
-                    }}
-                  >
-                    {seg.eventos &&
-                      parseEventos(seg.eventos).map((evento, idx) => {
-                        const cumplidoState = getEventoCumplidoState(
-                          evento.cumplido
-                        );
-                        // Si el evento tiene valor, mostrar el icono de compromiso de pago
-                        const esCompromisoPago =
-                          typeof evento.valor === "number" && evento.valor > 0;
-                        return (
-                          <OverlayTrigger
-                            key={idx}
-                            placement="top"
-                            overlay={renderTooltip(evento, idx)}
-                          >
-                            <span
-                              style={{
-                                display: "inline-flex",
-                                alignItems: "center",
-                              }}
-                            >
-                              {/* <FontAwesomeIcon
-                            icon={evento.color} color={evento.color} 
-                          /> */}
-                              {/* <FontAwesomeIcon icon={IconMap[evento.icono || 'home']} /> */}
-                              <span
-                                style={{
-                                  color: evento.color,
-                                  fontSize: 20,
-                                  cursor: "pointer",
-                                  opacity: cumplidoState === "done" ? 0.5 : 1,
-                                  marginLeft: 4,
-                                }}
-                              >
-                                <FontAwesomeIcon
-                                  icon={IconMap[evento.icono || "home"]}
-                                  color={evento.color}
-                                />
-                              </span>
-                            </span>
-                          </OverlayTrigger>
-                          // <RenderTooltip evento={evento} idx={idx}/>
-                          // <FontAwesomeIcon icon={IconMap[evento.icono || 'home']} />
-                        );
-                      })}
-                  </div>
-                </div>
-                <div
-                  style={{
-                    fontSize: 13,
-                    color: "#666",
-                    marginBottom: 8,
-                  }}
-                >
-                  {seg.fecha} {seg.hora}
-                </div>
-                <div
-                  style={{
-                    margin: "12px 0",
-                    color: "#333",
-                    lineHeight: 1.5,
-                  }}
-                >
-                  {seg.texto.length > 80
-                    ? seg.texto.slice(0, 80) + "..."
-                    : seg.texto}
-                </div>
-                <div style={{ display: "flex", gap: 8 }}>
-                  <Button
-                    size="sm"
-                    variant="primary"
-                    onClick={() => handleVerMas(seg)}
-                    style={{ borderRadius: 6 }}
-                  >
-                    Ver más
-                  </Button>
-                  {seg.grabacion && (
-                    <Button
-                      size="sm"
-                      variant="outline-primary"
-                      onClick={() => handleAudio(seg)}
-                      style={{ borderRadius: 6 }}
-                    >
-                      <FontAwesomeIcon
-                        icon={faMicrophone}
-                        style={{ marginRight: 4 }}
-                      />
-                      Escuchar
-                    </Button>
-                  )}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
+      <SeguimientosTimelineList
+        seguimientos={seguimientos}
+        parseEventos={parseEventos}
+        renderTooltip={renderTooltip}
+        onAudio={handleAudio}
+        onVerMas={handleVerMas}
+      />
 
       {/* Modal de detalle */}
       <ModalSeguimientoDetalle

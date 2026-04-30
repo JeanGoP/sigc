@@ -12,6 +12,7 @@ interface SingleSelectProps {
   onChange: (value: string | number) => void;
   label?: string;
   placeholder?: string;
+  compact?: boolean;
 }
 
 export const SingleSelect: React.FC<SingleSelectProps> = ({
@@ -19,12 +20,18 @@ export const SingleSelect: React.FC<SingleSelectProps> = ({
   selectedValue,
   onChange,
   label,
+  compact = false,
 }) => {
   return (
-    <Form.Group controlId="singleSelect">
-      {label && <Form.Label>{label}</Form.Label>}
+    <Form.Group controlId="singleSelect" style={compact ? { marginBottom: 0 } : undefined}>
+      {label && (
+        <Form.Label style={compact ? { fontSize: 12, marginBottom: 4 } : undefined}>
+          {label}
+        </Form.Label>
+      )}
       <Form.Control
         as="select"
+        size={compact ? "sm" : undefined}
         value={selectedValue}
         onChange={(e) => onChange(e.target.value)}
       >

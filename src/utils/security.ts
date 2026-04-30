@@ -11,6 +11,11 @@ export const can = (
   }
 
   const normalizedTarget = normalizePermissionCode(permissionCode);
+
+  if (!normalizedTarget) {
+    return false;
+  }
+
   return permissions.some(
     (permission) => normalizePermissionCode(permission) === normalizedTarget
   );

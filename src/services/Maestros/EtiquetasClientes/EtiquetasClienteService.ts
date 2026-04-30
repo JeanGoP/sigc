@@ -1,4 +1,5 @@
 // src/services/etiquetasClientesService.ts
+import { useCallback } from "react";
 import { useApi } from "@app/hooks/useApi";
 
 export type EtiquetaClientePayload = {
@@ -17,13 +18,16 @@ export function useListarEtiquetasClientes() {
     retryDelay: 5000,
   });
 
-  const listarEtiquetasClientes = (filter: string) => {
-    return request({
-      url: `/GetEtiqueta`,
-      method: "GET",
-      params: { filter },
-    });
-  };
+  const listarEtiquetasClientes = useCallback(
+    (filter: string) => {
+      return request({
+        url: `/GetEtiqueta`,
+        method: "GET",
+        params: { filter },
+      });
+    },
+    [request],
+  );
 
   return { loading, error, listarEtiquetasClientes };
 }
@@ -34,13 +38,16 @@ export function useGuardarEtiquetaCliente() {
     timeout: 5000,
   });
 
-  const guardarEtiquetaCliente = (payload: EtiquetaClientePayload) => {
-    return request({
-      url: "/Post",
-      method: "POST",
-      data: payload,
-    });
-  };
+  const guardarEtiquetaCliente = useCallback(
+    (payload: EtiquetaClientePayload) => {
+      return request({
+        url: "/Post",
+        method: "POST",
+        data: payload,
+      });
+    },
+    [request],
+  );
 
   return { loading, error, guardarEtiquetaCliente };
 }
@@ -51,12 +58,15 @@ export function useEliminarEtiquetaCliente() {
     timeout: 5000,
   });
 
-  const eliminarEtiquetaCliente = (id: number) => {
-    return request({
-      url: `/Post/${id}`,
-      method: "DELETE",
-    });
-  };
+  const eliminarEtiquetaCliente = useCallback(
+    (id: number) => {
+      return request({
+        url: `/Post/${id}`,
+        method: "DELETE",
+      });
+    },
+    [request],
+  );
 
   return { loading, error, eliminarEtiquetaCliente };
 }

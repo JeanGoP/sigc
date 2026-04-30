@@ -86,13 +86,11 @@ export const DynamicTablePaginationConsultaCartera: React.FC<DynamicTableProps> 
 
       if (e.key === "ArrowUp") {
         e.preventDefault();
-        console.log("UP",e);
         setSelectedIndex((prev) => Math.max(prev - 1, 0));
       }
 
       if (e.key === "Enter") {
         e.preventDefault();
-        console.log("ENTER on row:", paginatedRows[selectedIndex]);
         if (onRowEnter) {
           onRowEnter(paginatedRows[selectedIndex]);
         }

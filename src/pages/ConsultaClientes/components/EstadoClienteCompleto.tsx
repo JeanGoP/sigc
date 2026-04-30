@@ -11,8 +11,8 @@ import { TablaFacturas } from "./TablaFacturas";
 import EstadoClienteTable from "./prueba_tablaSaldos";
 import { RecibosCajaTable } from "./TablaRecibosCaja";
 import { FacturaListado } from "@app/models/facturaConsultaclienteModel";
-import { useRecibosCajaService } from "@app/services/GestionCartera/EstadoClienteCompletoService.ts/GetRecibosCajaListService";
-import { useFacturasService } from "@app/services/GestionCartera/EstadoClienteCompletoService.ts/EstadoClienteCompletoService";
+import { useRecibosCajaService } from "@app/services/GestionCartera/EstadoClienteCompletoService/GetRecibosCajaListService";
+import { useFacturasService } from "@app/services/GestionCartera/EstadoClienteCompletoService/EstadoClienteCompletoService";
 
 const normalizeValue = (value: string) => String(value ?? "").trim();
 

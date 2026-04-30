@@ -1,29 +1,19 @@
 import { Scatter } from "react-chartjs-2";
+import { Chart as ChartJS, ScatterController } from "chart.js";
 import { fmtCOP } from "@app/utils/formattersFunctions";
-import { ScatterController } from "chart.js";
-import { Chart as ChartJS } from "chart.js";
 import type { CarteraRow } from "@app/Data/dashboardCarteraData";
 import { useMaximize } from "./MaximizeContext";
+import { buildEficienciaRecuperacionChartData } from "./domain/remainingChartBuilders";
 
 ChartJS.register(ScatterController);
 
-export default function EficienciaRecuperacionChart({ data }: { data: CarteraRow[] }) {
+export default function EficienciaRecuperacionChart({
+  data,
+}: {
+  data: CarteraRow[];
+}) {
   const maximized = useMaximize();
-  const conDatos = data.filter((r) => r.carteraVencida > 0 && r.recaudoMesActual > 0);
-
-  const chartData = {
-    datasets: [{
-      label: "Carteras",
-      data: conDatos.map((r) => ({
-        x: r.carteraVencida / 1_000_000,
-        y: r.recaudoMesActual / 1_000_000,
-        label: r.desccta,
-      })),
-      backgroundColor: "#4f86c6cc",
-      pointRadius: 7,
-      pointHoverRadius: 9,
-    }],
-  };
+  const chartModel = buildEficienciaRecuperacionChartData(data);
 
   const options = {
     responsive: true,
@@ -32,19 +22,19 @@ export default function EficienciaRecuperacionChart({ data }: { data: CarteraRow
       legend: { display: false },
       tooltip: {
         callbacks: {
-          label: (ctx: any) =>
-            `${ctx.raw.label} — Vencida: ${fmtCOP(ctx.raw.x * 1_000_000)} | Recaudo: ${fmtCOP(ctx.raw.y * 1_000_000)}`,
+          label: (context: any) =>
+            `${context.raw.label} - Vencida: ${fmtCOP((context.raw.x as number) * 1_000_000)} | Recaudo: ${fmtCOP((context.raw.y as number) * 1_000_000)}`,
         },
       },
     },
     scales: {
       x: {
         title: { display: true, text: "Cartera vencida ($M)" },
-        ticks: { callback: (v: any) => `$${v}M` },
+        ticks: { callback: (value: any) => `$${value}M` },
       },
       y: {
         title: { display: true, text: "Recaudo mes actual ($M)" },
-        ticks: { callback: (v: any) => `$${v}M` },
+        ticks: { callback: (value: any) => `$${value}M` },
       },
     },
   };
@@ -53,10 +43,10 @@ export default function EficienciaRecuperacionChart({ data }: { data: CarteraRow
     <div className="card">
       <div className="card-body">
         <h6 className="card-title text-muted mb-3">
-          Eficiencia de recuperación — Vencida vs Recaudo
+          Eficiencia de recuperacion - Vencida vs Recaudo
         </h6>
         <div style={{ height: maximized ? "calc(100vh - 160px)" : 320 }}>
-          <Scatter data={chartData} options={options} />
+          <Scatter data={{ datasets: chartModel.datasets }} options={options} />
         </div>
       </div>
     </div>

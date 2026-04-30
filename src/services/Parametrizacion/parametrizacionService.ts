@@ -1,42 +1,13 @@
 import { useCallback } from "react";
 import { useApi } from "@app/hooks/useApi";
+import type { SaveUserPayload } from "./types";
 
-export interface ParametrizacionUser {
-  userId: number;
-  username: string;
-  fullName: string;
-  email: string;
-  isActive: boolean;
-  createdAt?: string | null;
-  roleId?: number | null;
-  roleName?: string;
-}
-
-export interface ParametrizacionRole {
-  roleId: number;
-  roleName: string;
-}
-
-export interface ParametrizacionRolePermission {
-  actionId: number;
-  menuId: number;
-  menuKey: string;
-  menuName: string;
-  sortOrder: number;
-  actionKey: string;
-  actionName: string;
-  permissionCode: string;
-  isAllowed: boolean;
-}
-
-export interface SaveUserPayload {
-  username: string;
-  password?: string;
-  fullName: string;
-  email: string;
-  roleId?: number | null;
-  isActive: boolean;
-}
+export type {
+  ParametrizacionRole,
+  ParametrizacionRolePermission,
+  ParametrizacionUser,
+  SaveUserPayload,
+} from "./types";
 
 export function useParametrizacionService() {
   const { loading, error, request } = useApi<any>("/api/v1", {

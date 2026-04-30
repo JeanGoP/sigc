@@ -125,7 +125,6 @@
 //     });
 
 //     const responseData: GestionFacturaInsertResponse = await response.json();
-//     console.log("Response Data:", responseData);
 
 //     responseData2 = responseData;
 

@@ -331,7 +331,6 @@ const BuscadorCuentas = React.memo((props: Props): JSX.Element => {
         aria-controls={shouldShowSuggestions ? listboxIdRef.current : undefined}
         style={{ marginTop: "4px" }}
       />
-      {/* <button onClick={()=>{console.log(selectedItem)}}></button> */}
 
       {shouldShowSuggestions && (
         <div

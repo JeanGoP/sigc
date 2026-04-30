@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Button, Spinner, OverlayTrigger, Tooltip } from "react-bootstrap";
 
 interface HotkeyConfig {
@@ -102,22 +102,13 @@ const SpeechToText: React.FC<SpeechToTextProps> = ({ onResult, value, toggleHotk
 
     const onKeyDown = (e: KeyboardEvent) => {
       if (!matchesHotkey(e)) return;
-      console.log("[SpeechToText] Hotkey detectada:", formatHotkey(config), {
-        key: e.key,
-        ctrl: e.ctrlKey,
-        shift: e.shiftKey,
-        alt: e.altKey,
-        meta: e.metaKey,
-      });
       e.preventDefault();
       if (listening) {
-        console.log("[SpeechToText] Deteniendo escucha por atajo");
         stopListening();
       } else {
         if (typeof value === "string") {
           accumulatedRef.current = value;
         }
-        console.log("[SpeechToText] Iniciando escucha por atajo");
         startListening();
       }
     };
@@ -178,13 +169,11 @@ const SpeechToText: React.FC<SpeechToTextProps> = ({ onResult, value, toggleHotk
       setListening(true);
       setErrorMessage(null);
       lastErrorRef.current = null;
-      console.log("[SpeechToText] Reconocimiento iniciado");
     };
 
     recognition.onend = () => {
       setListening(false);
       setInterimText("");
-      console.log("[SpeechToText] Reconocimiento finalizado");
       const fatalErrors = ["not-allowed", "service-not-allowed", "audio-capture"];
       if (
         listeningRequestedRef.current &&

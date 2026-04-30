@@ -1,157 +1,247 @@
+import { useEffect, useMemo, useState } from "react";
 import type { CarteraRow } from "@app/Data/dashboardCarteraData";
-import { fmtCOP } from "@app/utils/formattersFunctions";
+import { SingleSelect } from "@app/components/singleSelect/singleSelect";
+import type {
+  DashboardKpiDelta,
+  DashboardKpiPanel,
+  DashboardKpiMetric,
+} from "./domain/kpis";
+import { buildDashboardCarteraKpiPanels } from "./domain/kpis";
 
-const fmtPct = (v: number) => `${v.toFixed(1)}%`;
+function DeltaBadge({
+  pct,
+  inverted = false,
+}: DashboardKpiDelta) {
+  if (pct === 0) {
+    return null;
+  }
 
-// ─── Delta Badge ─────────────────────────────────────────────────────────────
-// inverted=true: reducción es mejora (ej. cartera vencida)
-function DeltaBadge({ pct, inverted = false }: { pct: number; inverted?: boolean }) {
-  if (pct === 0) return null;
   const improved = inverted ? pct < 0 : pct > 0;
-  const color    = improved ? "#28B463" : "#BA4A00";
-  const arrow    = pct > 0 ? "▲" : "▼";
+  const color = improved ? "#28B463" : "#BA4A00";
+  const prefix = pct > 0 ? "+" : "-";
+
   return (
-    <span style={{
-      display:      "inline-flex",
-      alignItems:   "center",
-      gap:          2,
-      fontSize:     10,
-      fontWeight:   600,
-      color,
-      background:   improved ? "#eaf6ee" : "#fdecea",
-      borderRadius: 4,
-      padding:      "1px 5px",
-      marginLeft:   6,
-      verticalAlign: "middle",
-      lineHeight:   1.4,
-    }}>
-      {arrow} {Math.abs(pct).toFixed(1)}%
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 2,
+        fontSize: 10,
+        fontWeight: 600,
+        color,
+        background: improved ? "#eaf6ee" : "#fdecea",
+        borderRadius: 4,
+        padding: "1px 5px",
+        marginLeft: 6,
+        verticalAlign: "middle",
+        lineHeight: 1.4,
+      }}
+    >
+      {prefix} {Math.abs(pct).toFixed(1)}%
     </span>
   );
 }
 
-// ─── Metric types ─────────────────────────────────────────────────────────────
+function UnifiedMetricPanel({
+  panels,
+  accountOptions,
+  selectedAccount,
+  onSelectedAccountChange,
+}: {
+  panels: DashboardKpiPanel[];
+  accountOptions: Array<{ label: string; value: string | number }>;
+  selectedAccount: string;
+  onSelectedAccountChange: (value: string) => void;
+}) {
+  const metrics = panels.flatMap((panel) =>
+    panel.metrics.map((metric) => ({
+      panelTitle: panel.title,
+      panelColor: panel.color,
+      metric,
+    })),
+  );
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStartX, setDragStartX] = useState(0);
+  const [dragStartScrollLeft, setDragStartScrollLeft] = useState(0);
 
-interface Metric {
-  label:   string;
-  value:   string;
-  sub:     string;
-  color:   string;
-  delta?:  { pct: number; inverted?: boolean };
-}
+  const handlePointerDown = (
+    event: React.PointerEvent<HTMLDivElement>,
+  ) => {
+    const target = event.currentTarget;
+    setIsDragging(true);
+    setDragStartX(event.clientX);
+    setDragStartScrollLeft(target.scrollLeft);
+    target.setPointerCapture(event.pointerId);
+  };
 
-function MetricPanel({ title, color, metrics }: { title: string; color: string; metrics: Metric[] }) {
+  const handlePointerMove = (
+    event: React.PointerEvent<HTMLDivElement>,
+  ) => {
+    if (!isDragging) {
+      return;
+    }
+    const target = event.currentTarget;
+    const deltaX = event.clientX - dragStartX;
+    target.scrollLeft = dragStartScrollLeft - deltaX;
+  };
+
+  const handlePointerEnd = (
+    event: React.PointerEvent<HTMLDivElement>,
+  ) => {
+    if (!isDragging) {
+      return;
+    }
+    setIsDragging(false);
+    event.currentTarget.releasePointerCapture(event.pointerId);
+  };
+
   return (
-    <div className="card" style={{ borderTop: `3px solid ${color}`, borderRadius: 8, marginBottom: 8 }}>
+    <div
+      className="card"
+      style={{ borderTop: "3px solid #4f86c6", borderRadius: 8, marginBottom: 8 }}
+    >
       <div className="card-body" style={{ padding: "10px 14px" }}>
-        <div style={{ fontSize: 11, color: "#888", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>
-          {title}
-        </div>
-        <div style={{ display: "flex", gap: 0, flexWrap: "wrap" }}>
-          {metrics.map((m, i) => (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 12,
+            marginBottom: 8,
+            flexWrap: "wrap",
+          }}
+        >
+          <div>
             <div
-              key={m.label}
               style={{
-                flex:         "0 0 auto",
-                minWidth:     120,
-                paddingLeft:  i === 0 ? 0 : 20,
+                fontSize: 11,
+                color: "#888",
+                textTransform: "uppercase",
+                letterSpacing: 0.5,
+              }}
+            >
+              Resumen cartera y recaudo
+            </div>
+            <div style={{ fontSize: 10, color: "#9aa0a6", marginTop: 2 }}>
+              Arrastra horizontalmente para ver mas KPIs
+            </div>
+          </div>
+          <div style={{ maxWidth: 220, minWidth: 170 }}>
+            <SingleSelect
+              options={accountOptions}
+              selectedValue={selectedAccount}
+              onChange={(value) => onSelectedAccountChange(String(value))}
+              compact
+            />
+          </div>
+        </div>
+        <div
+          className="kpi-drag-strip"
+          style={{
+            overflowX: "auto",
+            overflowY: "hidden",
+            cursor: isDragging ? "grabbing" : "grab",
+            userSelect: isDragging ? "none" : "auto",
+            touchAction: "pan-y",
+            paddingBottom: 2,
+          }}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerEnd}
+          onPointerLeave={handlePointerEnd}
+        >
+          <div style={{ display: "flex", gap: 0, minWidth: "max-content" }}>
+            {metrics.map(({ panelTitle, panelColor, metric }, index) => (
+            <div
+              key={`${panelTitle}-${metric.label}`}
+              style={{
+                flex: "0 0 auto",
+                minWidth: 145,
+                paddingLeft: index === 0 ? 0 : 20,
                 paddingRight: 20,
-                borderLeft:   i > 0 ? "1px solid #e8eaed" : "none",
+                borderLeft: index > 0 ? "1px solid #e8eaed" : "none",
                 marginBottom: 4,
               }}
             >
-              <div style={{ fontSize: 11, color: "#aaa", marginBottom: 1 }}>{m.label}</div>
-              <div style={{ fontSize: 18, fontWeight: 700, color: m.color, lineHeight: 1.2 }}>
-                {m.value}
-                {m.delta && <DeltaBadge pct={m.delta.pct} inverted={m.delta.inverted} />}
+              <div
+                style={{
+                  fontSize: 10,
+                  color: panelColor,
+                  textTransform: "uppercase",
+                  fontWeight: 700,
+                  marginBottom: 2,
+                }}
+              >
+                {panelTitle}
               </div>
-              <div style={{ fontSize: 11, color: "#aaa", marginTop: 1 }}>{m.sub}</div>
+              <div style={{ fontSize: 11, color: "#aaa", marginBottom: 1 }}>
+                {metric.label}
+              </div>
+              <div
+                style={{
+                  fontSize: 18,
+                  fontWeight: 700,
+                  color: metric.color,
+                  lineHeight: 1.2,
+                }}
+              >
+                {metric.value}
+                {metric.delta && <DeltaBadge {...metric.delta} />}
+              </div>
+              <div style={{ fontSize: 11, color: "#aaa", marginTop: 1 }}>
+                {metric.sub}
+              </div>
             </div>
-          ))}
+            ))}
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
-// ─── Componente principal ─────────────────────────────────────────────────────
-
 export default function KpisSection({ data }: { data: CarteraRow[] }) {
-  // — Cartera general —
-  const totalObligaciones = data.reduce((s, r) => s + r.obligacionesTotal, 0);
-  const totalSaldo        = data.reduce((s, r) => s + r.total, 0);
-  const totalVencida      = data.reduce((s, r) => s + r.carteraVencida, 0);
-  const porcVencida       = totalSaldo > 0 ? (totalVencida / totalSaldo) * 100 : 0;
+  const accountOptions = useMemo(
+    () =>
+      data.map((row) => ({
+        value: row.codicta,
+        label: `${row.codicta} - ${row.desccta}`,
+      })),
+    [data],
+  );
 
-  // — Cartera general anterior —
-  const totalSaldoAnt   = data.reduce((s, r) => s + (r.totalAnt ?? 0), 0);
-  const totalVencidaAnt = data.reduce((s, r) => s + (r.carteraVencidaAnt ?? 0), 0);
-  const porcVencidaAnt  = totalSaldoAnt > 0 ? (totalVencidaAnt / totalSaldoAnt) * 100 : 0;
+  const [selectedAccount, setSelectedAccount] = useState<string>("");
 
-  // Deltas cartera
-  const deltaSaldo        = totalSaldoAnt > 0 ? ((totalSaldo - totalSaldoAnt) / totalSaldoAnt) * 100 : 0;
-  const deltaVencidaPorc  = porcVencidaAnt > 0 ? porcVencida - porcVencidaAnt : 0; // diferencia en pp
-  const deltaVencidaPct   = totalVencidaAnt > 0 ? ((totalVencida - totalVencidaAnt) / totalVencidaAnt) * 100 : 0;
+  useEffect(() => {
+    if (accountOptions.length === 0) {
+      setSelectedAccount("");
+      return;
+    }
 
-  // — Clientes —
-  const clientesEnMora    = data.reduce((s, r) => s + r.obligaciones30 + r.obligaciones60 + r.obligaciones90 + r.obligaciones90mas, 0);
-  const porcClientesAlDia = totalObligaciones > 0 ? (data.reduce((s, r) => s + r.obligacionesPV, 0) / totalObligaciones) * 100 : 0;
+    const stillExists = accountOptions.some(
+      (option) => String(option.value) === String(selectedAccount),
+    );
+    if (!stillExists) {
+      setSelectedAccount(String(accountOptions[0].value));
+    }
+  }, [accountOptions, selectedAccount]);
 
-  // — Recaudo —
-  const totalRecaudoAct   = data.reduce((s, r) => s + r.recaudoMesActual, 0);
-  const totalRecaudoAnt   = data.reduce((s, r) => s + r.recaudoMesAnterior, 0);
-  const difRecaudo        = totalRecaudoAct - totalRecaudoAnt;
-  const varRecaudo        = totalRecaudoAnt > 0 ? (difRecaudo / totalRecaudoAnt) * 100 : 0;
-  const indicesValidos    = data.filter((r) => r.indiceRecaudo > 0).map((r) => r.indiceRecaudo);
-  const indicePromedio    = indicesValidos.length > 0 ? indicesValidos.reduce((s, v) => s + v, 0) / indicesValidos.length : 0;
+  const selectedData = useMemo(() => {
+    if (!selectedAccount) {
+      return [];
+    }
+    return data.filter((row) => String(row.codicta) === String(selectedAccount));
+  }, [data, selectedAccount]);
 
-  // — Alertas —
-  const cartMoraCritica   = data.filter((r) => r.carteraVencidaPorc > 15 && !r.desccta.startsWith("DC")).length;
-  const mejorIndice       = [...data].filter((r) => r.indiceRecaudo > 0).sort((a, b) => b.indiceRecaudo - a.indiceRecaudo)[0];
-
-  // Indicador de si hay datos de período anterior disponibles
-  const hayDatosAnt = totalSaldoAnt > 0;
+  const panels = buildDashboardCarteraKpiPanels(selectedData);
 
   return (
-    <>
-      <MetricPanel
-        title="Cartera"
-        color="#4f86c6"
-        metrics={[
-          { label: "Total obligaciones",   value: totalObligaciones.toLocaleString("es-CO"),  sub: "clientes activos",     color: "#4f86c6" },
-          {
-            label: "Saldo total",
-            value: fmtCOP(totalSaldo),
-            sub:   hayDatosAnt ? `Ant: ${fmtCOP(totalSaldoAnt)}` : "saldo vigente",
-            color: "#4f86c6",
-            delta: hayDatosAnt ? { pct: deltaSaldo } : undefined,
-          },
-          {
-            label: "Cartera vencida",
-            value: fmtPct(porcVencida),
-            sub:   hayDatosAnt
-              ? `Ant: ${fmtPct(porcVencidaAnt)} (${deltaVencidaPorc >= 0 ? "+" : ""}${deltaVencidaPorc.toFixed(1)} pp)`
-              : fmtCOP(totalVencida),
-            color: porcVencida > 10 ? "#BA4A00" : "#D68910",
-            delta: hayDatosAnt ? { pct: deltaVencidaPct, inverted: true } : undefined,
-          },
-          { label: "Mora crítica",         value: `${cartMoraCritica} carteras`,               sub: "> 15% vencida",        color: cartMoraCritica > 3 ? "#BA4A00" : "#D68910" },
-          { label: "Clientes en mora",     value: clientesEnMora.toLocaleString("es-CO"),      sub: "atraso > 0 días",      color: "#CA6F1E" },
-          { label: "Clientes al día",      value: fmtPct(porcClientesAlDia),                   sub: "sobre total activos",  color: porcClientesAlDia >= 90 ? "#28B463" : "#D68910" },
-          { label: "Mejor índice recaudo", value: fmtPct(mejorIndice?.indiceRecaudo ?? 0),     sub: mejorIndice?.desccta ?? "", color: "#28B463" },
-        ]}
-      />
-
-      <MetricPanel
-        title="Recaudo"
-        color="#4f86c6"
-        metrics={[
-          { label: "Mes actual",   value: fmtCOP(totalRecaudoAct),                              sub: `${varRecaudo >= 0 ? "+" : ""}${fmtPct(varRecaudo)} vs mes anterior`, color: varRecaudo >= 0 ? "#28B463" : "#BA4A00" },
-          { label: "Mes anterior", value: fmtCOP(totalRecaudoAnt),                              sub: "período previo",            color: "#7a8a99" },
-          { label: "Diferencia",   value: `${difRecaudo >= 0 ? "+" : ""}${fmtCOP(difRecaudo)}`, sub: "actual vs anterior",        color: difRecaudo >= 0 ? "#28B463" : "#BA4A00" },
-          { label: "Índice prom.", value: fmtPct(indicePromedio),                             sub: "promedio carteras activas", color: indicePromedio >= 8 ? "#28B463" : "#D68910" },
-        ]}
-      />
-    </>
+    <UnifiedMetricPanel
+      panels={panels}
+      accountOptions={accountOptions}
+      selectedAccount={selectedAccount}
+      onSelectedAccountChange={setSelectedAccount}
+    />
   );
 }
+

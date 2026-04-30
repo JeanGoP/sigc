@@ -2,9 +2,12 @@ import { Action, ThunkAction, configureStore } from '@reduxjs/toolkit';
 
 import { authSlice } from '@app/store/reducers/auth';
 import { securitySlice } from '@app/store/reducers/security';
+import { shouldEnableReduxLogger } from '@app/store/storeConfig';
 import { uiSlice } from '@app/store/reducers/ui';
 import { createLogger } from 'redux-logger';
 import { TypedUseSelectorHook, useDispatch, useSelector } from 'react-redux';
+
+const enableReduxLogger = shouldEnableReduxLogger(import.meta.env);
 
 const store = configureStore({
   reducer: {
@@ -12,8 +15,11 @@ const store = configureStore({
     security: securitySlice.reducer,
     ui: uiSlice.reducer,
   },
-  middleware: (getDefaultMiddleware) =>
-    getDefaultMiddleware({ serializableCheck: false }).concat(createLogger()),
+  middleware: (getDefaultMiddleware) => {
+    const middleware = getDefaultMiddleware({ serializableCheck: false });
+
+    return enableReduxLogger ? middleware.concat(createLogger()) : middleware;
+  },
 });
 
 export default store;

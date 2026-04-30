@@ -1,5 +1,7 @@
 import { AdvisorInternalState, WebRtcCallDto } from "@app/services/WebRtc/webrtcService";
 import { WebRtcUiError } from "@app/services/WebRtc/webrtcLogger";
+import { DEFAULT_GLOBAL_WEBRTC_RUNTIME_SNAPSHOT } from "./runtimeContracts";
+import type { GlobalWebRtcRuntimeSnapshot } from "./runtimeContracts";
 
 export interface WebRtcOutboundDialRequest {
   destination: string;
@@ -17,22 +19,6 @@ export interface WebRtcAdvisorStateChangeResult {
   ok: boolean;
   error?: WebRtcUiError | null;
   message?: string;
-}
-
-export interface GlobalWebRtcRuntimeSnapshot {
-  inProgress: boolean;
-  connectionStatus: string;
-  advisorInternalState: string;
-  presenceStatus: string;
-  softphoneStatus: string;
-  isMuted: boolean;
-  activeCall: WebRtcCallDto | null;
-  incomingCall: {
-    callSid: string;
-    from?: string | null;
-    to?: string | null;
-    receivedAt: string;
-  } | null;
 }
 
 type OutboundDialHandler = (
@@ -71,16 +57,8 @@ const callStatusListeners = new Set<CallListener>();
 const callActivityListeners = new Set<CallActivityListener>();
 const runtimeSnapshotListeners = new Set<RuntimeSnapshotListener>();
 
-let runtimeSnapshot: GlobalWebRtcRuntimeSnapshot = {
-  inProgress: false,
-  connectionStatus: "disconnected",
-  advisorInternalState: "disponible",
-  presenceStatus: "offline",
-  softphoneStatus: "initializing",
-  isMuted: false,
-  activeCall: null,
-  incomingCall: null,
-};
+let runtimeSnapshot: GlobalWebRtcRuntimeSnapshot =
+  DEFAULT_GLOBAL_WEBRTC_RUNTIME_SNAPSHOT;
 
 function createUnsubscribe<T>(listeners: Set<T>, listener: T): () => void {
   return () => {

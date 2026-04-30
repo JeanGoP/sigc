@@ -15,7 +15,6 @@ export const NumericField: React.FC<Props> = ({ value, onChange }) => {
     const numeric = parseFloat(value);
     if (!isNaN(numeric)) {
       onChange(numeric.toFixed(2)); // Formato 0.00
-      console.log('Valor del campo interes mora:' + typeof numeric.toFixed(2));
     }
   };
 

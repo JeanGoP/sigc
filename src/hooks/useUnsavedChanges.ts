@@ -5,8 +5,6 @@ export const useUnsavedChanges = (initialValue: any) => {
   const [value, setValue] = useState(initialValue);
   const prevValueRef = useRef(initialValue);
 
-  console.log("Valor actual:", value);
-  console.log("Valor previo:", prevValueRef.current);
 
   const hasChanges =
     JSON.stringify(prevValueRef.current) !== JSON.stringify(value);

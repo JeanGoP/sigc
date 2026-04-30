@@ -8,185 +8,34 @@ import {
   faPhoneSlash,
 } from "@fortawesome/free-solid-svg-icons";
 import WebRtcDialer from "@app/components/WebRtcDialer/WebRtcDialer";
-import { useWebRtcTabOwnership } from "@app/hooks/useWebRtcTabOwnership";
-import { AdvisorInternalState, WebRtcCallDto } from "@app/services/WebRtc/webrtcService";
+import { useWebRtcSoftphoneOwnership } from "@app/hooks/useWebRtcSoftphoneOwnership";
+import type { AdvisorInternalState } from "@app/services/WebRtc/webrtcService";
 import {
   AdvisorInternalStateOrder,
   getAdvisorInternalStateLabel,
-  upsertPendingInboundCall,
 } from "@app/services/GestionLlamadas";
 import {
   getGlobalWebRtcRuntimeSnapshot,
   requestGlobalWebRtcAdvisorStateChange,
   requestGlobalWebRtcCallControl,
-  subscribeGlobalWebRtcCallStarted,
   subscribeGlobalWebRtcCallEnded,
-  subscribeGlobalWebRtcCallStatusChanged,
   subscribeGlobalWebRtcRuntimeSnapshot,
 } from "@app/services/WebRtc/webrtcBridge";
 import { toast } from "react-toastify";
-import {
-  GestionLlamadaEventType,
-  useGestionLlamadaService,
-} from "@app/services/GestionLlamadaService";
 import { useGestionSessionContext } from "@app/modules/main/gestion-session/GestionSessionContext";
 import { features } from "@app/config/features";
 import { useAppSelector } from "@app/store/store";
+import { useSoftphoneCallEventRegistration } from "./hooks/useSoftphoneCallEventRegistration";
+import {
+  buildEndedCallSummary,
+  buildSoftphoneCallDisplayState,
+  formatElapsedClock,
+  isAdministratorRole,
+} from "@app/services/WebRtc/softphoneWidgetHelpers";
+import type { EndedCallSummary } from "@app/services/WebRtc/softphoneWidgetHelpers";
+import { WEBRTC_CALL_SUMMARY_AUTO_HIDE_MS } from "@app/services/WebRtc/runtimeContracts";
 
-const OWNER_CHANNEL_KEY = "consulta_cartera_webrtc_owner";
-const CALL_SUMMARY_AUTO_HIDE_MS = 16000;
 const EXPERIMENTAL_CALL_HUD_ENABLED = features.experimentalCallHudEnabled;
-
-interface EndedCallSummary {
-  callSid: string;
-  from: string;
-  to: string;
-  status: string;
-  durationText: string;
-}
-
-function formatElapsedClock(startedAt?: string | null, fallbackAt?: string | null): string {
-  const reference = startedAt || fallbackAt;
-  if (!reference) {
-    return "00:00:00";
-  }
-
-  const startedMs = Date.parse(reference);
-  if (Number.isNaN(startedMs)) {
-    return "00:00:00";
-  }
-
-  const seconds = Math.max(0, Math.floor((Date.now() - startedMs) / 1000));
-  const hh = Math.floor(seconds / 3600).toString().padStart(2, "0");
-  const mm = Math.floor((seconds % 3600) / 60).toString().padStart(2, "0");
-  const ss = Math.floor(seconds % 60).toString().padStart(2, "0");
-  return `${hh}:${mm}:${ss}`;
-}
-
-function formatDuration(seconds: number): string {
-  const safe = Math.max(0, Math.floor(seconds));
-  const hh = Math.floor(safe / 3600).toString().padStart(2, "0");
-  const mm = Math.floor((safe % 3600) / 60).toString().padStart(2, "0");
-  const ss = Math.floor(safe % 60).toString().padStart(2, "0");
-  return `${hh}:${mm}:${ss}`;
-}
-
-function getStatusLabel(statusRaw: string): string {
-  const status = String(statusRaw || "").trim().toLowerCase();
-  switch (status) {
-    case "completed":
-      return "Finalizada";
-    case "canceled":
-      return "Cancelada";
-    case "rejected":
-      return "Rechazada";
-    case "failed":
-      return "Fallida";
-    case "no-answer":
-    case "noanswer":
-      return "Sin respuesta";
-    case "busy":
-      return "Ocupado";
-    case "ringing":
-      return "Sonando";
-    case "in-progress":
-      return "En llamada";
-    default:
-      return statusRaw || "Finalizada";
-  }
-}
-
-function buildEndedCallSummary(call: WebRtcCallDto): EndedCallSummary {
-  const startedMs = Date.parse(call.startedAt ?? "");
-  const endedMs = Date.parse(call.endedAt ?? "");
-
-  const durationSec = typeof call.durationSec === "number" && Number.isFinite(call.durationSec)
-    ? Math.max(0, Math.floor(call.durationSec))
-    : !Number.isNaN(startedMs) && !Number.isNaN(endedMs) && endedMs >= startedMs
-      ? Math.floor((endedMs - startedMs) / 1000)
-      : 0;
-
-  return {
-    callSid: String(call.callSid ?? "").trim(),
-    from: String(call.from ?? "").trim() || "-",
-    to: String(call.to ?? "").trim() || "-",
-    status: getStatusLabel(call.status),
-    durationText: formatDuration(durationSec),
-  };
-}
-
-function resolveActiveContactName(call: WebRtcCallDto | null): string {
-  if (!call) {
-    return "-";
-  }
-
-  const direction = String(call.direction ?? "").trim().toLowerCase();
-  const isInbound = direction.includes("inbound") || direction.includes("incoming");
-  if (isInbound) {
-    return String(call.from ?? "").trim() || String(call.to ?? "").trim() || "-";
-  }
-
-  return String(call.to ?? "").trim() || String(call.from ?? "").trim() || "-";
-}
-
-function buildContactInitials(value: string): string {
-  const clean = String(value || "").trim();
-  if (!clean || clean === "-") {
-    return "CL";
-  }
-
-  if (/^\+?\d+$/.test(clean)) {
-    return clean.slice(-2).toUpperCase();
-  }
-
-  const parts = clean.split(/\s+/).filter(Boolean);
-  if (parts.length === 1) {
-    return parts[0].slice(0, 2).toUpperCase();
-  }
-
-  return `${parts[0][0] ?? ""}${parts[1][0] ?? ""}`.toUpperCase();
-}
-
-function isInboundCallDirection(directionRaw?: string | null): boolean {
-  const direction = String(directionRaw ?? "").trim().toLowerCase();
-  return direction.includes("inbound") || direction.includes("incoming");
-}
-
-function shouldTrackPendingInboundCall(
-  eventType: GestionLlamadaEventType,
-  statusRaw?: string | null
-): boolean {
-  const status = String(statusRaw ?? "").trim().toLowerCase();
-  if (!status) {
-    return eventType === "end";
-  }
-
-  if (eventType === "status") {
-    return status === "in-progress" || status === "in_progress" || status === "answered";
-  }
-
-  if (eventType === "start") {
-    return status === "in-progress" || status === "in_progress" || status === "answered";
-  }
-
-  if (eventType === "end") {
-    return ![
-      "canceled",
-      "cancelled",
-      "rejected",
-      "no-answer",
-      "busy",
-      "failed",
-      "error",
-    ].includes(status);
-  }
-
-  return false;
-}
-
-function isAdministratorRole(role?: string | null): boolean {
-  return String(role ?? "").trim().toLowerCase() === "administrador";
-}
 
 export default function SoftphoneWidget() {
   const [open, setOpen] = useState(false);
@@ -195,16 +44,18 @@ export default function SoftphoneWidget() {
   );
   const [callClockText, setCallClockText] = useState("00:00:00");
   const [endedCallSummary, setEndedCallSummary] = useState<EndedCallSummary | null>(null);
-  const { registrarEventoLlamada } = useGestionLlamadaService();
   const { activeSession } = useGestionSessionContext();
   const currentUser = useAppSelector((state) => state.auth.currentUser);
   const canViewSoftphoneButton = isAdministratorRole(currentUser?.role);
 
-  const ownership = useWebRtcTabOwnership({
-    channelKey: OWNER_CHANNEL_KEY,
+  const ownership = useWebRtcSoftphoneOwnership({
     enabled: true,
     ttlSeconds: 45,
     debug: true,
+  });
+
+  useSoftphoneCallEventRegistration({
+    activeSession,
   });
 
   useEffect(() => {
@@ -229,125 +80,13 @@ export default function SoftphoneWidget() {
   }, [canViewSoftphoneButton, open]);
 
   useEffect(() => {
-    const registerCallEvent = async (
-      eventType: GestionLlamadaEventType,
-      call: WebRtcCallDto | null
-    ) => {
-      if (!call?.callSid) {
-        return;
-      }
-
-      const callSid = String(call.callSid).trim();
-      if (!callSid) {
-        return;
-      }
-
-      if (!isInboundCallDirection(call.direction)) {
-        const sessionRef = activeSession?.sessionRef ?? null;
-        const idGestionSession = activeSession?.idGestionSession ?? null;
-
-        if (!sessionRef) {
-          return;
-        }
-
-        const response = await registrarEventoLlamada({
-          idGestionSession: idGestionSession ?? undefined,
-          sessionRef,
-          callSid,
-          eventType,
-          direction: call.direction ?? "outbound-client",
-          status: call.status ?? null,
-          finalStatus: eventType === "end" ? call.status ?? null : null,
-          startedAt: call.startedAt ?? null,
-          endedAt:
-            eventType === "end"
-              ? call.endedAt ?? new Date().toISOString()
-              : call.endedAt ?? null,
-          durationSec: call.durationSec ?? null,
-          costFinal: call.costFinal ?? null,
-          currency: call.currency ?? null,
-          recordingSid: call.recordingSid ?? null,
-          source: `softphone_widget_outbound_${eventType}`,
-        });
-
-        if (!response?.success) {
-          console.warn("[SoftphoneWidget] No se pudo registrar outbound ligado", {
-            eventType,
-            callSid,
-            message: response?.message ?? "sin respuesta",
-            statusCode: response?.statusCode ?? null,
-          });
-        }
-
-        return;
-      }
-
-      const payload = {
-        callSid,
-        eventType,
-        direction: call.direction ?? "inbound-client",
-        status: call.status ?? null,
-        finalStatus: eventType === "end" ? call.status ?? null : null,
-        startedAt: call.startedAt ?? null,
-        endedAt:
-          eventType === "end"
-            ? call.endedAt ?? new Date().toISOString()
-            : call.endedAt ?? null,
-        durationSec: call.durationSec ?? null,
-        costFinal: call.costFinal ?? null,
-        currency: call.currency ?? null,
-        recordingSid: call.recordingSid ?? null,
-        source: `softphone_widget_inbound_${eventType}`,
-      };
-
-      const response = await registrarEventoLlamada(payload);
-      if (!response?.success) {
-        console.warn("[SoftphoneWidget] No se pudo registrar inbound provisional", {
-          eventType,
-          callSid,
-          message: response?.message ?? "sin respuesta",
-          statusCode: response?.statusCode ?? null,
-        });
-      }
-
-      if (shouldTrackPendingInboundCall(eventType, payload.status)) {
-        upsertPendingInboundCall({
-          callSid,
-          direction: payload.direction,
-          status: payload.status,
-          from: call.from ?? null,
-          to: call.to ?? null,
-          startedAt: payload.startedAt,
-          endedAt: payload.endedAt,
-        });
-      }
-    };
-
-    const unsubscribeStarted = subscribeGlobalWebRtcCallStarted((call) => {
-      void registerCallEvent("start", call);
-    });
-    const unsubscribeStatus = subscribeGlobalWebRtcCallStatusChanged((call) => {
-      void registerCallEvent("status", call);
-    });
-    const unsubscribeEnded = subscribeGlobalWebRtcCallEnded((call) => {
-      void registerCallEvent("end", call);
-    });
-
-    return () => {
-      unsubscribeStarted();
-      unsubscribeStatus();
-      unsubscribeEnded();
-    };
-  }, [registrarEventoLlamada]);
-
-  useEffect(() => {
     if (!endedCallSummary) {
       return;
     }
 
     const timer = window.setTimeout(() => {
       setEndedCallSummary(null);
-    }, CALL_SUMMARY_AUTO_HIDE_MS);
+    }, WEBRTC_CALL_SUMMARY_AUTO_HIDE_MS);
 
     return () => window.clearTimeout(timer);
   }, [endedCallSummary]);
@@ -365,46 +104,26 @@ export default function SoftphoneWidget() {
     return () => window.clearInterval(interval);
   }, [runtimeSnapshot.activeCall?.startedAt, runtimeSnapshot.incomingCall?.receivedAt]);
 
-  const ownershipLabel = useMemo(() => {
-    if (ownership.isOwner) {
-      return "owner";
-    }
-
-    if (ownership.hasOwner) {
-      return "acom";
-    }
-
-    return "sync";
-  }, [ownership.hasOwner, ownership.isOwner]);
+  const ownershipLabel = ownership.ownershipLabel;
 
   const isAvailableAdvisorState = runtimeSnapshot.advisorInternalState === "disponible";
   const advisorStateDotColor = isAvailableAdvisorState ? "#16a34a" : "#dc2626";
   const advisorStateDotTitle = isAvailableAdvisorState
     ? "Asesor disponible"
     : "Asesor no disponible";
-  const stateSelectorDisabled = !ownership.isOwner
+  const stateSelectorDisabled = !ownership.canControlSoftphone
     || runtimeSnapshot.connectionStatus === "connecting"
     || runtimeSnapshot.connectionStatus === "dialing"
     || runtimeSnapshot.connectionStatus === "in_call";
 
-  const hasIncomingCall = Boolean(runtimeSnapshot.incomingCall?.callSid);
-  const hasCallInProgress = Boolean(
-    runtimeSnapshot.inProgress
-    || runtimeSnapshot.connectionStatus === "dialing"
-    || runtimeSnapshot.connectionStatus === "in_call"
+  const callDisplayState = useMemo(
+    () =>
+      buildSoftphoneCallDisplayState(runtimeSnapshot, {
+        experimentalCallHudEnabled: EXPERIMENTAL_CALL_HUD_ENABLED,
+        hasEndedCallSummary: Boolean(endedCallSummary),
+      }),
+    [endedCallSummary, runtimeSnapshot]
   );
-  const hasLiveCall = hasCallInProgress && !hasIncomingCall;
-  const isInConnectedCall = runtimeSnapshot.connectionStatus === "in_call";
-
-  const activeContactName = resolveActiveContactName(runtimeSnapshot.activeCall);
-  const activeContactInitials = buildContactInitials(activeContactName);
-
-  const showIncomingCard = EXPERIMENTAL_CALL_HUD_ENABLED && hasIncomingCall;
-  const showLiveHeaderCard = EXPERIMENTAL_CALL_HUD_ENABLED && hasLiveCall;
-  const showCallSummaryCard = EXPERIMENTAL_CALL_HUD_ENABLED
-    && !hasIncomingCall
-    && !hasCallInProgress
-    && Boolean(endedCallSummary);
 
   const handleAdvisorStateChange = async (event: ChangeEvent<HTMLSelectElement>) => {
     const nextState = event.target.value as AdvisorInternalState;
@@ -439,13 +158,10 @@ export default function SoftphoneWidget() {
     );
   };
 
-  const incomingFrom = runtimeSnapshot.incomingCall?.from || "-";
-  const incomingTo = runtimeSnapshot.incomingCall?.to || "-";
-
   return (
     <>
       <li className="nav-item d-flex align-items-center">
-        {showLiveHeaderCard && (
+        {callDisplayState.showLiveHeaderCard && (
           <div
             className="d-flex align-items-center me-2 px-2 py-1 border rounded"
             style={{
@@ -455,7 +171,7 @@ export default function SoftphoneWidget() {
               borderColor: "rgba(0,0,0,0.12)",
               height: 40,
             }}
-            title={activeContactName}
+            title={callDisplayState.activeContactName}
           >
             <span
               style={{
@@ -473,7 +189,7 @@ export default function SoftphoneWidget() {
                 marginRight: 8,
               }}
             >
-              {activeContactInitials}
+              {callDisplayState.activeContactInitials}
             </span>
 
             <div className="d-flex flex-column flex-grow-1" style={{ minWidth: 0 }}>
@@ -481,7 +197,7 @@ export default function SoftphoneWidget() {
                 className="text-truncate"
                 style={{ fontSize: "0.78rem", fontWeight: 600, lineHeight: 1.05 }}
               >
-                {activeContactName}
+                {callDisplayState.activeContactName}
               </span>
               <span style={{ fontSize: "0.74rem", color: "#6b7280", lineHeight: 1.1 }}>
                 {callClockText}
@@ -494,7 +210,7 @@ export default function SoftphoneWidget() {
               onClick={() => {
                 void runCallControlAction("toggle_mute");
               }}
-              disabled={!isInConnectedCall}
+              disabled={!callDisplayState.isInConnectedCall}
               title={runtimeSnapshot.isMuted ? "Activar microfono" : "Silenciar microfono"}
             >
               <FontAwesomeIcon
@@ -578,7 +294,7 @@ export default function SoftphoneWidget() {
         )}
       </li>
 
-      {showIncomingCard && (
+      {callDisplayState.showIncomingCard && (
         <div
           style={{
             position: "fixed",
@@ -598,8 +314,8 @@ export default function SoftphoneWidget() {
             <span style={{ fontSize: "0.8rem", opacity: 0.9 }}>{callClockText}</span>
           </div>
           <div style={{ fontSize: "0.82rem", opacity: 0.95 }}>
-            <div><strong>Desde:</strong> {incomingFrom}</div>
-            <div><strong>Hacia:</strong> {incomingTo}</div>
+            <div><strong>Desde:</strong> {callDisplayState.incomingFrom}</div>
+            <div><strong>Hacia:</strong> {callDisplayState.incomingTo}</div>
           </div>
 
           <div className="d-flex gap-2 mt-3">
@@ -625,7 +341,7 @@ export default function SoftphoneWidget() {
         </div>
       )}
 
-      {showCallSummaryCard && endedCallSummary && (
+      {callDisplayState.showCallSummaryCard && endedCallSummary && (
         <div
           style={{
             position: "fixed",

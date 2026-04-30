@@ -1,4 +1,5 @@
 // src/services/tiposContactoService.ts
+import { useCallback } from "react";
 import { useApi } from "@app/hooks/useApi";
 
 export function useListarTiposContacto() {
@@ -8,13 +9,16 @@ export function useListarTiposContacto() {
     retryDelay: 5000,
   });
 
-  const listarTiposContacto = (params: { nombre?: string; page: number; pageSize: number }) => {
-    return request({
-      url: "/ListarTiposContacto",
-      method: "GET",
-      params,
-    });
-  };
+  const listarTiposContacto = useCallback(
+    (params: { nombre?: string; page: number; pageSize: number }) => {
+      return request({
+        url: "/ListarTiposContacto",
+        method: "GET",
+        params,
+      });
+    },
+    [request],
+  );
 
   return { loading, error, listarTiposContacto };
 }

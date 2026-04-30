@@ -28,7 +28,6 @@ const BuscadorEtiquetasCliente = React.memo((props: Props): JSX.Element => {
   );
 
   if (value === null || value === undefined) {
-    console.log("BuscadorEtiquetasCliente: valor nulo o indefinido recibido");
   }
 
   const normalizeEventos = (rawValue: unknown): TipoEventoItem[] => {

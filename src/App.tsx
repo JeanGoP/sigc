@@ -1,12 +1,15 @@
-import { useEffect, useState } from "react";
-import { Routes, Route, useLocation } from "react-router-dom";
-import { toast, ToastContainer } from "react-toastify";
-import ReactGA from "react-ga4";
+import { useEffect } from "react";
+import { Routes, Route, Navigate } from "react-router-dom";
+import { ToastContainer } from "react-toastify";
 import Main from "@modules/main/Main";
 import Login from "@modules/login/Login";
 import Register from "@modules/register/Register";
 import ForgetPassword from "@modules/forgot-password/ForgotPassword";
 import RecoverPassword from "@modules/recover-password/RecoverPassword";
+import { useBrowserTranslationObserver } from "@app/hooks/useBrowserTranslationObserver";
+import { usePageTracking } from "@app/hooks/usePageTracking";
+import { useSeguimientoDraftCleanup } from "@app/hooks/useSeguimientoDraftCleanup";
+import { useSessionBootstrap } from "@app/hooks/useSessionBootstrap";
 import { useWindowSize } from "@app/hooks/useWindowSize";
 import { calculateWindowSize } from "@app/utils/helpers";
 import { setWindowSize } from "@app/store/reducers/ui";
@@ -16,212 +19,32 @@ import SubMenu from "@pages/SubMenu";
 import PublicRoute from "./routes/PublicRoute";
 import PrivateRoute from "./routes/PrivateRoute";
 import PermissionRoute from "./routes/PermissionRoute";
-import { setCurrentUser } from "./store/reducers/auth";
-import { clearSecurity, setSecurityData } from "./store/reducers/security";
 import { useAppDispatch, useAppSelector } from "./store/store";
 import { Loading } from "./components/Loading";
-import { User } from "./models/auth/User.model";
 import ConsultaClientes from "@app/pages/ConsultaClientes/ConsultaCLientes";
 import { ConsultaCartera } from "@app/pages/ConsultaCartera/ConsultaCartera";
 import ParametrosGenerales from "@app/pages/ParametrosGenerales";
 import TiposEventos from "@app/modules/maestros/tipos-eventos/TiposEventos";
-import MonitorSeguimientos from "@pages/MonitorSeguimientos";
 import Calendario from "@pages/Calendario";
 import { RendimientoDeAsesores } from "@app/pages/MonitorGestion/RendimientoDeAsesores";
-import Campaigns from "./pages/Campaigns/Campaigns";
 import TiposGestiones from "./modules/maestros/tipos-gestiones/TiposGestiones";
 import EtiquetasClientes from "./modules/maestros/etiquetas-cliente/EtiquetasClientes";
 import AsignacionCarterasPage from "@app/modules/asignacion-carteras/AsignacionCarterasPage";
 import UsuariosPage from "@app/modules/parametrizacion/usuarios/UsuariosPage";
 import RolesPermisosPage from "@app/modules/parametrizacion/roles-permisos/RolesPermisosPage";
-import { useSessionService } from "@app/services/Auth/ValidateToken";
-import { useSecurityService } from "@app/services/Security/securityService";
 import { ModificacionEventos } from "./pages/ModificacionEventos/ModificacionEventos";
 import Unauthorized from "./pages/Unauthorized";
 import CambiarContrasena from "./pages/CambiarContrasena";
-
-const { VITE_NODE_ENV } = import.meta.env;
 
 const App = () => {
   const windowSize = useWindowSize();
   const screenSize = useAppSelector((state) => state.ui.screenSize);
   const dispatch = useAppDispatch();
-  const location = useLocation();
-  const { validateToken } = useSessionService();
-  const { getSecurityMe } = useSecurityService();
-  const [isAppLoading, setIsAppLoading] = useState(true);
+  const isAppLoading = useSessionBootstrap();
 
-  const TARGETS = [
-    "/login",
-    "/register",
-    "/forgot-password",
-    "/recover-password",
-  ];
-
-  useEffect(() => {
-    const observer = new MutationObserver((mutations) => {
-      const hasLargeTextMutation = mutations.some((item) => item.type === "characterData");
-      if (hasLargeTextMutation) {
-        // Reserved for browser-translation warnings if needed.
-      }
-    });
-
-    observer.observe(document.documentElement, {
-      subtree: true,
-      childList: true,
-      characterData: true,
-    });
-
-    return () => observer.disconnect();
-  }, []);
-
-  useEffect(() => {
-    const DRAFT_PREFIX = "sigc.gestion.seguimiento-draft:";
-    const MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 horas
-    const now = Date.now();
-    try {
-      Object.keys(localStorage)
-        .filter((key) => key.startsWith(DRAFT_PREFIX))
-        .forEach((key) => {
-          try {
-            const parsed = JSON.parse(localStorage.getItem(key) ?? "{}");
-            const age = now - new Date(parsed.updatedAt ?? 0).getTime();
-            if (age > MAX_AGE_MS) {
-              localStorage.removeItem(key);
-            }
-          } catch {
-            localStorage.removeItem(key);
-          }
-        });
-    } catch {
-      // Si localStorage no está disponible, ignorar silenciosamente
-    }
-  }, []);
-
-  useEffect(() => {
-    const checkUserSession = async () => {
-      try {
-        const currentPath = location.pathname;
-        if (TARGETS.includes(currentPath)) {
-          dispatch(clearSecurity());
-          return;
-        }
-
-        const userData = localStorage.getItem("userAccess");
-        if (!userData) {
-          dispatch(setCurrentUser(null));
-          dispatch(clearSecurity());
-          toast.info("No tienes una sesion activa, por favor inicia sesion.");
-          return;
-        }
-
-        let parsedData: any = null;
-        try {
-          parsedData = JSON.parse(userData);
-        } catch {
-          parsedData = null;
-        }
-
-        if (
-          !parsedData ||
-          typeof parsedData !== "object" ||
-          !parsedData.id ||
-          !parsedData.username
-        ) {
-          localStorage.removeItem("userAccess");
-          dispatch(setCurrentUser(null));
-          dispatch(clearSecurity());
-          return;
-        }
-
-        const tokenValidation = await validateToken({
-          id: parsedData.id,
-          username: parsedData.username,
-          fullName: parsedData.fullName,
-          email: parsedData.email,
-          role: parsedData.role,
-          token: parsedData.token ?? "",
-          tenantId: parsedData.tenantId ?? "",
-          mustChangePassword: Boolean(parsedData.mustChangePassword),
-          telephonyEnabled: Boolean(parsedData.telephonyEnabled),
-        });
-
-        if (tokenValidation.valid && tokenValidation.user) {
-          dispatch(setCurrentUser(tokenValidation.user));
-        } else {
-          const fallbackUser = new User(
-            parsedData.id,
-            parsedData.username,
-            "",
-            parsedData.fullName || "",
-            parsedData.email || parsedData.username,
-            parsedData.role,
-            parsedData.token ?? "",
-            parsedData.tenantId ?? "",
-            Boolean(parsedData.mustChangePassword),
-            Boolean(parsedData.telephonyEnabled)
-          );
-          dispatch(setCurrentUser(fallbackUser));
-        }
-
-        const securityResponse = await getSecurityMe();
-        if (securityResponse?.success && securityResponse.data) {
-          const mustChangePassword = Boolean(securityResponse.data.mustChangePassword);
-          dispatch(
-            setSecurityData({
-              menuTree: mustChangePassword ? [] : securityResponse.data.menuTree ?? [],
-              permissions: mustChangePassword ? [] : securityResponse.data.permissions ?? [],
-            })
-          );
-
-          const refreshedUser = new User(
-            securityResponse.data.userId.toString(),
-            securityResponse.data.username,
-            "",
-            securityResponse.data.fullName || "",
-            securityResponse.data.email || securityResponse.data.username,
-            securityResponse.data.role || parsedData.role,
-            parsedData.token ?? "",
-            securityResponse.data.tenantId || parsedData.tenantId || "",
-            mustChangePassword,
-            Boolean(securityResponse.data.telephonyEnabled)
-          );
-
-          dispatch(setCurrentUser(refreshedUser));
-          localStorage.setItem(
-            "userAccess",
-            JSON.stringify({
-              id: refreshedUser.id,
-              username: refreshedUser.username,
-              fullName: refreshedUser.fullName,
-              email: refreshedUser.email,
-              role: refreshedUser.role,
-              token: refreshedUser.token,
-              tenantId: refreshedUser.tenantId,
-              mustChangePassword: refreshedUser.mustChangePassword,
-              telephonyEnabled: refreshedUser.telephonyEnabled,
-            })
-          );
-        } else {
-          dispatch(
-            setSecurityData({
-              menuTree: [],
-              permissions: [],
-            })
-          );
-        }
-      } catch (error) {
-        console.error("Error validando sesion:", error);
-        localStorage.removeItem("userAccess");
-        dispatch(setCurrentUser(null));
-        dispatch(clearSecurity());
-      } finally {
-        setIsAppLoading(false);
-      }
-    };
-
-    checkUserSession();
-  }, [dispatch, validateToken, getSecurityMe, location.pathname]);
+  useBrowserTranslationObserver();
+  useSeguimientoDraftCleanup();
+  usePageTracking();
 
   useEffect(() => {
     const size = calculateWindowSize(windowSize.width);
@@ -229,15 +52,6 @@ const App = () => {
       dispatch(setWindowSize(size));
     }
   }, [windowSize, screenSize, dispatch]);
-
-  useEffect(() => {
-    if (location.pathname && VITE_NODE_ENV === "production") {
-      ReactGA.send({
-        hitType: "pageview",
-        page: location.pathname,
-      });
-    }
-  }, [location]);
 
   if (isAppLoading) {
     return <Loading />;
@@ -337,7 +151,10 @@ const App = () => {
                 </PermissionRoute>
               }
             />
-            <Route path="/monitor_seguimientos" element={<MonitorSeguimientos />} />
+            <Route
+              path="/monitor_seguimientos"
+              element={<Navigate to="/profile" replace />}
+            />
             <Route
               path="/rendimiento_asesores"
               element={
@@ -362,14 +179,7 @@ const App = () => {
                 </PermissionRoute>
               }
             />
-            <Route
-              path="/campanas"
-              element={
-                <PermissionRoute permission="campanas.view">
-                  <Campaigns />
-                </PermissionRoute>
-              }
-            />
+            <Route path="/campanas" element={<Navigate to="/profile" replace />} />
             <Route path="/unauthorized" element={<Unauthorized />} />
             <Route
               index
