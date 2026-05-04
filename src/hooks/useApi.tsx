@@ -1,5 +1,5 @@
 // src/hooks/useApi.ts
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback } from "react";
 import { AxiosError, AxiosRequestConfig } from "axios";
 
 import { ApiResponse } from "@app/models/apiResponse";
@@ -20,8 +20,6 @@ export function useApi<T>(
 ) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const activeControllerRef = useRef<AbortController | null>(null);
-  const latestRequestIdRef = useRef(0);
 
   const apiUrl = getConfiguredApiUrl();
 
@@ -30,11 +28,6 @@ export function useApi<T>(
 
   const request = useCallback(
     async (config: AxiosRequestConfig): Promise<ApiResponse<T> | null> => {
-      activeControllerRef.current?.abort();
-      const controller = new AbortController();
-      activeControllerRef.current = controller;
-      const requestId = ++latestRequestIdRef.current;
-
       setLoading(true);
       setError(null);
 
@@ -49,10 +42,7 @@ export function useApi<T>(
 
       while (attempt <= retries) {
         try {
-          const res = await instance.request<ApiResponse<T>>({
-            ...config,
-            signal: controller.signal,
-          });
+          const res = await instance.request<ApiResponse<T>>(config);
           return res.data;
         } catch (err) {
           const axiosErr = err as AxiosError<ApiResponse<T>>;
@@ -94,9 +84,7 @@ export function useApi<T>(
           setError(axiosErr.message);
           return null;
         } finally {
-          if (requestId === latestRequestIdRef.current) {
-            setLoading(false);
-          }
+          setLoading(false);
         }
       }
 
@@ -104,12 +92,6 @@ export function useApi<T>(
     },
     [apiUrl, baseURL, timeout, retries, retryDelay, logoutOn401]
   );
-
-  useEffect(() => {
-    return () => {
-      activeControllerRef.current?.abort();
-    };
-  }, []);
 
   return { loading, error, request };
 }

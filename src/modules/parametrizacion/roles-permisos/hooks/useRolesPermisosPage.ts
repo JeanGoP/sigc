@@ -89,14 +89,14 @@ export function useRolesPermisosPage() {
     [initialPermissionsMap, permissionsFilter, permissionsSearch, rolePermissions]
   );
 
-  const loadRoles = useCallback(async () => {
+  const loadRoles = useCallback(async (roleIdToSync?: number | null) => {
     const response = await listarRoles();
     if (response?.success) {
       const nextRoles: ParametrizacionRole[] = response.data ?? [];
       setRoles(nextRoles);
 
-      if (selectedRoleId) {
-        const updatedSelectedRole = nextRoles.find((role) => role.roleId === selectedRoleId);
+      if (roleIdToSync) {
+        const updatedSelectedRole = nextRoles.find((role) => role.roleId === roleIdToSync);
         if (!updatedSelectedRole) {
           setSelectedRoleId(null);
           setRoleName("");
@@ -111,7 +111,7 @@ export function useRolesPermisosPage() {
     }
 
     toast.error(response?.message || "No fue posible cargar roles");
-  }, [listarRoles, selectedRoleId]);
+  }, [listarRoles]);
 
   const loadPermissions = useCallback(
     async (roleId: number) => {
@@ -136,7 +136,7 @@ export function useRolesPermisosPage() {
   );
 
   useEffect(() => {
-    void loadRoles();
+    void loadRoles(null);
   }, [loadRoles]);
 
   const confirmarDescartarCambios = useCallback(() => {
@@ -210,9 +210,9 @@ export function useRolesPermisosPage() {
 
         if (response?.success) {
           toast.success(response.message || "Rol guardado exitosamente");
-          await loadRoles();
 
           const responseRole = response.data as ParametrizacionRole | undefined;
+          await loadRoles(responseRole?.roleId ?? selectedRoleId);
           if (responseRole?.roleId) {
             await handleSelectRole(responseRole);
           }
@@ -258,7 +258,7 @@ export function useRolesPermisosPage() {
     if (response?.success) {
       toast.success(response.message || "Rol eliminado exitosamente");
       handleNewRole();
-      await loadRoles();
+      await loadRoles(null);
       return;
     }
 
