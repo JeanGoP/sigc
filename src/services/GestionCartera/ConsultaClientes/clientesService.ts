@@ -1,4 +1,5 @@
 // src/services/clientesService.ts
+import { useCallback } from "react";
 import { useApi } from "@app/hooks/useApi";
 // import { ClientesListRequest } from "./GetClientesListByFilter"; // Reutilizamos el tipo que ya tienes
 
@@ -12,17 +13,20 @@ export type ClientesListRequest = {
 export function useClientesService() {
   const { loading, error, request } = useApi<any>("/api/v1", {
     timeout: 5000,
-    retries: 2,
+    retries: 0,
     retryDelay: 5000,
   });
 
-  const listarClientes = (params: ClientesListRequest) => {
-    return request({
-      url: "/GetClientes", // el endpoint que usas
-      method: "POST",
-      data: params,
-    });
-  };
+  const listarClientes = useCallback(
+    (params: ClientesListRequest) => {
+      return request({
+        url: "/GetClientes", // el endpoint que usas
+        method: "POST",
+        data: params,
+      });
+    },
+    [request]
+  );
 
   return { loading, error, listarClientes };
 }

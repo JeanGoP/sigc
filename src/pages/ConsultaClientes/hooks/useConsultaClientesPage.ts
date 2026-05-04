@@ -43,6 +43,7 @@ export function useConsultaClientesPage() {
     async (filter = "") => {
       const params = buildClientesListRequest(paginationModel, intMora, filter);
       if (!shouldSearchClientes(params.filter)) {
+        setTableRowsClientes([]);
         return;
       }
 
@@ -75,15 +76,23 @@ export function useConsultaClientesPage() {
   const handleOpenModal = useCallback(() => {
     setSearchTerm("");
     setShowModal(true);
-    void searchClientes();
-  }, [searchClientes]);
+  }, []);
 
   const handleCloseModal = useCallback(() => {
     setShowModal(false);
   }, []);
 
   const handlePaginationChange = useCallback((model: GridPaginationModel) => {
-    setPaginationModel(model);
+    setPaginationModel((previousModel) => {
+      if (
+        previousModel.page === model.page &&
+        previousModel.pageSize === model.pageSize
+      ) {
+        return previousModel;
+      }
+
+      return model;
+    });
   }, []);
 
   const handleBuscarFacturas = useCallback(() => {
@@ -108,22 +117,20 @@ export function useConsultaClientesPage() {
   }, [facturaSeleccionada, navigate]);
 
   useEffect(() => {
-    void searchClientes(searchTerm);
-    // Keep pagination-triggered fetch behavior stable; search term changes are debounced below.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [paginationModel.page, paginationModel.pageSize, searchClientes]);
-
-  useEffect(() => {
     setFacturaSeleccionada(null);
   }, [selectedValue]);
 
   useEffect(() => {
+    if (!showModal) {
+      return;
+    }
+
     const timeoutId = window.setTimeout(() => {
       void searchClientes(searchTerm);
     }, 400);
 
     return () => window.clearTimeout(timeoutId);
-  }, [searchClientes, searchTerm]);
+  }, [searchClientes, searchTerm, showModal]);
 
   const seguimientoTitle = useMemo(
     () => buildSeguimientoButtonTitle(facturaSeleccionada),

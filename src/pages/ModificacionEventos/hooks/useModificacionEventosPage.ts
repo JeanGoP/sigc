@@ -175,8 +175,7 @@ export function useModificacionEventosPage() {
   const handleOpenModalCliente = useCallback(() => {
     setSearchClienteTerm("");
     setShowModalClientes(true);
-    void searchClientes();
-  }, [searchClientes]);
+  }, []);
 
   const handleHideModalClientes = useCallback(() => {
     setShowModalClientes(false);
@@ -188,7 +187,16 @@ export function useModificacionEventosPage() {
 
   const handlePaginationClientesChange = useCallback(
     (model: GridPaginationModel) => {
-      setPaginationModelClientes(model);
+      setPaginationModelClientes((previousModel) => {
+        if (
+          previousModel.page === model.page &&
+          previousModel.pageSize === model.pageSize
+        ) {
+          return previousModel;
+        }
+
+        return model;
+      });
     },
     [],
   );
@@ -289,15 +297,6 @@ export function useModificacionEventosPage() {
     if (page > maxPage) setPage(maxPage);
   }, [page, rowsPerPage, totalRows]);
 
-  useEffect(() => {
-    if (!showModalClientes) return;
-    void searchClientes(searchClienteTerm);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    paginationModelClientes.page,
-    paginationModelClientes.pageSize,
-    showModalClientes,
-  ]);
 
   useEffect(() => {
     if (!showModalClientes) return;
@@ -306,8 +305,7 @@ export function useModificacionEventosPage() {
     }, 400);
 
     return () => window.clearTimeout(timeoutId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchClienteTerm, showModalClientes]);
+  }, [searchClienteTerm, showModalClientes, searchClientes]);
 
   useEffect(() => {
     if (!filtrosConsulta) return;
