@@ -5,6 +5,8 @@ interface CarteraToolbarProps {
   lastFecha: string | null;
   loading: boolean;
   error: string | null;
+  cuentasExcluidasCount: number;
+  onOpenExclusiones: () => void;
   onFechaChange: (value: string) => void;
   onConsultar: () => void;
 }
@@ -14,6 +16,8 @@ export const CarteraToolbar: React.FC<CarteraToolbarProps> = ({
   lastFecha,
   loading,
   error,
+  cuentasExcluidasCount,
+  onOpenExclusiones,
   onFechaChange,
   onConsultar,
 }) => {
@@ -72,6 +76,28 @@ export const CarteraToolbar: React.FC<CarteraToolbarProps> = ({
       )}
 
       {error && <span style={{ fontSize: 12, color: "#d9534f" }}>{error}</span>}
+
+      <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
+        <span style={{ fontSize: 11, color: "#999" }}>
+          Excluidas: {cuentasExcluidasCount}
+        </span>
+        <button
+          onClick={onOpenExclusiones}
+          style={{
+            padding: "5px 12px",
+            fontSize: 12,
+            fontWeight: 600,
+            borderRadius: 6,
+            border: "1px solid #4f86c6",
+            background: "#fff",
+            color: "#4f86c6",
+            cursor: "pointer",
+            whiteSpace: "nowrap",
+          }}
+        >
+          Configurar exclusiones
+        </button>
+      </div>
     </div>
   );
 };

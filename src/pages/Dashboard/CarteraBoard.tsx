@@ -17,18 +17,26 @@ import ComparativoAgingChart from "./cartera/ComparativoAgingChart";
 import MaximizeWrapper from "./cartera/MaximizeWrapper";
 import { MaximizeProvider } from "./cartera/MaximizeContext";
 import { CarteraToolbar } from "./cartera/components/CarteraToolbar";
+import { CarteraExclusionesModal } from "./cartera/components/CarteraExclusionesModal";
 import { useCarteraBoard } from "./cartera/hooks/useCarteraBoard";
+import { useState } from "react";
 
 export default function CarteraBoard() {
   const {
     fecha,
     data,
+    accountOptions,
     lastFecha,
     loading,
     error,
+    cuentasExcluidas,
+    loadingCuentasExcluidas,
     handleFechaChange,
     handleConsultar,
+    handleAgregarCuentaExcluida,
+    handleEliminarCuentaExcluida,
   } = useCarteraBoard();
+  const [showExclusionesModal, setShowExclusionesModal] = useState(false);
 
   return (
     <MaximizeProvider>
@@ -38,8 +46,24 @@ export default function CarteraBoard() {
           lastFecha={lastFecha}
           loading={loading}
           error={error}
+          cuentasExcluidasCount={cuentasExcluidas.length}
+          onOpenExclusiones={() => setShowExclusionesModal(true)}
           onFechaChange={handleFechaChange}
           onConsultar={handleConsultar}
+        />
+
+        <CarteraExclusionesModal
+          show={showExclusionesModal}
+          onHide={() => setShowExclusionesModal(false)}
+          loading={loadingCuentasExcluidas}
+          accountOptions={accountOptions}
+          cuentasExcluidas={cuentasExcluidas}
+          onAgregarCuenta={async (cuenta) =>
+            handleAgregarCuentaExcluida(cuenta)
+          }
+          onEliminarCuenta={async (cuenta) =>
+            handleEliminarCuentaExcluida(cuenta)
+          }
         />
 
         {data.length === 0 && !loading && (
@@ -64,6 +88,30 @@ export default function CarteraBoard() {
             <Row className="g-3 mb-3">
               <Col md={12}>
                 <MaximizeWrapper>
+                  <ComparativoAgingChart data={data} />
+                </MaximizeWrapper>
+              </Col>
+            </Row>
+
+            <Row className="g-3 mb-3">
+              <Col md={12}>
+                <MaximizeWrapper>
+                  <AgingChart data={data} />
+                </MaximizeWrapper>
+              </Col>
+            </Row>
+
+            <Row className="g-3">
+              <Col md={12}>
+                <MaximizeWrapper>
+                  <RecaudoChart data={data} />
+                </MaximizeWrapper>
+              </Col>
+            </Row>
+
+            <Row className="g-3 mb-3">
+              <Col md={12}>
+                <MaximizeWrapper>
                   <ComparativoSaldoChart data={data} />
                 </MaximizeWrapper>
               </Col>
@@ -72,22 +120,14 @@ export default function CarteraBoard() {
             <Row className="g-3 mb-3">
               <Col md={12}>
                 <MaximizeWrapper>
-                  <ComparativoAgingChart data={data} />
-                </MaximizeWrapper>
-              </Col>
-            </Row>
-
-            <Row className="g-3 mb-3">
-              <Col md={5}>
-                <MaximizeWrapper>
                   <DistribucionSaldoChart data={data} />
                 </MaximizeWrapper>
               </Col>
-              <Col md={7}>
+              {/* <Col md={7}>
                 <MaximizeWrapper>
                   <ConcentracionCarteraChart data={data} />
                 </MaximizeWrapper>
-              </Col>
+              </Col> */}
             </Row>
 
             <Row className="g-3 mb-3">
@@ -144,22 +184,6 @@ export default function CarteraBoard() {
               <Col md={12}>
                 <MaximizeWrapper>
                   <IndiceRecaudoChart data={data} />
-                </MaximizeWrapper>
-              </Col>
-            </Row>
-
-            <Row className="g-3 mb-3">
-              <Col md={12}>
-                <MaximizeWrapper>
-                  <AgingChart data={data} />
-                </MaximizeWrapper>
-              </Col>
-            </Row>
-
-            <Row className="g-3">
-              <Col md={12}>
-                <MaximizeWrapper>
-                  <RecaudoChart data={data} />
                 </MaximizeWrapper>
               </Col>
             </Row>
