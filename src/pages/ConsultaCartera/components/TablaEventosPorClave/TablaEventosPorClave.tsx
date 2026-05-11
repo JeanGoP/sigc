@@ -419,23 +419,23 @@ export const TablaEventosPorClave: React.FC<TablaEventosPorClaveProps> = ({
       </strong>
     </div>
 
-    <div className="p-2 border rounded">
+    {/* <div className="p-2 border rounded">
       <div className="text-muted" style={{ fontSize: 12 }}>
         Total comprometido
       </div>
       <strong>
         $ {StringToMoney(resumen.totalComprometido)}
       </strong>
-    </div>
+    </div> */}
 
-    <div className="p-2 border rounded">
+    {/* <div className="p-2 border rounded">
       <div className="text-muted" style={{ fontSize: 12 }}>
         Total pagado
       </div>
       <strong>
         $ {StringToMoney(resumen.totalPagado)}
       </strong>
-    </div>
+    </div> */}
 
     <div
       className={`p-2 border rounded ${
