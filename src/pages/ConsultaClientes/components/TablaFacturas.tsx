@@ -1,5 +1,6 @@
 import React from "react";
 import { Box, Button, Typography } from "@mui/material";
+import { getAgeBadgeStyle } from "@app/constants/ageBuckets";
 import { StringToMoney } from "@app/utils/formattersFunctions";
 import { DynamicTable, TableColumn } from "./tablaReutilizables";
 
@@ -20,6 +21,30 @@ export const TablaFacturas = (props: Props) => {
   // 👇 el hook va aquí, en el nivel superior del componente
   const { FetchEstadoCuentaClienteFactura, loading, error } =
     useEstadoCuentaService();
+
+  const readDisplayValue = (value: unknown) => {
+    if (typeof value === "string") {
+      const trimmed = value.trim();
+      return trimmed.length > 0 ? trimmed : "-";
+    }
+
+    if (typeof value === "number" && Number.isFinite(value)) {
+      return String(value);
+    }
+
+    return "-";
+  };
+
+  const buildAgeSx = (ageValue: unknown) => {
+    const badge = getAgeBadgeStyle(ageValue);
+    return {
+      backgroundColor: badge.fillColor,
+      color: badge.textColor,
+      borderRadius: "4px",
+      width: "100%",
+      textAlign: "center" as const,
+    };
+  };
 
   const GetCuotasFactura = async (
     cuenta: string,
@@ -99,15 +124,7 @@ export const TablaFacturas = (props: Props) => {
       id: "SACTMORA",
       label: "Saldo Mora",
       format: (value: any, row?: any) => (
-        <Box
-          sx={{
-            backgroundColor: row?.ColorCodigo || "gray",
-            color: "#fff",
-            borderRadius: "4px",
-            width: "100%",
-            textAlign: "center",
-          }}
-        >
+        <Box sx={buildAgeSx(row?.EDAD)}>
           $ {StringToMoney(value)}
         </Box>
       ),
@@ -116,15 +133,7 @@ export const TablaFacturas = (props: Props) => {
       id: "VALMORA",
       label: "Int. Mora",
       format: (value: any, row?: any) => (
-        <Box
-          sx={{
-            backgroundColor: row?.ColorCodigo || "gray",
-            color: "#fff",
-            borderRadius: "4px",
-            width: "100%",
-            textAlign: "center",
-          }}
-        >
+        <Box sx={buildAgeSx(row?.EDAD)}>
           $ {StringToMoney(value)}
         </Box>
       ),
@@ -137,19 +146,14 @@ export const TablaFacturas = (props: Props) => {
     {
       id: "EDAD",
       label: "Edad",
-      format: (value: any, row?: any) => (
-        <Box
-          sx={{
-            backgroundColor: row?.ColorCodigo || "gray",
-            color: "#fff",
-            borderRadius: "4px",
-            width: "100%",
-            textAlign: "center",
-          }}
-        >
-          {value}
-        </Box>
-      ),
+      format: (value: any) => {
+        const badge = getAgeBadgeStyle(value);
+        return (
+          <Box sx={buildAgeSx(value)}>
+            {readDisplayValue(value)}
+          </Box>
+        );
+      },
     },
   ];
 

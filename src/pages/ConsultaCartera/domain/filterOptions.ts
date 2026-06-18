@@ -1,3 +1,5 @@
+import { AGE_BUCKETS } from "@app/constants/ageBuckets";
+
 export interface EdadMoraOption {
   label: string;
   value: string;
@@ -9,13 +11,10 @@ export interface SinGestionDiasOption {
   color: string | null;
 }
 
-export const EDAD_MORA_OPTIONS: EdadMoraOption[] = [
-  { label: "Por vencer", value: "PV" },
-  { label: "30", value: "30" },
-  { label: "60", value: "60" },
-  { label: "90", value: "90" },
-  { label: "+90", value: "+90" },
-];
+export const EDAD_MORA_OPTIONS: EdadMoraOption[] = AGE_BUCKETS.map((bucket) => ({
+  label: bucket.badgeLabel,
+  value: bucket.key,
+}));
 
 export const SIN_GESTION_DIAS_OPTIONS: SinGestionDiasOption[] = [
   { value: 0, label: "⚪ Todos", color: null },

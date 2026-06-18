@@ -1,4 +1,5 @@
 import type { CarteraRow } from "@app/Data/dashboardCarteraData";
+import { DASHBOARD_AGE_COMPARATIVE_COLORS } from "@app/constants/ageBuckets";
 
 export type ComparativoSaldoSortKey = "actual" | "anterior" | "delta";
 export type ComparativoAgingViewMode = "distribucion" | "variacion";
@@ -34,11 +35,11 @@ export const COMPARATIVO_AGING_SEGMENT_COLORS: Record<
   Exclude<ComparativoAgingSegment, "total">,
   SegmentColorScale
 > = {
-  pv: { active: "#28B463", previous: "#94D9B1" },
-  d30: { active: "#D4AC0D", previous: "#EDD986" },
-  d60: { active: "#D68910", previous: "#EBC488" },
-  d90: { active: "#CA6F1E", previous: "#E5B78F" },
-  d90mas: { active: "#BA4A00", previous: "#DDA580" },
+  pv: DASHBOARD_AGE_COMPARATIVE_COLORS.pv,
+  d30: DASHBOARD_AGE_COMPARATIVE_COLORS.d30,
+  d60: DASHBOARD_AGE_COMPARATIVE_COLORS.d60,
+  d90: DASHBOARD_AGE_COMPARATIVE_COLORS.d90,
+  d90mas: DASHBOARD_AGE_COMPARATIVE_COLORS.d90mas,
 };
 
 export const COMPARATIVO_AGING_SEGMENTS: ComparativoAgingSegmentDefinition[] = [

@@ -1,4 +1,5 @@
 import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Typography, Box } from '@mui/material';
+import { getAgeBadgeStyle } from '@app/constants/ageBuckets';
 import { DynamicTable, TableColumn } from './tablaReutilizables';
 import { StringToMoney } from '@app/utils/formattersFunctions';
 
@@ -18,6 +19,17 @@ interface EstadoCliente {
 
 
 const EstadoClienteTable = (props: any) => {
+  const buildAgeSx = (ageValue: unknown) => {
+    const badge = getAgeBadgeStyle(ageValue);
+    return {
+      backgroundColor: badge.fillColor,
+      color: badge.textColor,
+      borderRadius: "4px",
+      width: "100%",
+      textAlign: "center" as const,
+    };
+  };
+
   const columns_saldos: TableColumn[] = [
     {
       id: "FECHFAC",
@@ -30,15 +42,7 @@ const EstadoClienteTable = (props: any) => {
       id: "DEBE",
       label: "Valor Debe",
       format: (value: any, row?: any) => (
-        <Box
-          sx={{
-            backgroundColor: row?.ColorCodigo || "gray",
-            color: "#fff",
-            borderRadius: "4px",
-            width: "100%",
-            textAlign: "center",
-          }}
-        >
+        <Box sx={buildAgeSx(row?.DIAS ?? row?.EDAD)}>
           $ {StringToMoney(value)}
         </Box>
       ),

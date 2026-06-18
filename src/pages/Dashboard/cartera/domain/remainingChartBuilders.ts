@@ -1,14 +1,15 @@
 import type { CarteraRow } from "@app/Data/dashboardCarteraData";
+import { AGE_BUCKET_BY_ALIAS } from "@app/constants/ageBuckets";
 
 export type DashboardAgingMode = "valor" | "cantidad";
 export type DashboardComposicionPorCarteraMode = "valor" | "porcentaje";
 
 const AGE_COLORS = {
-  pv: "#28B463",
-  d30: "#D4AC0D",
-  d60: "#D68910",
-  d90: "#CA6F1E",
-  d90mas: "#BA4A00",
+  pv: AGE_BUCKET_BY_ALIAS.pv.fillColor,
+  d30: AGE_BUCKET_BY_ALIAS.d30.fillColor,
+  d60: AGE_BUCKET_BY_ALIAS.d60.fillColor,
+  d90: AGE_BUCKET_BY_ALIAS.d90.fillColor,
+  d90mas: AGE_BUCKET_BY_ALIAS.d90mas.fillColor,
 };
 
 const CONCENTRACION_COLORS = [

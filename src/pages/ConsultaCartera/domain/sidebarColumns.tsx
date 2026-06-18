@@ -1,4 +1,5 @@
 import type { TableColumn } from "@app/pages/ConsultaClientes/components/tablaReutilizables";
+import { getAgeBadgeStyle } from "@app/constants/ageBuckets";
 
 type ConsultaCarteraSidebarRow = Record<string, unknown>;
 
@@ -9,6 +10,19 @@ interface BuildConsultaCarteraSidebarColumnsOptions {
 export function buildConsultaCarteraSidebarColumns({
   onBuscarRow,
 }: BuildConsultaCarteraSidebarColumnsOptions): TableColumn[] {
+  const readDisplayValue = (value: unknown) => {
+    if (typeof value === "string") {
+      const trimmed = value.trim();
+      return trimmed.length > 0 ? trimmed : "-";
+    }
+
+    if (typeof value === "number" && Number.isFinite(value)) {
+      return String(value);
+    }
+
+    return "-";
+  };
+
   return [
     {
       id: "buscar",
@@ -55,22 +69,25 @@ export function buildConsultaCarteraSidebarColumns({
     {
       id: "EDAD",
       label: "Edad",
-      format: (value, row) => (
-        <span
-          style={{
-            background: row.ColorCodigo || "#eee",
-            color: "#fff",
-            borderRadius: "4px",
-            padding: "2px 8px",
-            display: "inline-block",
-            minWidth: 40,
-            textAlign: "center",
-            fontWeight: "bold",
-          }}
-        >
-          {value}
-        </span>
-      ),
+      format: (value) => {
+        const badge = getAgeBadgeStyle(value);
+        return (
+          <span
+            style={{
+              background: badge.fillColor,
+              color: badge.textColor,
+              borderRadius: "4px",
+              padding: "2px 8px",
+              display: "inline-block",
+              minWidth: 40,
+              textAlign: "center",
+              fontWeight: "bold",
+            }}
+          >
+            {readDisplayValue(value)}
+          </span>
+        );
+      },
     },
   ];
 }

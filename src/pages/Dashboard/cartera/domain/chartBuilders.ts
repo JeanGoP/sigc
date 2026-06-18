@@ -1,23 +1,15 @@
 import type { CarteraRow } from "@app/Data/dashboardCarteraData";
+import {
+  DASHBOARD_AGE_COLORS as SHARED_DASHBOARD_AGE_COLORS,
+  DASHBOARD_AGE_LABELS as SHARED_DASHBOARD_AGE_LABELS,
+} from "@app/constants/ageBuckets";
 
 export type RecaudoChartMode = "valor" | "variacion";
 export type ComposicionRecaudoMode = "valor" | "porcentaje";
 
-export const DASHBOARD_CARTERA_AGE_LABELS = [
-  "Por vencer",
-  "30 dias",
-  "60 dias",
-  "90 dias",
-  "+90 dias",
-];
+export const DASHBOARD_CARTERA_AGE_LABELS = SHARED_DASHBOARD_AGE_LABELS;
 
-export const DASHBOARD_CARTERA_AGE_COLORS = [
-  "#28B463",
-  "#D4AC0D",
-  "#D68910",
-  "#CA6F1E",
-  "#BA4A00",
-];
+export const DASHBOARD_CARTERA_AGE_COLORS = SHARED_DASHBOARD_AGE_COLORS;
 
 export function toggleHiddenDashboardCartera(
   current: ReadonlySet<string>,

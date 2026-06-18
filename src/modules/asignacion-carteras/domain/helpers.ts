@@ -5,6 +5,7 @@ import type {
   ListarAsignacionesParams,
   ListarHistorialParams,
 } from "@app/services/AsignacionCarteras/asignacionCarterasService";
+import { AGE_BUCKETS } from "@app/constants/ageBuckets";
 import type {
   AsignacionCarterasFilters,
   MasivoReasignacionFormState,
@@ -12,13 +13,10 @@ import type {
   ReasignacionFormState,
 } from "./types";
 
-export const TRAMOS = [
-  { value: "PV", label: "Por vencer" },
-  { value: "30", label: "30" },
-  { value: "60", label: "60" },
-  { value: "90", label: "90" },
-  { value: "+90", label: "+90" },
-];
+export const TRAMOS = AGE_BUCKETS.map((bucket) => ({
+  value: bucket.key,
+  label: bucket.badgeLabel,
+}));
 
 export function formatDateTime(value?: string | null): string {
   if (!value) {

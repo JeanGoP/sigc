@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Alert, Button, Spinner } from "react-bootstrap";
+import { AGE_BUCKET_BY_KEY } from "@app/constants/ageBuckets";
 import { fmtCOP } from "../../utils/formattersFunctions";
 import { computeAsesorLiteDashboardKpis, type AnyRow } from "./domain/kpis";
 import { useAsesorLiteDashboard } from "./hooks/useAsesorLiteDashboard";
@@ -63,15 +64,15 @@ const MONTH_FORMATTER = new Intl.DateTimeFormat("es-CO", {
 const AGE_CONFIG: Array<{
   key: AgeKey;
   label: string;
-  cssVar: string;
+  fillColor: string;
   tone: "ok" | "warn" | "bad";
   pill?: { label: string; tone: "ok" | "bad" };
 }> = [
-  { key: "PV", label: "Por vencer", cssVar: "var(--verde)", tone: "ok", pill: { label: "al día", tone: "ok" } },
-  { key: "30", label: "1 a 30 días", cssVar: "var(--lima)", tone: "ok" },
-  { key: "60", label: "31 a 60 días", cssVar: "var(--ambar)", tone: "warn" },
-  { key: "90", label: "61 a 90 días", cssVar: "var(--naranja)", tone: "warn" },
-  { key: "+90", label: "Más de 90 días", cssVar: "var(--rojo-mora)", tone: "bad", pill: { label: "crítica", tone: "bad" } },
+  { key: "PV", label: "Por vencer", fillColor: AGE_BUCKET_BY_KEY.PV.fillColor, tone: "ok", pill: { label: "al día", tone: "ok" } },
+  { key: "30", label: "1 a 30 días", fillColor: AGE_BUCKET_BY_KEY["30"].fillColor, tone: "ok" },
+  { key: "60", label: "31 a 60 días", fillColor: AGE_BUCKET_BY_KEY["60"].fillColor, tone: "warn" },
+  { key: "90", label: "61 a 90 días", fillColor: AGE_BUCKET_BY_KEY["90"].fillColor, tone: "warn" },
+  { key: "+90", label: "Más de 90 días", fillColor: AGE_BUCKET_BY_KEY["+90"].fillColor, tone: "bad", pill: { label: "crítica", tone: "bad" } },
 ];
 
 function readString(value: unknown): string {
@@ -768,7 +769,7 @@ export function AsesorLiteDashboardPage() {
                   return (
                     <tr key={row.key}>
                       <td>
-                        <span className="sw" style={{ background: config.cssVar }} />
+                        <span className="sw" style={{ background: config.fillColor }} />
                         {row.label}
                         {row.pill && <span className={`pill ${row.pill.tone}`}>{row.pill.label}</span>}
                       </td>
