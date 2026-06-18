@@ -109,12 +109,35 @@ function clampPct(value: number): number {
   return Math.max(0, Math.min(1, value));
 }
 
+function readPositiveUserId(value: unknown): number | null {
+  if (typeof value === "number") {
+    return Number.isInteger(value) && value > 0 ? value : null;
+  }
+
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    const parsed = Number(trimmed);
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+  }
+
+  return null;
+}
+
 function formatPercent(value: number): string {
   return `${PERCENT_FORMATTER.format(Math.max(0, value) * 100)}%`;
 }
 
 function formatPercentPoints(value: number): string {
   return `${value >= 0 ? "+" : "-"}${PERCENT_FORMATTER.format(Math.abs(value) * 100)} pts`;
+}
+
+function formatSignedMoney(value: number): string {
+  return value < 0 ? fmtCOP(value, true) : fmtCOP(value);
+}
+
+function getFaltaTextClass(value: number): string {
+  return value < 0 ? "asesor-mockup-text--green" : "asesor-mockup-text--red";
 }
 
 function formatDateTimeShort(date: Date) {
@@ -277,7 +300,7 @@ function buildAgeRows(cartera: AnyRow[], recaudos: AnyRow[]): AgeRow[] {
     const pct = saldo / safeTotalSaldo;
     const recaudado = recaudoByAge.get(config.key) ?? 0;
     const meta = saldoAnterior;
-    const falta = Math.max(0, saldo - saldoAnterior);
+    const falta = saldo - saldoAnterior;
     const avancePct = saldo > 0 ? clampPct(meta / saldo) : meta <= 0 ? 1 : 0;
     return {
       key: config.key,
@@ -524,9 +547,14 @@ function resolvePuntoVentaLabel(recaudos: AnyRow[]): string {
 export function AsesorLiteDashboardPage() {
   const { currentUser, currentUserId, data, consultar, lastUpdatedAtMs, loading, error } = useAsesorLiteDashboard();
   const [selectedAccountKey, setSelectedAccountKey] = useState("");
+  const [adminQueryUserId, setAdminQueryUserId] = useState("");
 
   const now = useMemo(() => new Date(), []);
   const nombre = String(currentUser?.fullName ?? currentUser?.username ?? "").trim() || "Asesor";
+  const isAdmin = useMemo(
+    () => String(currentUser?.role ?? "").trim().toLowerCase() === "administrador",
+    [currentUser?.role],
+  );
   const periodo = useMemo(() => {
     const value = MONTH_FORMATTER.format(now);
     return value.charAt(0).toUpperCase() + value.slice(1);
@@ -545,6 +573,10 @@ export function AsesorLiteDashboardPage() {
   );
 
   useEffect(() => {
+    setAdminQueryUserId(currentUserId);
+  }, [currentUserId]);
+
+  useEffect(() => {
     if (accountOptions.length === 0) {
       if (selectedAccountKey) setSelectedAccountKey("");
       return;
@@ -560,6 +592,23 @@ export function AsesorLiteDashboardPage() {
     () => accountOptions.find((option) => option.key === selectedAccountKey) ?? null,
     [accountOptions, selectedAccountKey],
   );
+  const requestedUserId = useMemo(() => {
+    if (!isAdmin) {
+      return readPositiveUserId(currentUserId);
+    }
+
+    return readPositiveUserId(adminQueryUserId) ?? readPositiveUserId(currentUserId);
+  }, [adminQueryUserId, currentUserId, isAdmin]);
+  const handleConsultar = (force = false) => {
+    if (!requestedUserId) {
+      return;
+    }
+
+    return consultar({
+      force,
+      userId: requestedUserId,
+    });
+  };
   const activeAccountKey = selectedAccountKey;
   const filteredGestiones = useMemo(
     () => filterRowsByAccount(data?.gestiones ?? [], activeAccountKey),
@@ -682,10 +731,28 @@ export function AsesorLiteDashboardPage() {
               <i style={{ width: `${Math.round(clampPct(workingMonth.progressPct) * 100)}%` }} />
             </div>
             <div className="asesor-mockup-actions">
-              <Button variant="light" size="sm" onClick={() => void consultar()} disabled={!currentUserId || loading}>
+              {isAdmin ? (
+                <label className="asesor-mockup-admin-field">
+                  <span>Usuario ID</span>
+                  <input
+                    aria-label="Indicar usuario para consultar dashboard"
+                    type="number"
+                    min={1}
+                    step={1}
+                    value={adminQueryUserId}
+                    onChange={(event) => setAdminQueryUserId(event.target.value)}
+                  />
+                </label>
+              ) : null}
+              <Button variant="light" size="sm" onClick={() => void handleConsultar()} disabled={!requestedUserId || loading}>
                 Consultar
               </Button>
-              <Button variant="outline-light" size="sm" onClick={() => void consultar({ force: true })} disabled={!currentUserId || loading}>
+              <Button
+                variant="outline-light"
+                size="sm"
+                onClick={() => void handleConsultar(true)}
+                disabled={!requestedUserId || loading}
+              >
                 Forzar
               </Button>
               {loading && <Spinner animation="border" size="sm" />}
@@ -734,7 +801,7 @@ export function AsesorLiteDashboardPage() {
           </div>
           <div className="asesor-mockup-kpi asesor-mockup-kpi--falt">
             <div className="t">Faltante para la meta</div>
-            <div className="v r">{fmtCOP(faltante)}</div>
+            <div className="v r">{formatSignedMoney(faltante)}</div>
             <div className="n r">{faltanteSubtitle}</div>
           </div>
           <div className="asesor-mockup-kpi">
@@ -777,7 +844,7 @@ export function AsesorLiteDashboardPage() {
                       <td>{formatPercent(row.pct)}</td>
                       <td>{fmtCOP(row.meta)}</td>
                       <td className="asesor-mockup-text--green">{fmtCOP(row.recaudado)}</td>
-                      <td className="asesor-mockup-text--red">{fmtCOP(row.falta)}</td>
+                      <td className={getFaltaTextClass(row.falta)}>{formatSignedMoney(row.falta)}</td>
                     </tr>
                   );
                 })}
@@ -787,7 +854,7 @@ export function AsesorLiteDashboardPage() {
                   <td>100,0%</td>
                   <td>{fmtCOP(currentMeta)}</td>
                   <td className="asesor-mockup-text--green">{fmtCOP(currentRecaudado)}</td>
-                  <td className="asesor-mockup-text--red">{fmtCOP(currentFaltante)}</td>
+                  <td className={getFaltaTextClass(currentFaltante)}>{formatSignedMoney(currentFaltante)}</td>
                 </tr>
               </tbody>
             </table>
@@ -813,7 +880,7 @@ export function AsesorLiteDashboardPage() {
           </div>
           <div className="asesor-mockup-legend">
             <span>Recaudado: <b className="g">{fmtCOP(recaudado)}</b></span>
-            <span>Faltante: <b className="r">{fmtCOP(faltante)} ({formatPercent(meta > 0 ? faltante / meta : 0)})</b></span>
+            <span>Faltante: <b className="r">{formatSignedMoney(faltante)} ({formatPercent(meta > 0 ? faltante / meta : 0)})</b></span>
             <span>Meta: <b className="t">{fmtCOP(meta)} (100%)</b></span>
           </div>
           <div className="asesor-mockup-mini">

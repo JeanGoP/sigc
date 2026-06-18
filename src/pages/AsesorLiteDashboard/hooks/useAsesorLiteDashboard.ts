@@ -16,6 +16,12 @@ type CachedDashboard = {
   fetchedAtMs: number;
 };
 
+type ConsultarOptions = {
+  force?: boolean;
+  cacheTtlMs?: number;
+  userId?: number | string | null;
+};
+
 const dashboardCache = new Map<number, CachedDashboard>();
 
 function pruneDashboardCache(nowMs: number) {
@@ -24,6 +30,19 @@ function pruneDashboardCache(nowMs: number) {
       dashboardCache.delete(key);
     }
   }
+}
+
+function normalizeUserId(value: number | string | null | undefined): number | null {
+  if (typeof value === "number") {
+    return Number.isFinite(value) && value > 0 ? value : null;
+  }
+
+  if (typeof value === "string") {
+    const parsed = Number(value.trim());
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+  }
+
+  return null;
 }
 
 export function useAsesorLiteDashboard() {
@@ -42,9 +61,9 @@ export function useAsesorLiteDashboard() {
     return () => pruneDashboardCache(Date.now());
   }, []);
 
-  const consultar = useCallback(async (options?: { force?: boolean; cacheTtlMs?: number }) => {
-    const userId = Number(currentUserId);
-    if (!Number.isFinite(userId) || userId <= 0) {
+  const consultar = useCallback(async (options?: ConsultarOptions) => {
+    const userId = normalizeUserId(options?.userId) ?? normalizeUserId(currentUserId);
+    if (!userId) {
       return;
     }
 

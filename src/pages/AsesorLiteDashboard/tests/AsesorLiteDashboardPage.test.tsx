@@ -3,6 +3,20 @@ import { MemoryRouter } from "react-router-dom";
 import { AsesorLiteDashboardPage } from "../AsesorLiteDashboardPage";
 import { fmtCOP } from "../../../utils/formattersFunctions";
 
+jest.mock(
+  "@app/constants/ageBuckets",
+  () => ({
+    AGE_BUCKET_BY_KEY: {
+      PV: { fillColor: "#10B981" },
+      "30": { fillColor: "#FBBF24" },
+      "60": { fillColor: "#F97316" },
+      "90": { fillColor: "#EF4444" },
+      "+90": { fillColor: "#B91C1C" },
+    },
+  }),
+  { virtual: true },
+);
+
 function getDateKey(date: Date): string {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -119,6 +133,8 @@ function getCurrentDateKey(): string {
 }
 
 const currentDateKey = getCurrentDateKey();
+const mockConsultar = jest.fn();
+const mockedNow = new Date(2026, 4, 2, 10, 0, 0);
 
 const mockData = {
   cuentasTramos: [],
@@ -230,23 +246,34 @@ const mockData = {
   ],
 };
 
-jest.mock("../hooks/useAsesorLiteDashboard", () => {
-  const now = new Date(2026, 4, 2, 10, 0, 0);
+const mockHookState = {
+  currentUser: { id: 1, fullName: "Asesor Demo", username: "demo", role: "Asesor" },
+  currentUserId: "1",
+  data: mockData,
+  consultar: mockConsultar,
+  lastUpdatedAtMs: mockedNow.getTime(),
+  loading: false,
+  error: null as string | null,
+};
 
-  return {
-    useAsesorLiteDashboard: () => ({
-      currentUser: { id: 1, fullName: "Asesor Demo", username: "demo" },
-      currentUserId: "1",
-      data: mockData,
-      consultar: jest.fn(),
-      lastUpdatedAtMs: now.getTime(),
-      loading: false,
-      error: null,
-    }),
-  };
-});
+jest.mock("../hooks/useAsesorLiteDashboard", () => ({
+  useAsesorLiteDashboard: () => mockHookState,
+}));
 
 describe("AsesorLiteDashboardPage", () => {
+  beforeEach(() => {
+    mockConsultar.mockReset();
+    Object.assign(mockHookState, {
+      currentUser: { id: 1, fullName: "Asesor Demo", username: "demo", role: "Asesor" },
+      currentUserId: "1",
+      data: mockData,
+      consultar: mockConsultar,
+      lastUpdatedAtMs: mockedNow.getTime(),
+      loading: false,
+      error: null,
+    });
+  });
+
   it("renders the advisor collection dashboard layout", () => {
     render(
       <MemoryRouter>
@@ -263,6 +290,7 @@ describe("AsesorLiteDashboardPage", () => {
     expect(screen.getByRole("option", { name: /todas las cuentas/i })).toBeInTheDocument();
     expect(screen.queryByText(/ticket promedio/i)).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Consultar" })).toBeInTheDocument();
+    expect(screen.queryByLabelText(/indicar usuario para consultar dashboard/i)).not.toBeInTheDocument();
   });
 
   it("applies the global account filter to kpis and age table", () => {
@@ -381,5 +409,56 @@ describe("AsesorLiteDashboardPage", () => {
     expect(screen.getByText("Llamadas")).toBeInTheDocument();
     expect(screen.getByText("1001")).toBeInTheDocument();
     expect(screen.getByText(fmtCOP(250000))).toBeInTheDocument();
+  });
+
+  it("preserves negative falta values in the age table, total row and top kpi", () => {
+    render(
+      <MemoryRouter>
+        <AsesorLiteDashboardPage />
+      </MemoryRouter>,
+    );
+
+    fireEvent.change(screen.getByLabelText(/seleccionar cuenta del dashboard/i), {
+      target: { value: "130505007" },
+    });
+
+    const thirtyRow = screen.getByText("1 a 30 días").closest("tr");
+    const totalRow = screen.getByText("Total general").closest("tr");
+    const faltanteCard = screen.getByText("Faltante para la meta").closest(".asesor-mockup-kpi");
+
+    expect(thirtyRow).not.toBeNull();
+    expect(totalRow).not.toBeNull();
+    expect(faltanteCard).not.toBeNull();
+
+    expect(within(thirtyRow!).getByText(fmtCOP(-50, true))).toBeInTheDocument();
+    expect(within(totalRow!).getByText(fmtCOP(-50, true))).toBeInTheDocument();
+    expect(within(faltanteCard!).getByText(fmtCOP(-50, true))).toBeInTheDocument();
+    expect(within(thirtyRow!).getByText(fmtCOP(-50, true))).toHaveClass("asesor-mockup-text--green");
+    expect(within(totalRow!).getByText(fmtCOP(-50, true))).toHaveClass("asesor-mockup-text--green");
+  });
+
+  it("shows the numeric user id field only for administrators and uses it in the query", () => {
+    mockHookState.currentUser = {
+      id: 1,
+      fullName: "Administrador Demo",
+      username: "admin",
+      role: "Administrador",
+    };
+
+    render(
+      <MemoryRouter>
+        <AsesorLiteDashboardPage />
+      </MemoryRouter>,
+    );
+
+    const input = screen.getByLabelText(/indicar usuario para consultar dashboard/i);
+    expect(input).toBeInTheDocument();
+
+    fireEvent.change(input, { target: { value: "25" } });
+    fireEvent.click(screen.getByRole("button", { name: "Consultar" }));
+    fireEvent.click(screen.getByRole("button", { name: "Forzar" }));
+
+    expect(mockConsultar).toHaveBeenNthCalledWith(1, { force: false, userId: 25 });
+    expect(mockConsultar).toHaveBeenNthCalledWith(2, { force: true, userId: 25 });
   });
 });
