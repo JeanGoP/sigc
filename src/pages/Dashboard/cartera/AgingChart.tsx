@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Bar } from "react-chartjs-2";
 import { fmtCOP } from "@app/utils/formattersFunctions";
 import type { CarteraRow } from "@app/Data/dashboardCarteraData";
 import { useMaximize } from "./MaximizeContext";
-import { toggleHiddenDashboardCartera } from "./domain/chartBuilders";
+import { CarteraCuentaMultiSelect } from "./components/CarteraCuentaMultiSelect";
 import { buildAgingChartData } from "./domain/remainingChartBuilders";
 
 export default function AgingChart({ data }: { data: CarteraRow[] }) {
@@ -11,6 +11,30 @@ export default function AgingChart({ data }: { data: CarteraRow[] }) {
   const [modo, setModo] = useState<"valor" | "cantidad">("valor");
   const [ocultas, setOcultas] = useState<Set<string>>(new Set());
   const chartModel = buildAgingChartData(data, ocultas, modo);
+  const cuentaOptions = useMemo(
+    () =>
+      chartModel.chipRows.map((row) => ({
+        value: row.codicta,
+        label: row.desccta,
+      })),
+    [chartModel.chipRows],
+  );
+  const selectedCodictas = useMemo(
+    () =>
+      new Set(
+        cuentaOptions
+          .map((option) => option.value)
+          .filter((value) => !ocultas.has(value)),
+      ),
+    [cuentaOptions, ocultas],
+  );
+  const handleSelectedChange = useCallback(
+    (nextSelected: Set<string>) => {
+      const all = cuentaOptions.map((option) => option.value);
+      setOcultas(new Set(all.filter((value) => !nextSelected.has(value))));
+    },
+    [cuentaOptions],
+  );
 
   const options = {
     indexAxis: "y" as const,
@@ -100,38 +124,14 @@ export default function AgingChart({ data }: { data: CarteraRow[] }) {
         </div>
 
         <small className="text-muted d-block mb-2">
-          Leyenda: oculta/muestra edades. Chips: oculta/muestra carteras
+          Leyenda: oculta/muestra edades.
         </small>
 
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginBottom: 12 }}>
-          {chartModel.chipRows.map((row) => {
-            const hidden = ocultas.has(row.codicta);
-
-            return (
-              <button
-                key={row.codicta}
-                onClick={() =>
-                  setOcultas((current) =>
-                    toggleHiddenDashboardCartera(current, row.codicta),
-                  )
-                }
-                style={{
-                  padding: "2px 9px",
-                  fontSize: 11,
-                  borderRadius: 12,
-                  border: "1px solid #ccc",
-                  background: hidden ? "#f5f5f5" : "#fff",
-                  color: hidden ? "#bbb" : "#444",
-                  cursor: "pointer",
-                  textDecoration: hidden ? "line-through" : "none",
-                  transition: "all 0.15s",
-                }}
-              >
-                {row.desccta}
-              </button>
-            );
-          })}
-        </div>
+        <CarteraCuentaMultiSelect
+          options={cuentaOptions}
+          selectedValues={selectedCodictas}
+          onSelectedValuesChange={handleSelectedChange}
+        />
 
         <div
           style={{

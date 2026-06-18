@@ -56,6 +56,10 @@ describe("dashboard cartera kpis", () => {
         obligaciones30: 1,
         obligaciones60: 1,
         total: 1000,
+        d30: 120,
+        d60: 50,
+        d90: 20,
+        d90mas: 10,
         carteraVencida: 200,
         carteraVencidaPorc: 20,
         totalAnt: 800,
@@ -91,6 +95,12 @@ describe("dashboard cartera kpis", () => {
     ).toMatchObject({
       value: "$1.500,00",
       sub: "Ant: $1.300,00",
+    });
+    expect(
+      panels[0].metrics.find((metric) => metric.label === "Vencida 30 dias"),
+    ).toMatchObject({
+      value: "$120,00",
+      sub: "8.0% de cartera bruta",
     });
     expect(
       panels[0].metrics.find((metric) => metric.label === "Mora critica"),

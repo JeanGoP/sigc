@@ -2,13 +2,14 @@ import React from "react";
 import {
   TimelineSeguimientos,
   type Seguimiento,
+  type NuevoSeguimientoResult,
 } from "@app/modules/maestros/tipos-eventos/TimelineSeguimientos";
 
 interface ConsultaCarteraSeguimientoTabProps {
   seguimientos: Seguimiento[];
   onNuevoSeguimiento: (
     seguimiento: Omit<Seguimiento, "id" | "usuario" | "fecha" | "hora">
-  ) => Promise<boolean>;
+  ) => Promise<NuevoSeguimientoResult>;
   onBuscar?: () => Promise<unknown> | void;
   isSeguimientoDraftOpen: boolean;
   onSeguimientoDraftOpenChange: (open: boolean) => void;
@@ -19,6 +20,7 @@ interface ConsultaCarteraSeguimientoTabProps {
   selectedCliente: string;
   selectedFactura: string;
   selectedCuenta: string;
+  montoEventoSugerido?: number;
 }
 
 export function ConsultaCarteraSeguimientoTab({
@@ -34,6 +36,7 @@ export function ConsultaCarteraSeguimientoTab({
   selectedCliente,
   selectedFactura,
   selectedCuenta,
+  montoEventoSugerido,
 }: ConsultaCarteraSeguimientoTabProps) {
   return (
     <TimelineSeguimientos
@@ -52,6 +55,7 @@ export function ConsultaCarteraSeguimientoTab({
         factura: selectedFactura,
         cuenta: selectedCuenta,
       }}
+      montoSugeridoEvento={montoEventoSugerido}
     />
   );
 }

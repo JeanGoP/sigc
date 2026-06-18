@@ -28,7 +28,8 @@ export function createEmptyEvento(): Evento {
 
 export function buildDefaultFormEvento(
   tiposEvento: readonly TipoEventoOption[],
-  preferNombre?: string
+  preferNombre?: string,
+  montoSugerido?: number
 ): Evento {
   const preferred =
     (preferNombre
@@ -39,6 +40,10 @@ export function buildDefaultFormEvento(
     ...createEmptyEvento(),
     tipo: preferred?.nombre ?? "",
     id: preferred?.id ?? 0,
+    valor:
+      preferred?.requiereMonto && typeof montoSugerido === "number"
+        ? montoSugerido
+        : undefined,
   };
 }
 

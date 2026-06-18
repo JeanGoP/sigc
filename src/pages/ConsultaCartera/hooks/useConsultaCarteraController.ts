@@ -11,6 +11,7 @@ import {
   updateConsultaCarteraFilterProperty,
 } from "../domain/filterStorage";
 import {
+  buildFacturaMontoSuggestion,
   buildFallbackFacturaSelectionFromSearchParams,
   buildFacturaSelection,
   buildFacturasListParams,
@@ -50,6 +51,7 @@ export function useConsultaCarteraController({
   );
   const [tablaRows, setTablaRows] = useState<ConsultaCarteraRow[]>([]);
   const [tablaTotalRows, setTablaTotalRows] = useState(0);
+  const [totalSaldoCartera, setTotalSaldoCartera] = useState(0);
   const [tablaLoading, setTablaLoading] = useState(false);
   const [tablaSearch, setTablaSearch] = useState("");
   const [tablaRowsPerPage, setTablaRowsPerPage] = useState(50);
@@ -57,6 +59,9 @@ export function useConsultaCarteraController({
   const [clienteInfo, setClienteInfo] = useState<ClienteInfo | null>(null);
   const [activeTab, setActiveTab] = useState<string>("info");
   const [isSeguimientoDraftOpen, setIsSeguimientoDraftOpen] = useState(false);
+  const [montoEventoSugerido, setMontoEventoSugerido] = useState<number | undefined>(
+    undefined
+  );
 
   useEffect(() => {
     obtenerClienteRef.current = obtenerCliente;
@@ -116,23 +121,31 @@ export function useConsultaCarteraController({
 
         const data = await getFacturasList(params);
         if (data?.success && data.data) {
-          if (Array.isArray(data.data)) {
-            resultRows = data.data;
+          const responseData = data.data as any;
+
+          if (Array.isArray(responseData)) {
+            resultRows = responseData;
             setTablaRows(resultRows);
             setTablaTotalRows(resultRows.length);
-          } else if (Array.isArray(data.data.items)) {
-            resultRows = data.data.items as unknown as ConsultaCarteraRow[];
+            setTotalSaldoCartera(0);
+          } else if (Array.isArray(responseData.items)) {
+            resultRows = responseData.items as unknown as ConsultaCarteraRow[];
             setTablaRows(resultRows);
             setTablaTotalRows(
-              typeof data.data.total === "number" ? data.data.total : resultRows.length
+              typeof responseData.total === "number" ? responseData.total : resultRows.length
+            );
+            setTotalSaldoCartera(
+              typeof responseData.totalSaldoCartera === "number" ? responseData.totalSaldoCartera : 0
             );
           } else {
             setTablaRows([]);
             setTablaTotalRows(0);
+            setTotalSaldoCartera(0);
           }
         } else {
           setTablaRows([]);
           setTablaTotalRows(0);
+          setTotalSaldoCartera(0);
         }
       } catch {
         setTablaRows([]);
@@ -155,6 +168,7 @@ export function useConsultaCarteraController({
   const limpiarSeleccion = useCallback(() => {
     setIsSeguimientoDraftOpen(false);
     setRegistroSeleccionado(null);
+    setMontoEventoSugerido(undefined);
     setSelectedValue("");
     setActiveTab("info");
   }, []);
@@ -167,6 +181,9 @@ export function useConsultaCarteraController({
       );
 
       setRegistroSeleccionado(seleccionado);
+      setMontoEventoSugerido(
+        buildFacturaMontoSuggestion(row as Record<string, unknown>)
+      );
       setIsSeguimientoDraftOpen(false);
       if (seleccionado.cliente) {
         setSelectedValue(seleccionado.cliente);
@@ -181,6 +198,7 @@ export function useConsultaCarteraController({
     setSelectedValue(clienteId);
     setIsSeguimientoDraftOpen(false);
     setRegistroSeleccionado(null);
+    setMontoEventoSugerido(undefined);
     setActiveTab("info");
   }, []);
 
@@ -276,6 +294,7 @@ export function useConsultaCarteraController({
     fechaConsultaFacturas,
     filtroSaldoCero,
     isSeguimientoDraftOpen,
+    montoEventoSugerido,
     registroSeleccionado,
     selectedValue,
     tablaFacturasRef,
@@ -285,6 +304,7 @@ export function useConsultaCarteraController({
     tablaRowsPerPage,
     tablaSearch,
     tablaTotalRows,
+    totalSaldoCartera,
     cargarInfoCliente,
     fetchFacturas,
     handleBuscar,

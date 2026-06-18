@@ -30,6 +30,16 @@ export function buildDashboardCarteraKpiPanels(
   const totalVencida = data.reduce((sum, row) => sum + row.carteraVencida, 0);
   const porcVencida = totalSaldo > 0 ? (totalVencida / totalSaldo) * 100 : 0;
 
+  const totalVencida30 = data.reduce((sum, row) => sum + row.d30, 0);
+  const totalVencida60 = data.reduce((sum, row) => sum + row.d60, 0);
+  const totalVencida90 = data.reduce((sum, row) => sum + row.d90, 0);
+  const totalVencida90mas = data.reduce((sum, row) => sum + row.d90mas, 0);
+  const porcVencida30 = totalSaldo > 0 ? (totalVencida30 / totalSaldo) * 100 : 0;
+  const porcVencida60 = totalSaldo > 0 ? (totalVencida60 / totalSaldo) * 100 : 0;
+  const porcVencida90 = totalSaldo > 0 ? (totalVencida90 / totalSaldo) * 100 : 0;
+  const porcVencida90mas =
+    totalSaldo > 0 ? (totalVencida90mas / totalSaldo) * 100 : 0;
+
   const totalSaldoAnt = data.reduce((sum, row) => sum + (row.totalAnt ?? 0), 0);
   const totalVencidaAnt = data.reduce(
     (sum, row) => sum + (row.carteraVencidaAnt ?? 0),
@@ -115,6 +125,30 @@ export function buildDashboardCarteraKpiPanels(
             : fmtCOP(totalVencida),
           color: porcVencida > 10 ? "#BA4A00" : "#D68910",
           delta: hayDatosAnt ? { pct: deltaVencidaPct, inverted: true } : undefined,
+        },
+        {
+          label: "Vencida 30 dias",
+          value: fmtCOP(totalVencida30),
+          sub: `${fmtPct(porcVencida30)} de cartera bruta`,
+          color: "#D4AC0D",
+        },
+        {
+          label: "Vencida 60 dias",
+          value: fmtCOP(totalVencida60),
+          sub: `${fmtPct(porcVencida60)} de cartera bruta`,
+          color: "#D68910",
+        },
+        {
+          label: "Vencida 90 dias",
+          value: fmtCOP(totalVencida90),
+          sub: `${fmtPct(porcVencida90)} de cartera bruta`,
+          color: "#CA6F1E",
+        },
+        {
+          label: "Vencida +90 dias",
+          value: fmtCOP(totalVencida90mas),
+          sub: `${fmtPct(porcVencida90mas)} de cartera bruta`,
+          color: "#BA4A00",
         },
         {
           label: "Mora critica",

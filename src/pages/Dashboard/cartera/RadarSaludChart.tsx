@@ -1,19 +1,21 @@
-import { useState } from "react";
+import { useMemo } from "react";
 import { Radar } from "react-chartjs-2";
 import { Chart as ChartJS, Filler, RadarController, RadialLinearScale } from "chart.js";
 import { useMaximize } from "./MaximizeContext";
 import type { CarteraRow } from "@app/Data/dashboardCarteraData";
 import {
   buildRadarSaludChartData,
-  RADAR_SALUD_COLOR_PALETTE,
 } from "./domain/advancedChartBuilders";
 
 ChartJS.register(RadarController, RadialLinearScale, Filler);
 
 export default function RadarSaludChart({ data }: { data: CarteraRow[] }) {
   const maximized = useMaximize();
-  const [seleccionadas, setSeleccionadas] = useState<Set<string>>(new Set());
-  const chartModel = buildRadarSaludChartData(data, seleccionadas);
+  const selectedCodictas = useMemo(
+    () => new Set(data.map((row) => row.codicta)),
+    [data],
+  );
+  const chartModel = buildRadarSaludChartData(data, selectedCodictas);
 
   const options = {
     responsive: true,
@@ -50,54 +52,6 @@ export default function RadarSaludChart({ data }: { data: CarteraRow[] }) {
           </small>
         </div>
 
-        <small className="text-muted d-block mt-2 mb-2">
-          Selecciona las carteras que deseas comparar
-        </small>
-
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginBottom: 12 }}>
-          {chartModel.chipRows.map((row) => {
-            const selectedIndex = chartModel.selectedRows.findIndex(
-              (selectedRow) => selectedRow.codicta === row.codicta,
-            );
-            const active = selectedIndex >= 0;
-            const color = active
-              ? RADAR_SALUD_COLOR_PALETTE[
-                  selectedIndex % RADAR_SALUD_COLOR_PALETTE.length
-                ].border
-              : "#ccc";
-
-            return (
-              <button
-                key={row.codicta}
-                onClick={() =>
-                  setSeleccionadas((current) => {
-                    const next = new Set(current);
-                    if (next.has(row.codicta)) {
-                      next.delete(row.codicta);
-                    } else {
-                      next.add(row.codicta);
-                    }
-                    return next;
-                  })
-                }
-                style={{
-                  padding: "2px 9px",
-                  fontSize: 11,
-                  borderRadius: 12,
-                  border: `1px solid ${color}`,
-                  background: active ? `${color}22` : "#f5f5f5",
-                  color: active ? color : "#bbb",
-                  cursor: "pointer",
-                  fontWeight: active ? 600 : 400,
-                  transition: "all 0.15s",
-                }}
-              >
-                {row.desccta}
-              </button>
-            );
-          })}
-        </div>
-
         {chartModel.selectedRows.length === 0 ? (
           <div
             style={{
@@ -108,7 +62,7 @@ export default function RadarSaludChart({ data }: { data: CarteraRow[] }) {
             }}
           >
             <span className="text-muted" style={{ fontSize: 13 }}>
-              Selecciona al menos una cartera para visualizar su perfil
+              No hay carteras seleccionadas para comparar
             </span>
           </div>
         ) : (

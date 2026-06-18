@@ -35,6 +35,29 @@ describe("tipos eventos timeline helpers", () => {
     });
   });
 
+  it("prefills the suggested amount only for event types that require it", () => {
+    const tiposConMonto = [
+      { id: 10, nombre: "Promesa de pago", requiereMonto: true },
+      { id: 20, nombre: "Visita", requiereMonto: false },
+    ];
+
+    expect(buildDefaultFormEvento(tiposConMonto, "Promesa de pago", 45000)).toEqual({
+      id: 10,
+      tipo: "Promesa de pago",
+      fecha: "",
+      hora: null,
+      valor: 45000,
+    });
+
+    expect(buildDefaultFormEvento(tiposConMonto, "Visita", 45000)).toEqual({
+      id: 20,
+      tipo: "Visita",
+      fecha: "",
+      hora: null,
+      valor: undefined,
+    });
+  });
+
   it("merges draft form data over the default form for that event type", () => {
     const draft: SeguimientoDraftState = {
       texto: "",

@@ -63,12 +63,12 @@ export function buildRendimientoAsesoresColumns(): TableColumn[] {
       align: "right",
       format: formatMoneyCell,
     },
-    // {
-    //   id: "acumuladoCompromisosCumplidos",
-    //   label: "Acum. Cumplidos",
-    //   align: "right",
-    //   format: formatMoneyCell,
-    // },
+    {
+      id: "acumuladoCompromisosCumplidos",
+      label: "Acum. Cumplidos",
+      align: "right",
+      format: formatMoneyCell,
+    },
   ];
 }
 

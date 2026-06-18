@@ -5,7 +5,6 @@ import { fmtCOP } from "@app/utils/formattersFunctions";
 import { useMaximize } from "./MaximizeContext";
 import {
   buildRecaudoChartData,
-  toggleHiddenDashboardCartera,
 } from "./domain/chartBuilders";
 
 const fmtPct = (value: number) => `${value >= 0 ? "+" : ""}${value.toFixed(1)}%`;
@@ -13,8 +12,7 @@ const fmtPct = (value: number) => `${value >= 0 ? "+" : ""}${value.toFixed(1)}%`
 export default function RecaudoChart({ data }: { data: CarteraRow[] }) {
   const maximized = useMaximize();
   const [modo, setModo] = useState<"valor" | "variacion">("valor");
-  const [ocultas, setOcultas] = useState<Set<string>>(new Set());
-  const chartModel = buildRecaudoChartData(data, ocultas, modo);
+  const chartModel = buildRecaudoChartData(data, new Set(), modo);
 
   const options = {
     indexAxis: "y" as const,
@@ -103,38 +101,6 @@ export default function RecaudoChart({ data }: { data: CarteraRow[] }) {
               Variacion (%)
             </span>
           </div>
-        </div>
-
-        <small className="text-muted d-block mb-2">Chips: oculta/muestra carteras</small>
-
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginBottom: 12 }}>
-          {chartModel.chipRows.map((row) => {
-            const hidden = ocultas.has(row.codicta);
-
-            return (
-              <button
-                key={row.codicta}
-                onClick={() =>
-                  setOcultas((current) =>
-                    toggleHiddenDashboardCartera(current, row.codicta),
-                  )
-                }
-                style={{
-                  padding: "2px 9px",
-                  fontSize: 11,
-                  borderRadius: 12,
-                  border: "1px solid #ccc",
-                  background: hidden ? "#f5f5f5" : "#fff",
-                  color: hidden ? "#bbb" : "#444",
-                  cursor: "pointer",
-                  textDecoration: hidden ? "line-through" : "none",
-                  transition: "all 0.15s",
-                }}
-              >
-                {row.desccta}
-              </button>
-            );
-          })}
         </div>
 
         <div

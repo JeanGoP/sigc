@@ -1,11 +1,10 @@
 import { Col, Row } from "react-bootstrap";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import KpisSection from "./cartera/KpisSection";
 import DistribucionSaldoChart from "./cartera/DistribucionSaldoChart";
 import CarteraVencidaChart from "./cartera/CarteraVencidaChart";
-import AgingChart from "./cartera/AgingChart";
 import RecaudoChart from "./cartera/RecaudoChart";
 import IndiceRecaudoChart from "./cartera/IndiceRecaudoChart";
-import ComposicionRecaudoChart from "./cartera/ComposicionRecaudoChart";
 import ConcentracionCarteraChart from "./cartera/ConcentracionCarteraChart";
 import EficienciaRecuperacionChart from "./cartera/EficienciaRecuperacionChart";
 import ComposicionRecaudoPorCarteraChart from "./cartera/ComposicionRecaudoPorCarteraChart";
@@ -16,10 +15,10 @@ import ComparativoSaldoChart from "./cartera/ComparativoSaldoChart";
 import ComparativoAgingChart from "./cartera/ComparativoAgingChart";
 import MaximizeWrapper from "./cartera/MaximizeWrapper";
 import { MaximizeProvider } from "./cartera/MaximizeContext";
+import { CarteraCuentaMultiSelect } from "./cartera/components/CarteraCuentaMultiSelect";
 import { CarteraToolbar } from "./cartera/components/CarteraToolbar";
 import { CarteraExclusionesModal } from "./cartera/components/CarteraExclusionesModal";
 import { useCarteraBoard } from "./cartera/hooks/useCarteraBoard";
-import { useState } from "react";
 
 export default function CarteraBoard() {
   const {
@@ -36,7 +35,45 @@ export default function CarteraBoard() {
     handleAgregarCuentaExcluida,
     handleEliminarCuentaExcluida,
   } = useCarteraBoard();
+  const [ocultasGlobales, setOcultasGlobales] = useState<Set<string>>(new Set());
   const [showExclusionesModal, setShowExclusionesModal] = useState(false);
+
+  const visibleData = useMemo(
+    () => data.filter((row) => !ocultasGlobales.has(row.codicta)),
+    [data, ocultasGlobales],
+  );
+
+  const cuentaOptions = useMemo(
+    () => data.map((row) => ({ value: row.codicta, label: row.desccta })),
+    [data],
+  );
+
+  const selectedCodictas = useMemo(
+    () =>
+      new Set(
+        cuentaOptions
+          .map((option) => option.value)
+          .filter((value) => !ocultasGlobales.has(value)),
+      ),
+    [cuentaOptions, ocultasGlobales],
+  );
+
+  const handleSelectedChange = useCallback(
+    (nextSelected: Set<string>) => {
+      const all = cuentaOptions.map((option) => option.value);
+      setOcultasGlobales(new Set(all.filter((value) => !nextSelected.has(value))));
+    },
+    [cuentaOptions],
+  );
+
+  useEffect(() => {
+    const allowed = new Set(cuentaOptions.map((option) => option.value));
+    const next = new Set([...ocultasGlobales].filter((value) => allowed.has(value)));
+
+    if (next.size !== ocultasGlobales.size) {
+      setOcultasGlobales(next);
+    }
+  }, [cuentaOptions, ocultasGlobales]);
 
   return (
     <MaximizeProvider>
@@ -83,20 +120,20 @@ export default function CarteraBoard() {
 
         {data.length > 0 && (
           <>
-            <KpisSection data={data} />
+            <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
+              <CarteraCuentaMultiSelect
+                options={cuentaOptions}
+                selectedValues={selectedCodictas}
+                onSelectedValuesChange={handleSelectedChange}
+              />
+            </div>
+
+            <KpisSection data={visibleData} />
 
             <Row className="g-3 mb-3">
               <Col md={12}>
                 <MaximizeWrapper>
-                  <ComparativoAgingChart data={data} />
-                </MaximizeWrapper>
-              </Col>
-            </Row>
-
-            <Row className="g-3 mb-3">
-              <Col md={12}>
-                <MaximizeWrapper>
-                  <AgingChart data={data} />
+                  <ComparativoAgingChart data={visibleData} />
                 </MaximizeWrapper>
               </Col>
             </Row>
@@ -104,7 +141,7 @@ export default function CarteraBoard() {
             <Row className="g-3">
               <Col md={12}>
                 <MaximizeWrapper>
-                  <RecaudoChart data={data} />
+                  <RecaudoChart data={visibleData} />
                 </MaximizeWrapper>
               </Col>
             </Row>
@@ -112,7 +149,7 @@ export default function CarteraBoard() {
             <Row className="g-3 mb-3">
               <Col md={12}>
                 <MaximizeWrapper>
-                  <ComparativoSaldoChart data={data} />
+                  <ComparativoSaldoChart data={visibleData} />
                 </MaximizeWrapper>
               </Col>
             </Row>
@@ -120,7 +157,7 @@ export default function CarteraBoard() {
             <Row className="g-3 mb-3">
               <Col md={12}>
                 <MaximizeWrapper>
-                  <DistribucionSaldoChart data={data} />
+                  <DistribucionSaldoChart data={visibleData} />
                 </MaximizeWrapper>
               </Col>
               {/* <Col md={7}>
@@ -133,25 +170,12 @@ export default function CarteraBoard() {
             <Row className="g-3 mb-3">
               <Col md={7}>
                 <MaximizeWrapper>
-                  <BubbleRiesgoChart data={data} />
+                  <BubbleRiesgoChart data={visibleData} />
                 </MaximizeWrapper>
               </Col>
               <Col md={5}>
                 <MaximizeWrapper>
-                  <RadarSaludChart data={data} />
-                </MaximizeWrapper>
-              </Col>
-            </Row>
-
-            <Row className="g-3 mb-3">
-              <Col md={4}>
-                <MaximizeWrapper>
-                  <ComposicionRecaudoChart data={data} />
-                </MaximizeWrapper>
-              </Col>
-              <Col md={8}>
-                <MaximizeWrapper>
-                  <EficienciaRecuperacionChart data={data} />
+                  <RadarSaludChart data={visibleData} />
                 </MaximizeWrapper>
               </Col>
             </Row>
@@ -159,7 +183,7 @@ export default function CarteraBoard() {
             <Row className="g-3 mb-3">
               <Col md={12}>
                 <MaximizeWrapper>
-                  <ComposicionRecaudoPorCarteraChart data={data} />
+                  <EficienciaRecuperacionChart data={visibleData} />
                 </MaximizeWrapper>
               </Col>
             </Row>
@@ -167,7 +191,7 @@ export default function CarteraBoard() {
             <Row className="g-3 mb-3">
               <Col md={12}>
                 <MaximizeWrapper>
-                  <MixedRecaudoIndiceChart data={data} />
+                  <ComposicionRecaudoPorCarteraChart data={visibleData} />
                 </MaximizeWrapper>
               </Col>
             </Row>
@@ -175,7 +199,7 @@ export default function CarteraBoard() {
             <Row className="g-3 mb-3">
               <Col md={12}>
                 <MaximizeWrapper>
-                  <CarteraVencidaChart data={data} />
+                  <MixedRecaudoIndiceChart data={visibleData} />
                 </MaximizeWrapper>
               </Col>
             </Row>
@@ -183,7 +207,15 @@ export default function CarteraBoard() {
             <Row className="g-3 mb-3">
               <Col md={12}>
                 <MaximizeWrapper>
-                  <IndiceRecaudoChart data={data} />
+                  <CarteraVencidaChart data={visibleData} />
+                </MaximizeWrapper>
+              </Col>
+            </Row>
+
+            <Row className="g-3 mb-3">
+              <Col md={12}>
+                <MaximizeWrapper>
+                  <IndiceRecaudoChart data={visibleData} />
                 </MaximizeWrapper>
               </Col>
             </Row>

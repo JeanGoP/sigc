@@ -1,18 +1,19 @@
-import { useState } from "react";
+import { useMemo } from "react";
 import { Bar } from "react-chartjs-2";
 import { Chart as ChartJS, LineController, LineElement } from "chart.js";
 import { fmtCOP } from "@app/utils/formattersFunctions";
 import type { CarteraRow } from "@app/Data/dashboardCarteraData";
 import { useMaximize } from "./MaximizeContext";
-import { toggleHiddenDashboardCartera } from "./domain/chartBuilders";
 import { buildMixedRecaudoIndiceChartData } from "./domain/remainingChartBuilders";
 
 ChartJS.register(LineController, LineElement);
 
 export default function MixedRecaudoIndiceChart({ data }: { data: CarteraRow[] }) {
   const maximized = useMaximize();
-  const [ocultas, setOcultas] = useState<Set<string>>(new Set());
-  const chartModel = buildMixedRecaudoIndiceChartData(data, ocultas);
+  const chartModel = useMemo(
+    () => buildMixedRecaudoIndiceChartData(data, new Set()),
+    [data],
+  );
 
   const options = {
     responsive: true,
@@ -54,38 +55,6 @@ export default function MixedRecaudoIndiceChart({ data }: { data: CarteraRow[] }
           <h6 className="card-title text-muted mb-0">
             Recaudo vs Indice de recaudo por cartera
           </h6>
-        </div>
-
-        <small className="text-muted d-block mb-2">Chips: oculta/muestra carteras</small>
-
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginBottom: 12 }}>
-          {chartModel.chipRows.map((row) => {
-            const hidden = ocultas.has(row.codicta);
-
-            return (
-              <button
-                key={row.codicta}
-                onClick={() =>
-                  setOcultas((current) =>
-                    toggleHiddenDashboardCartera(current, row.codicta),
-                  )
-                }
-                style={{
-                  padding: "2px 9px",
-                  fontSize: 11,
-                  borderRadius: 12,
-                  border: "1px solid #ccc",
-                  background: hidden ? "#f5f5f5" : "#fff",
-                  color: hidden ? "#bbb" : "#444",
-                  cursor: "pointer",
-                  textDecoration: hidden ? "line-through" : "none",
-                  transition: "all 0.15s",
-                }}
-              >
-                {row.desccta}
-              </button>
-            );
-          })}
         </div>
 
         <div style={{ height: maximized ? "calc(100vh - 320px)" : 340 }}>

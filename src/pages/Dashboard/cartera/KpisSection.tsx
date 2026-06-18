@@ -1,11 +1,10 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import type { CarteraRow } from "@app/Data/dashboardCarteraData";
 import type {
   DashboardKpiDelta,
   DashboardKpiPanel,
 } from "./domain/kpis";
 import { buildDashboardCarteraKpiPanels } from "./domain/kpis";
-import { toggleHiddenDashboardCartera } from "./domain/chartBuilders";
 
 function DeltaBadge({
   pct,
@@ -43,14 +42,8 @@ function DeltaBadge({
 
 function UnifiedMetricPanel({
   panels,
-  rows,
-  ocultas,
-  onToggleCuenta,
 }: {
   panels: DashboardKpiPanel[];
-  rows: CarteraRow[];
-  ocultas: ReadonlySet<string>;
-  onToggleCuenta: (codicta: string) => void;
 }) {
   const metrics = panels.flatMap((panel) =>
     panel.metrics.map((metric) => ({
@@ -127,33 +120,6 @@ function UnifiedMetricPanel({
           </div>
         </div>
 
-        <small className="text-muted d-block mb-2">Chips: oculta/muestra carteras</small>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginBottom: 10 }}>
-          {rows.map((row) => {
-            const hidden = ocultas.has(row.codicta);
-
-            return (
-              <button
-                key={row.codicta}
-                onClick={() => onToggleCuenta(row.codicta)}
-                style={{
-                  padding: "2px 9px",
-                  fontSize: 11,
-                  borderRadius: 12,
-                  border: "1px solid #ccc",
-                  background: hidden ? "#f5f5f5" : "#fff",
-                  color: hidden ? "#bbb" : "#444",
-                  cursor: "pointer",
-                  textDecoration: hidden ? "line-through" : "none",
-                  transition: "all 0.15s",
-                }}
-              >
-                {row.desccta}
-              </button>
-            );
-          })}
-        </div>
-
         <div
           className="kpi-drag-strip"
           style={{
@@ -220,23 +186,11 @@ function UnifiedMetricPanel({
 }
 
 export default function KpisSection({ data }: { data: CarteraRow[] }) {
-  const [ocultas, setOcultas] = useState<Set<string>>(new Set());
-
-  const visibleData = useMemo(
-    () => data.filter((row) => !ocultas.has(row.codicta)),
-    [data, ocultas],
-  );
-
-  const panels = buildDashboardCarteraKpiPanels(visibleData);
+  const panels = buildDashboardCarteraKpiPanels(data);
 
   return (
     <UnifiedMetricPanel
       panels={panels}
-      rows={data}
-      ocultas={ocultas}
-      onToggleCuenta={(codicta) =>
-        setOcultas((current) => toggleHiddenDashboardCartera(current, codicta))
-      }
     />
   );
 }

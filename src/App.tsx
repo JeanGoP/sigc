@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { Suspense, lazy, useEffect } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { ToastContainer } from "react-toastify";
 import Main from "@modules/main/Main";
@@ -21,6 +21,7 @@ import PrivateRoute from "./routes/PrivateRoute";
 import PermissionRoute from "./routes/PermissionRoute";
 import { useAppDispatch, useAppSelector } from "./store/store";
 import { Loading } from "./components/Loading";
+import { features } from "./config/features";
 import ConsultaClientes from "@app/pages/ConsultaClientes/ConsultaCLientes";
 import { ConsultaCartera } from "@app/pages/ConsultaCartera/ConsultaCartera";
 import ParametrosGenerales from "@app/pages/ParametrosGenerales";
@@ -35,6 +36,11 @@ import RolesPermisosPage from "@app/modules/parametrizacion/roles-permisos/Roles
 import { ModificacionEventos } from "./pages/ModificacionEventos/ModificacionEventos";
 import Unauthorized from "./pages/Unauthorized";
 import CambiarContrasena from "./pages/CambiarContrasena";
+const AsesorLiteDashboardPageLazy = lazy(() =>
+  import("@app/pages/AsesorLiteDashboard/AsesorLiteDashboardPage").then((m) => ({
+    default: m.AsesorLiteDashboardPage,
+  })),
+);
 
 const App = () => {
   const windowSize = useWindowSize();
@@ -91,6 +97,20 @@ const App = () => {
                 <PermissionRoute permission="consulta_carteras.view">
                   <ConsultaCartera />
                 </PermissionRoute>
+              }
+            />
+            <Route
+              path="/asesor_dashboard"
+              element={
+                features.asesorLiteDashboardEnabled ? (
+                  <PermissionRoute permission="dashboard.asesor">
+                    <Suspense fallback={<Loading />}>
+                      <AsesorLiteDashboardPageLazy />
+                    </Suspense>
+                  </PermissionRoute>
+                ) : (
+                  <Navigate to="/profile" replace />
+                )
               }
             />
             <Route

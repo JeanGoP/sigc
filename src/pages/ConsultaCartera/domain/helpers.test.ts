@@ -2,6 +2,7 @@ import {
   areEquivalentPhoneValues,
   buildFallbackFacturaSelectionFromSearchParams,
   buildCombinedApiErrorMessage,
+  buildFacturaMontoSuggestion,
   buildEventosXml,
   buildFacturaSelection,
   buildFacturasListParams,
@@ -208,6 +209,13 @@ describe("consulta cartera helpers", () => {
       numefac: "",
       cuenta: "",
     });
+  });
+
+  it("reads SACTMORA as the suggested event amount when available", () => {
+    expect(buildFacturaMontoSuggestion({ SACTMORA: 12345 })).toBe(12345);
+    expect(buildFacturaMontoSuggestion({ sactmora: "98,765" })).toBe(98765);
+    expect(buildFacturaMontoSuggestion({ SACTMORA: "" })).toBeUndefined();
+    expect(buildFacturaMontoSuggestion(null)).toBeUndefined();
   });
 
   it("builds eventos XML exactly as the save flow expects", () => {

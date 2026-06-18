@@ -94,6 +94,22 @@ function readTrimmedString(value: unknown): string {
   return String(value ?? "").trim();
 }
 
+function readOptionalNumber(value: unknown): number | undefined {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : undefined;
+  }
+
+  const normalized = String(value ?? "")
+    .replace(/[$,\s]/g, "")
+    .trim();
+  if (!normalized) {
+    return undefined;
+  }
+
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
 function readFacturaRowValue(
   row: Record<string, unknown> | null | undefined,
   keys: string[]
@@ -325,6 +341,12 @@ export function buildFacturaSelection(
     numefac: String(row?.numefac ?? row?.NUMEFAC ?? row?.factura ?? ""),
     cuenta: String(row?.cuenta ?? row?.CUENTA ?? ""),
   };
+}
+
+export function buildFacturaMontoSuggestion(
+  row: Record<string, unknown> | null | undefined
+): number | undefined {
+  return readOptionalNumber(row?.SACTMORA ?? row?.sactmora);
 }
 
 export function buildEventosXml(

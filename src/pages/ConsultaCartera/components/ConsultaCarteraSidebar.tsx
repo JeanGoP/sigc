@@ -20,6 +20,7 @@ interface ConsultaCarteraSidebarProps {
   columns: TableColumn[];
   tablaRows: ConsultaCarteraRow[];
   tablaTotalRows: number;
+  totalSaldoCartera: number;
   tablaRowsPerPage: number;
   tablaPage: number;
   hasFullSelection: boolean;
@@ -31,6 +32,8 @@ interface ConsultaCarteraSidebarProps {
   onRowsPerPageChange: (rowsPerPage: number) => void;
   onPageChange: (page: number) => void;
   onRowEnter: (row: ConsultaCarteraRow) => void;
+  onExportToCsv: () => void;
+  exporting: boolean;
 }
 
 export function ConsultaCarteraSidebar({
@@ -42,6 +45,7 @@ export function ConsultaCarteraSidebar({
   columns,
   tablaRows,
   tablaTotalRows,
+  totalSaldoCartera,
   tablaRowsPerPage,
   tablaPage,
   hasFullSelection,
@@ -53,6 +57,8 @@ export function ConsultaCarteraSidebar({
   onRowsPerPageChange,
   onPageChange,
   onRowEnter,
+  onExportToCsv,
+  exporting,
 }: ConsultaCarteraSidebarProps) {
   return (
     <div
@@ -133,6 +139,7 @@ export function ConsultaCarteraSidebar({
             columns={columns}
             rows={tablaRows}
             totalRows={tablaTotalRows}
+            totalSaldoCartera={totalSaldoCartera}
             searchText={tablaSearch}
             onSearchChange={onSearchChange}
             rowsPerPage={tablaRowsPerPage}
@@ -144,6 +151,8 @@ export function ConsultaCarteraSidebar({
             onPageChange={onPageChange}
             enableKeyboardNavigation={true}
             onRowEnter={onRowEnter}
+            onExportToCsv={onExportToCsv}
+            exporting={exporting}
             selectedPredicate={(row) =>
               Boolean(
                 hasFullSelection &&

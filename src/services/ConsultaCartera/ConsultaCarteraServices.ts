@@ -14,6 +14,8 @@ export interface FacturaListModel {
 
 export interface FacturaListResponse {
   total: number;
+  totalSaldoCartera: number;
+  totalValorMora: number;
   page: number;
   numPage: number;
   items: FacturaListModel[];

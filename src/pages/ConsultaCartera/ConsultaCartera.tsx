@@ -1,4 +1,4 @@
-﻿import React, { useRef, useState, useEffect, useCallback } from "react";
+import React, { useRef, useState, useEffect, useCallback } from "react";
 import "./GestionCobroLayout.css";
 import {
   useGestionFacturaService,
@@ -18,6 +18,7 @@ import { getCurrentTabId } from "@app/services/GestionLlamadas";
 import { useConsultaCarteraController } from "./hooks/useConsultaCarteraController";
 import { useConsultaCarteraGestionSession } from "./hooks/useConsultaCarteraGestionSession";
 import { useConsultaCarteraMail } from "./hooks/useConsultaCarteraMail";
+import { useExportCarteraCsv } from "./hooks/useExportCarteraCsv";
 import { useConsultaCarteraSelectedSummaryProps } from "./hooks/useConsultaCarteraSelectedSummaryProps";
 import { useConsultaCarteraSeguimiento } from "./hooks/useConsultaCarteraSeguimiento";
 import { useConsultaCarteraTelephony } from "./hooks/useConsultaCarteraTelephony";
@@ -52,6 +53,7 @@ export const ConsultaCartera: React.FC = () => {
     fechaConsultaFacturas,
     filtroSaldoCero,
     isSeguimientoDraftOpen,
+    montoEventoSugerido,
     registroSeleccionado,
     selectedValue,
     tablaFacturasRef,
@@ -61,6 +63,7 @@ export const ConsultaCartera: React.FC = () => {
     tablaRowsPerPage,
     tablaSearch,
     tablaTotalRows,
+    totalSaldoCartera,
     fetchFacturas,
     handleBuscar,
     handleClicLupaBuscar,
@@ -77,6 +80,13 @@ export const ConsultaCartera: React.FC = () => {
     currentUserId: currentUser?.id,
     getFacturasList,
     obtenerCliente,
+  });
+
+  const { exportToCsv, exporting } = useExportCarteraCsv({
+    getFacturasList,
+    currentUserId: currentUser?.id,
+    fechaConsultaFacturas,
+    tablaSearch,
   });
 
   const hasFullSelection = Boolean(
@@ -288,6 +298,7 @@ export const ConsultaCartera: React.FC = () => {
       selectedCliente={selectedCliente}
       selectedFactura={selectedFactura}
       selectedCuenta={selectedCuenta}
+      montoEventoSugerido={montoEventoSugerido}
     />
   );
 
@@ -315,6 +326,7 @@ export const ConsultaCartera: React.FC = () => {
               columns={columns}
               tablaRows={tablaRows}
               tablaTotalRows={tablaTotalRows}
+              totalSaldoCartera={totalSaldoCartera}
               tablaRowsPerPage={tablaRowsPerPage}
               tablaPage={tablaPage}
               hasFullSelection={hasFullSelection}
@@ -325,6 +337,8 @@ export const ConsultaCartera: React.FC = () => {
               onToggleCollapsed={collapseHandler}
               onRowsPerPageChange={setTablaRowsPerPage}
               onPageChange={setTablaPage}
+              onExportToCsv={exportToCsv}
+              exporting={exporting}
               onRowEnter={(row) => {
                 handleClicLupaBuscar(row);
               }}

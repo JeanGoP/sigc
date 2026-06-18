@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Bar } from "react-chartjs-2";
+import { Doughnut } from "react-chartjs-2";
 import { fmtCOP } from "@app/utils/formattersFunctions";
 import type { CarteraRow } from "@app/Data/dashboardCarteraData";
 import { useMaximize } from "./MaximizeContext";
-import { toggleHiddenDashboardCartera } from "./domain/chartBuilders";
+import { buildComposicionRecaudoChartData } from "./domain/chartBuilders";
 import { buildComposicionRecaudoPorCarteraChartData } from "./domain/remainingChartBuilders";
 
 export default function ComposicionRecaudoPorCarteraChart({
@@ -13,14 +14,48 @@ export default function ComposicionRecaudoPorCarteraChart({
 }) {
   const maximized = useMaximize();
   const [modoPorc, setModoPorc] = useState(true);
-  const [ocultas, setOcultas] = useState<Set<string>>(new Set());
-  const chartModel = buildComposicionRecaudoPorCarteraChartData(
+  const [tipoGrafico, setTipoGrafico] = useState<"barras" | "dona">("barras");
+  const [carteraDona, setCarteraDona] = useState<string>("__TOTAL__");
+  const chartModelBarras = buildComposicionRecaudoPorCarteraChartData(
     data,
-    ocultas,
+    new Set(),
     modoPorc ? "porcentaje" : "valor",
   );
+  const cuentaOptions = useMemo(
+    () =>
+      chartModelBarras.chipRows.map((row) => ({
+        value: row.codicta,
+        label: row.desccta,
+      })),
+    [chartModelBarras.chipRows],
+  );
+  const cuentasDisponibles = useMemo(
+    () => cuentaOptions.map((option) => option.value),
+    [cuentaOptions],
+  );
 
-  const options = {
+  useEffect(() => {
+    if (carteraDona === "__TOTAL__") {
+      return;
+    }
+
+    if (!cuentasDisponibles.includes(carteraDona)) {
+      setCarteraDona("__TOTAL__");
+    }
+  }, [carteraDona, cuentasDisponibles]);
+
+  const chartModelDona = useMemo(() => {
+    const mode = modoPorc ? "porcentaje" : "valor";
+
+    if (carteraDona === "__TOTAL__") {
+      return buildComposicionRecaudoChartData(data, new Set(), mode);
+    }
+
+    const row = data.find((item) => item.codicta === carteraDona);
+    return buildComposicionRecaudoChartData(row ? [row] : [], new Set(), mode);
+  }, [carteraDona, data, modoPorc]);
+
+  const optionsBarras = {
     indexAxis: "y" as const,
     responsive: true,
     maintainAspectRatio: false,
@@ -51,6 +86,22 @@ export default function ComposicionRecaudoPorCarteraChart({
     },
   };
 
+  const optionsDona = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { position: "right" as const },
+      tooltip: {
+        callbacks: {
+          label: (context: any) =>
+            modoPorc
+              ? ` ${context.label}: ${(context.raw as number).toFixed(1)}%`
+              : ` ${context.label}: ${fmtCOP(context.raw as number)}`,
+        },
+      },
+    },
+  };
+
   return (
     <div className="card">
       <div className="card-body">
@@ -66,7 +117,29 @@ export default function ComposicionRecaudoPorCarteraChart({
             Composicion del recaudo por cartera
           </h6>
 
-          <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13 }}>
+            <div style={{ display: "flex", gap: 6 }}>
+              {(["barras", "dona"] as const).map((tipo) => (
+                <button
+                  key={tipo}
+                  onClick={() => setTipoGrafico(tipo)}
+                  style={{
+                    padding: "2px 10px",
+                    fontSize: 11,
+                    borderRadius: 12,
+                    border: "1px solid",
+                    borderColor: tipoGrafico === tipo ? "#4f86c6" : "#ddd",
+                    background: tipoGrafico === tipo ? "#4f86c6" : "#fff",
+                    color: tipoGrafico === tipo ? "#fff" : "#666",
+                    cursor: "pointer",
+                    transition: "all 0.15s",
+                  }}
+                >
+                  {tipo === "barras" ? "Barras" : "Dona"}
+                </button>
+              ))}
+            </div>
+
             <span
               style={{
                 color: !modoPorc ? "#4f86c6" : "#aaa",
@@ -112,53 +185,73 @@ export default function ComposicionRecaudoPorCarteraChart({
         </div>
 
         <small className="text-muted d-block mb-2">
-          Leyenda: oculta/muestra edades. Chips: oculta/muestra carteras
+          El filtro global de carteras se aplica a esta visualización.
         </small>
 
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginBottom: 12 }}>
-          {chartModel.chipRows.map((row) => {
-            const hidden = ocultas.has(row.codicta);
-
-            return (
-              <button
-                key={row.codicta}
-                onClick={() =>
-                  setOcultas((current) =>
-                    toggleHiddenDashboardCartera(current, row.codicta),
-                  )
-                }
-                style={{
-                  padding: "2px 9px",
-                  fontSize: 11,
-                  borderRadius: 12,
-                  border: "1px solid #ccc",
-                  background: hidden ? "#f5f5f5" : "#fff",
-                  color: hidden ? "#bbb" : "#444",
-                  cursor: "pointer",
-                  textDecoration: hidden ? "line-through" : "none",
-                  transition: "all 0.15s",
-                }}
-              >
-                {row.desccta}
-              </button>
-            );
-          })}
-        </div>
+        {tipoGrafico === "dona" && (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              marginTop: 8,
+              marginBottom: 8,
+              flexWrap: "wrap",
+            }}
+          >
+            <span style={{ fontSize: 11, color: "#aaa" }}>Cartera:</span>
+            <select
+              value={carteraDona}
+              onChange={(event) => setCarteraDona(event.target.value)}
+              style={{
+                fontSize: 12,
+                padding: "4px 8px",
+                borderRadius: 8,
+                border: "1px solid #d0d5dd",
+                color: "#344054",
+                background: "#fff",
+              }}
+            >
+              <option value="__TOTAL__">Total</option>
+              {cuentasDisponibles.map((codicta) => {
+                const label = cuentaOptions.find((option) => option.value === codicta)
+                  ?.label ?? codicta;
+                return (
+                  <option key={codicta} value={codicta}>
+                    {label}
+                  </option>
+                );
+              })}
+            </select>
+          </div>
+        )}
 
         <div
           style={{
             height: maximized
               ? "calc(100vh - 320px)"
-              : chartModel.rowCount * 28 + 60,
+              : tipoGrafico === "barras"
+                ? chartModelBarras.rowCount * 28 + 60
+                : 280,
           }}
         >
-          <Bar
-            data={{
-              labels: chartModel.labels,
-              datasets: chartModel.datasets,
-            }}
-            options={options}
-          />
+          {tipoGrafico === "barras" ? (
+            <Bar
+              data={{
+                labels: chartModelBarras.labels,
+                datasets: chartModelBarras.datasets,
+              }}
+              options={optionsBarras}
+            />
+          ) : (
+            <Doughnut
+              data={{
+                labels: chartModelDona.labels,
+                datasets: chartModelDona.datasets,
+              }}
+              options={optionsDona}
+            />
+          )}
         </div>
       </div>
     </div>

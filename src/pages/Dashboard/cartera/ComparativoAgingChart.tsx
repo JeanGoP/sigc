@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo } from "react";
 import { Bar } from "react-chartjs-2";
 import { type Plugin } from "chart.js";
 import { fmtCOP } from "@app/utils/formattersFunctions";
@@ -7,9 +7,6 @@ import { useMaximize } from "./MaximizeContext";
 import {
   buildComparativoAgingChartData,
   calculateDashboardPercentDelta,
-  type ComparativoAgingSegment,
-  type ComparativoAgingViewMode,
-  COMPARATIVO_AGING_SEGMENTS,
 } from "./domain/advancedChartBuilders";
 
 const gapPlugin: Plugin<"bar"> = {
@@ -82,10 +79,20 @@ const gapPlugin: Plugin<"bar"> = {
 
 export default function ComparativoAgingChart({ data }: { data: CarteraRow[] }) {
   const maximized = useMaximize();
-  const [view, setView] = useState<ComparativoAgingViewMode>("distribucion");
-  const [segmento, setSegmento] = useState<ComparativoAgingSegment>("total");
-  const [ocultas, setOcultas] = useState<Set<string>>(new Set());
-  const chartModel = buildComparativoAgingChartData(data, ocultas, segmento);
+  const chartModel = buildComparativoAgingChartData(data, new Set(), "total");
+
+  const obligacionesPorTramo = useMemo(() => {
+    return chartModel.visibleRows.reduce(
+      (sum, row) => ({
+        pv: sum.pv + row.obligacionesPV,
+        d30: sum.d30 + row.obligaciones30,
+        d60: sum.d60 + row.obligaciones60,
+        d90: sum.d90 + row.obligaciones90,
+        d90mas: sum.d90mas + row.obligaciones90mas,
+      }),
+      { pv: 0, d30: 0, d60: 0, d90: 0, d90mas: 0 },
+    );
+  }, [chartModel.visibleRows]);
 
   const distributionOptions = {
     indexAxis: "y" as const,
@@ -99,7 +106,30 @@ export default function ComparativoAgingChart({ data }: { data: CarteraRow[] }) 
         labels: {
           font: { size: 10 },
           boxWidth: 10,
-          filter: (item: any) => !item.text.includes("ant"),
+          generateLabels: (chart: any) => {
+            const trancheMeta = [
+              { datasetIndex: 0, key: "pv" as const },
+              { datasetIndex: 1, key: "d30" as const },
+              { datasetIndex: 2, key: "d60" as const },
+              { datasetIndex: 3, key: "d90" as const },
+              { datasetIndex: 4, key: "d90mas" as const },
+            ];
+
+            return trancheMeta.map(({ datasetIndex, key }) => {
+              const dataset = chart.data.datasets[datasetIndex];
+              const meta = chart.getDatasetMeta(datasetIndex);
+              const count = obligacionesPorTramo[key] ?? 0;
+
+              return {
+                text: `${dataset.label} (${count.toLocaleString("es-CO")} oblig.)`,
+                fillStyle: dataset.backgroundColor,
+                strokeStyle: dataset.backgroundColor,
+                lineWidth: 0,
+                hidden: meta.hidden,
+                datasetIndex,
+              };
+            });
+          },
         },
         onClick: (_event: any, item: any, legend: any) => {
           const chart = legend.chart;
@@ -127,8 +157,26 @@ export default function ComparativoAgingChart({ data }: { data: CarteraRow[] }) 
 
             const isPrevious = (context.dataset.stack as string) === "anterior";
             const tramo = context.dataset.label.replace(" ant", "");
+            const row = chartModel.visibleRows[context.dataIndex] as CarteraRow | undefined;
+            const obligaciones =
+              row && !isPrevious
+                ? tramo === "PV"
+                  ? row.obligacionesPV
+                  : tramo === "30d"
+                    ? row.obligaciones30
+                    : tramo === "60d"
+                      ? row.obligaciones60
+                      : tramo === "90d"
+                        ? row.obligaciones90
+                        : tramo === "+90d"
+                          ? row.obligaciones90mas
+                          : 0
+                : null;
 
-            return ` ${tramo}${isPrevious ? " (anterior)" : ""}: ${fmtCOP(value)}`;
+            const base = ` ${tramo}${isPrevious ? " (anterior)" : ""}: ${fmtCOP(value)}`;
+            return typeof obligaciones === "number"
+              ? [base, ` Oblig.: ${obligaciones.toLocaleString("es-CO")}`]
+              : base;
           },
         },
       },
@@ -150,46 +198,7 @@ export default function ComparativoAgingChart({ data }: { data: CarteraRow[] }) 
     },
   };
 
-  const variationOptions = {
-    indexAxis: "y" as const,
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: { display: false },
-      tooltip: {
-        callbacks: {
-          label: (context: any) => {
-            const delta = context.raw as number;
-            const row = chartModel.visibleRows[context.dataIndex];
-            const previous = chartModel.activeSegment.previous(row);
-            const pct = calculateDashboardPercentDelta(
-              chartModel.activeSegment.active(row),
-              previous,
-            );
-
-            return ` ${fmtCOP(delta, true)} (${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%)`;
-          },
-        },
-      },
-    },
-    scales: {
-      x: {
-        ticks: {
-          callback: (value: any) => fmtCOP(value as number),
-          font: { size: 10 },
-          maxTicksLimit: 6,
-        },
-        grid: {
-          color: (context: any) =>
-            context.tick?.value === 0 ? "#999" : "#e8eaed",
-          lineWidth: (context: any) => (context.tick?.value === 0 ? 2 : 1),
-        },
-      },
-      y: { ticks: { font: { size: 11 } } },
-    },
-  };
-
-  const rowHeight = view === "distribucion" && chartModel.hayAnt ? 52 : 28;
+  const rowHeight = chartModel.hayAnt ? 52 : 28;
   const chartHeight = maximized
     ? "calc(100vh - 320px)"
     : `${chartModel.rowCount * rowHeight + 60}px`;
@@ -210,65 +219,9 @@ export default function ComparativoAgingChart({ data }: { data: CarteraRow[] }) 
           <h6 className="card-title text-muted mb-0">
             Comparativo saldo por tramo · Actual vs Anterior
           </h6>
-          <div style={{ display: "flex", gap: 6 }}>
-            {(["distribucion", "variacion"] as ComparativoAgingViewMode[]).map(
-              (mode) => (
-                <button
-                  key={mode}
-                  onClick={() => setView(mode)}
-                  style={{
-                    padding: "2px 12px",
-                    fontSize: 11,
-                    borderRadius: 12,
-                    border: "1px solid",
-                    borderColor: view === mode ? "#4f86c6" : "#ddd",
-                    background: view === mode ? "#4f86c6" : "#fff",
-                    color: view === mode ? "#fff" : "#666",
-                    cursor: "pointer",
-                    transition: "all 0.15s",
-                  }}
-                >
-                  {mode === "distribucion" ? "Distribucion" : "Variacion Delta"}
-                </button>
-              ),
-            )}
-          </div>
         </div>
 
-        {view === "variacion" && (
-          <div
-            style={{
-              display: "flex",
-              gap: 6,
-              marginBottom: 10,
-              alignItems: "center",
-              flexWrap: "wrap",
-            }}
-          >
-            <span style={{ fontSize: 11, color: "#aaa" }}>Tramo:</span>
-            {COMPARATIVO_AGING_SEGMENTS.map((item) => (
-              <button
-                key={item.key}
-                onClick={() => setSegmento(item.key)}
-                style={{
-                  padding: "2px 10px",
-                  fontSize: 11,
-                  borderRadius: 12,
-                  border: "1px solid",
-                  borderColor: segmento === item.key ? "#CA6F1E" : "#ddd",
-                  background: segmento === item.key ? "#CA6F1E" : "#fff",
-                  color: segmento === item.key ? "#fff" : "#666",
-                  cursor: "pointer",
-                  transition: "all 0.15s",
-                }}
-              >
-                {item.label}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {view === "distribucion" && chartModel.hayAnt && (
+        {chartModel.hayAnt && (
           <div style={{ display: "flex", gap: 16, fontSize: 11, color: "#666", marginBottom: 6 }}>
             <span>
               <span
@@ -299,44 +252,6 @@ export default function ComparativoAgingChart({ data }: { data: CarteraRow[] }) 
           </div>
         )}
 
-        <small className="text-muted d-block mb-2">Chips: oculta/muestra carteras</small>
-
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginBottom: 12 }}>
-          {chartModel.chipRows.map((row) => {
-            const hidden = ocultas.has(row.codicta);
-
-            return (
-              <button
-                key={row.codicta}
-                onClick={() =>
-                  setOcultas((current) => {
-                    const next = new Set(current);
-                    if (next.has(row.codicta)) {
-                      next.delete(row.codicta);
-                    } else {
-                      next.add(row.codicta);
-                    }
-                    return next;
-                  })
-                }
-                style={{
-                  padding: "2px 9px",
-                  fontSize: 11,
-                  borderRadius: 12,
-                  border: "1px solid #ccc",
-                  background: hidden ? "#f5f5f5" : "#fff",
-                  color: hidden ? "#bbb" : "#444",
-                  cursor: "pointer",
-                  textDecoration: hidden ? "line-through" : "none",
-                  transition: "all 0.15s",
-                }}
-              >
-                {row.desccta}
-              </button>
-            );
-          })}
-        </div>
-
         {!chartModel.hayAnt && (
           <div
             style={{
@@ -351,24 +266,14 @@ export default function ComparativoAgingChart({ data }: { data: CarteraRow[] }) 
         )}
 
         <div style={{ height: chartHeight }}>
-          {view === "distribucion" ? (
-            <Bar
-              data={{
-                labels: chartModel.labels,
-                datasets: chartModel.distribucionDatasets,
-              }}
-              options={distributionOptions}
-              plugins={chartModel.hayAnt ? [gapPlugin] : []}
-            />
-          ) : (
-            <Bar
-              data={{
-                labels: chartModel.labels,
-                datasets: [chartModel.variacionDataset],
-              }}
-              options={variationOptions}
-            />
-          )}
+          <Bar
+            data={{
+              labels: chartModel.labels,
+              datasets: chartModel.distribucionDatasets,
+            }}
+            options={distributionOptions}
+            plugins={chartModel.hayAnt ? [gapPlugin] : []}
+          />
         </div>
       </div>
     </div>

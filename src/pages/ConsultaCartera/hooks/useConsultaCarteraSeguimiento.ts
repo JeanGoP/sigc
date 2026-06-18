@@ -9,6 +9,7 @@ import {
 import { toast } from "react-toastify";
 import type {
   Seguimiento,
+  NuevoSeguimientoResult,
 } from "@app/modules/maestros/tipos-eventos/TimelineSeguimientos";
 import type { ApiResponse } from "@app/models/apiResponse";
 import type {
@@ -288,48 +289,48 @@ export function useConsultaCarteraSeguimiento({
   const handleNuevoSeguimiento = useCallback(
     async (
       seguimiento: Omit<Seguimiento, "id" | "usuario" | "fecha" | "hora">
-    ): Promise<boolean> => {
+    ): Promise<NuevoSeguimientoResult> => {
       if (!selectedSelection) {
         toast.error("Debe seleccionar un cliente, factura y cuenta.");
-        return false;
+        return { ok: false };
       }
 
       if (!currentUser?.id) {
         toast.error(
           "No hay usuario logueado. Por favor, inicie sesion nuevamente."
         );
-        return false;
+        return { ok: false };
       }
 
       if (!gestionOperativaActiva) {
         toast.warning(
           "Debes iniciar una gestion activa antes de guardar seguimiento."
         );
-        return false;
+        return { ok: false };
       }
 
       if (isCallInProgress) {
         toast.warning(
           "No puedes guardar mientras hay una llamada activa. Primero debes colgar."
         );
-        return false;
+        return { ok: false };
       }
 
       if (hasPendingInboundCalls) {
         toast.warning(
           "Tienes una llamada entrante pendiente de asociar. Debes resolverla antes de guardar."
         );
-        return false;
+        return { ok: false };
       }
 
       if (isAssociatingInboundCall) {
         toast.info("Espera a que termine la asociacion de la llamada entrante.");
-        return false;
+        return { ok: false };
       }
 
       if (isSaveRequestInFlight || isSavingSeguimientoRef.current) {
         toast.info("Ya hay un guardado en curso. Espera a que termine.");
-        return false;
+        return { ok: false };
       }
 
       const activeSessionId = activeGestionSession?.idGestionSession ?? null;
@@ -339,7 +340,7 @@ export function useConsultaCarteraSeguimiento({
         toast.warning(
           "No se encontro una gestion activa valida. Inicia gestion antes de guardar."
         );
-        return false;
+        return { ok: false };
       }
 
       const saveScopeKey = activeSessionRef;
@@ -354,7 +355,7 @@ export function useConsultaCarteraSeguimiento({
         toast.warning(
           "Ya hay un guardado/cierre en curso para esta gestion desde otra pestana."
         );
-        return false;
+        return { ok: false };
       }
 
       isSavingSeguimientoRef.current = true;
@@ -367,7 +368,7 @@ export function useConsultaCarteraSeguimiento({
           toast.warning(
             "El contexto cambio mientras intentabas guardar. Verifica que estes en el cliente correcto e intenta de nuevo."
           );
-          return false;
+          return { ok: false };
         }
 
         const eventosXml = buildEventosXml(seguimiento.eventos);
@@ -392,6 +393,7 @@ export function useConsultaCarteraSeguimiento({
         );
 
         if (responseGuardado?.success) {
+          const idGestionFinal = responseGuardado?.data?.idGestionFinal ?? null;
           if (outcomeCode === "idempotent_replay") {
             toast.info("Este guardado ya habia sido procesado.");
           } else {
@@ -437,7 +439,7 @@ export function useConsultaCarteraSeguimiento({
           }
 
           await cargarGestiones(selectedSelection);
-          return true;
+          return { ok: true, idGestionFinal };
         }
 
         if (responseGuardado?.statusCode === 409) {
@@ -465,7 +467,7 @@ export function useConsultaCarteraSeguimiento({
           }
 
           await cargarGestiones(selectedSelection);
-          return false;
+          return { ok: false };
         }
 
         toast.error(
@@ -476,7 +478,7 @@ export function useConsultaCarteraSeguimiento({
             )
           )
         );
-        return false;
+        return { ok: false };
       } catch (error) {
         console.error("Error al crear el seguimiento:", error);
         toast.error(
@@ -484,7 +486,7 @@ export function useConsultaCarteraSeguimiento({
             ? error.message
             : "Error al guardar el seguimiento"
         );
-        return false;
+        return { ok: false };
       } finally {
         isSavingSeguimientoRef.current = false;
         setIsSavingSeguimiento(false);

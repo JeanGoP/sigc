@@ -1,5 +1,0 @@
-se podran hacer los siguientes tipos de busqueda
-
--por fecha de vencimiento
--por cuenta
--por campaña

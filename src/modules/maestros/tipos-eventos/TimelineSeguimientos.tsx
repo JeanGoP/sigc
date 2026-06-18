@@ -3,6 +3,7 @@ import { Button } from "react-bootstrap";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faCheck, faTimes } from "@fortawesome/free-solid-svg-icons";
 import Tooltip from "react-bootstrap/Tooltip";
+import type { AxiosRequestConfig } from "axios";
 // import {
 //   obtenerTiposEvento,
 //   TipoEvento,
@@ -27,6 +28,10 @@ import ModalSeguimientoDetalle from "./components/VerMasComponent";
 import { NuevoSeguimientoModal } from "./components/NuevoSeguimientoModal";
 import { SeguimientosTimelineList } from "./components/SeguimientosTimelineList";
 import { toast } from "react-toastify";
+import { useApi } from "@app/hooks/useApi";
+import { resolveStoredAuthSession } from "@app/services/Auth/authStorage";
+import type { ApiResponse } from "@app/models/apiResponse";
+import { getConfiguredApiUrl } from "@app/services/api/apiConfig";
 import {
   getEventoCumplidoLabel,
   getEventoCumplidoState,
@@ -60,11 +65,16 @@ import {
 
 export type { Evento, Seguimiento } from "./domain/types";
 
+export type NuevoSeguimientoResult = {
+  ok: boolean;
+  idGestionFinal?: number | null;
+};
+
 interface TimelineSeguimientosProps {
   seguimientos: Seguimiento[];
   onNuevoSeguimiento: (
     seguimiento: Omit<Seguimiento, "id" | "usuario" | "fecha" | "hora">
-  ) => Promise<boolean>;
+  ) => Promise<NuevoSeguimientoResult>;
   onBuscar?: () => Promise<unknown> | void;
   nuevoAbiertoControlado?: boolean;
   onNuevoAbiertoChange?: (open: boolean) => void;
@@ -73,6 +83,7 @@ interface TimelineSeguimientosProps {
   disableGuardarSeguimientoReason?: string;
   contextoEvento?: SeguimientoEventoContext;
   draftStorageKey?: string;
+  montoSugeridoEvento?: number;
 }
 
 export const TimelineSeguimientos: React.FC<TimelineSeguimientosProps> = ({
@@ -86,7 +97,9 @@ export const TimelineSeguimientos: React.FC<TimelineSeguimientosProps> = ({
   disableGuardarSeguimientoReason = "",
   contextoEvento,
   draftStorageKey,
+  montoSugeridoEvento,
 }) => {
+  const maxAdjuntosPorSeguimiento = 2;
   const [showModal, setShowModal] = React.useState(false);
   const [seguimientoActivo, setSeguimientoActivo] =
     React.useState<Seguimiento | null>(null);
@@ -94,10 +107,21 @@ export const TimelineSeguimientos: React.FC<TimelineSeguimientosProps> = ({
   const [nuevoTexto, setNuevoTexto] = React.useState("");
   const [nuevoEventos, setNuevoEventos] = React.useState<Evento[]>([]);
   const [nuevoGrabacion, setNuevoGrabacion] = React.useState<File | null>(null);
+  const [nuevoAdjuntos, setNuevoAdjuntos] = React.useState<File[]>([]);
+  const [isUploadingAdjuntos, setIsUploadingAdjuntos] = React.useState(false);
   const [tiposEvento, setTiposEvento] = React.useState<TipoEvento[]>([]);
   const [nuevoTipoContacto, setNuevoTipoContacto] = React.useState<
     string | number
   >(0);
+
+  const { request: requestAdjuntosCupos } = useApi<{
+    max: number;
+    current: number;
+    remaining: number;
+  }>("/api/v1", {
+    timeout: 15000,
+    retries: 0,
+  });
 
   const { listarTiposEvento } = useListarTiposEvento();
   const {
@@ -142,14 +166,15 @@ export const TimelineSeguimientos: React.FC<TimelineSeguimientosProps> = ({
   );
   const getDefaultFormEvento = React.useCallback(
     (preferNombre?: string): Evento =>
-      buildDefaultFormEvento(tiposEvento, preferNombre),
-    [tiposEvento]
+      buildDefaultFormEvento(tiposEvento, preferNombre, montoSugeridoEvento),
+    [montoSugeridoEvento, tiposEvento]
   );
 
   const resetDraftState = React.useCallback(() => {
     setNuevoTexto("");
     setNuevoEventos([]);
     setNuevoGrabacion(null);
+    setNuevoAdjuntos([]);
     setNuevoTipoContacto(0);
     setEditIndex(null);
     setErrorValidacion(null);
@@ -315,24 +340,36 @@ export const TimelineSeguimientos: React.FC<TimelineSeguimientosProps> = ({
     (value: string | number) => {
       const selectedTipo = tiposEvento.find((tipo) => tipo.nombre === value);
       setFormEvento((prev) =>
-        aplicarReseteosPorRequerimientosEvento({
-          state: {
-            ...prev,
-            tipo: value as string,
-            id: selectedTipo ? selectedTipo.id : prev.id,
-          },
-          requerimientos: selectedTipo,
-          fechaKey: "fecha",
-          fechaVacia: "",
-          horaKey: "hora",
-          horaVacia: null,
-          montoKey: "valor",
-          montoVacio: undefined,
-        })
+        {
+          const nextState = aplicarReseteosPorRequerimientosEvento({
+            state: {
+              ...prev,
+              tipo: value as string,
+              id: selectedTipo ? selectedTipo.id : prev.id,
+            },
+            requerimientos: selectedTipo,
+            fechaKey: "fecha",
+            fechaVacia: "",
+            horaKey: "hora",
+            horaVacia: null,
+            montoKey: "valor",
+            montoVacio: undefined,
+          });
+
+          if (
+            selectedTipo?.requiereMonto &&
+            typeof nextState.valor !== "number" &&
+            typeof montoSugeridoEvento === "number"
+          ) {
+            return { ...nextState, valor: montoSugeridoEvento };
+          }
+
+          return nextState;
+        }
       );
       setErrorValidacion(null);
     },
-    [tiposEvento]
+    [montoSugeridoEvento, tiposEvento]
   );
 
   const handleVerMas = (seguimiento: Seguimiento) => {
@@ -444,12 +481,17 @@ export const TimelineSeguimientos: React.FC<TimelineSeguimientosProps> = ({
       return;
     }
 
+    if (isUploadingAdjuntos) {
+      toast.info("Espera a que terminen de subirse los adjuntos.");
+      return;
+    }
+
     const eventosConId = ensureEventosHaveIds(nuevoEventos, tiposEvento);
 
     const grabacionUrl = nuevoGrabacion
       ? URL.createObjectURL(nuevoGrabacion)
       : null;
-    const procesoGuardado = await onNuevoSeguimiento({
+    const resultadoGuardado = await onNuevoSeguimiento({
       texto: nuevoTexto,
       detalle: nuevoTexto,
       eventos: eventosConId,
@@ -460,7 +502,34 @@ export const TimelineSeguimientos: React.FC<TimelineSeguimientosProps> = ({
       URL.revokeObjectURL(grabacionUrl);
     }
 
-    if (await procesoGuardado) {
+    if (resultadoGuardado?.ok) {
+      const idGestionFinal = Number(resultadoGuardado.idGestionFinal ?? 0);
+
+      if (nuevoAdjuntos.length > 0) {
+        if (!idGestionFinal) {
+          toast.warning(
+            "Seguimiento guardado, pero no se pudo resolver el id final para adjuntar archivos. Puedes adjuntar desde 'Ver más'."
+          );
+        } else {
+          setIsUploadingAdjuntos(true);
+          try {
+            const result = await uploadAndRegisterAdjuntos({
+              idGestionFinal,
+              files: nuevoAdjuntos,
+              requestAdjuntosCupos,
+            });
+
+            if (result.failed > 0) {
+              toast.warning(
+                `Seguimiento guardado. ${result.failed} adjunto(s) no se pudieron registrar; puedes reintentarlos desde 'Ver más'.`
+              );
+            }
+          } finally {
+            setIsUploadingAdjuntos(false);
+          }
+        }
+      }
+
       clearSeguimientoDraft(draftStorageKey);
       setNuevoAbierto(false);
       resetDraftState();
@@ -545,6 +614,8 @@ export const TimelineSeguimientos: React.FC<TimelineSeguimientosProps> = ({
         texto={nuevoTexto}
         tipoContacto={nuevoTipoContacto}
         eventos={nuevoEventos}
+        adjuntos={nuevoAdjuntos}
+        isUploadingAdjuntos={isUploadingAdjuntos}
         tiposEvento={tiposEvento}
         formEvento={formEvento}
         editIndex={editIndex}
@@ -564,6 +635,43 @@ export const TimelineSeguimientos: React.FC<TimelineSeguimientosProps> = ({
         onCancelarEdicion={handleCancelarEdicionEvento}
         onEditarEvento={handleEditarEvento}
         onEliminarEvento={handleEliminarEvento}
+        onAdjuntosAdd={(files) => {
+          const list = Array.from(files ?? []);
+          if (list.length === 0) {
+            return;
+          }
+
+          const allowed = list.filter((file) => isAllowedAdjuntoFile(file));
+          const rejected = list.length - allowed.length;
+
+          if (rejected > 0) {
+            toast.warning(
+              "Algunos archivos fueron omitidos. Solo se permiten imágenes y PDF."
+            );
+          }
+
+          if (allowed.length === 0) {
+            return;
+          }
+
+          setNuevoAdjuntos((prev) => {
+            const remaining = Math.max(0, maxAdjuntosPorSeguimiento - prev.length);
+            if (remaining <= 0) {
+              toast.warning(`Máximo ${maxAdjuntosPorSeguimiento} adjuntos por seguimiento.`);
+              return prev;
+            }
+
+            const toAdd = allowed.slice(0, remaining);
+            if (toAdd.length < allowed.length) {
+              toast.warning(`Solo se permiten ${maxAdjuntosPorSeguimiento} adjuntos por seguimiento.`);
+            }
+
+            return prev.concat(toAdd);
+          });
+        }}
+        onAdjuntoRemove={(index) => {
+          setNuevoAdjuntos((prev) => prev.filter((_, i) => i !== index));
+        }}
         onGuardar={handleGuardarNuevo}
         onCerrar={() => setNuevoAbierto(false)}
       />
@@ -591,3 +699,118 @@ export const TimelineSeguimientos: React.FC<TimelineSeguimientosProps> = ({
 };
 
 export default TimelineSeguimientos;
+
+async function uploadAndRegisterAdjuntos({
+  idGestionFinal,
+  files,
+  requestAdjuntosCupos,
+}: {
+  idGestionFinal: number;
+  files: File[];
+  requestAdjuntosCupos: (
+    config: AxiosRequestConfig
+  ) => Promise<ApiResponse<{ max: number; current: number; remaining: number }> | null>;
+}): Promise<{ uploaded: number; failed: number }> {
+  const maxAdjuntosPorSeguimiento = 2;
+  const session = resolveStoredAuthSession();
+  const tenantId = String(session.tenantId ?? "").trim();
+  const token = String(session.token ?? "").trim();
+
+  if (!tenantId || !idGestionFinal || files.length === 0) {
+    return { uploaded: 0, failed: files.length };
+  }
+
+  const cuposRes = await requestAdjuntosCupos({
+    method: "GET",
+    url: "/ObtenerAdjuntosGestionCupos",
+    params: { idGestion: idGestionFinal },
+  });
+
+  const remainingFromServer =
+    cuposRes?.success && cuposRes.data
+      ? Math.max(0, Math.min(maxAdjuntosPorSeguimiento, Number(cuposRes.data.remaining) || 0))
+      : maxAdjuntosPorSeguimiento;
+
+  const cappedFiles = files.slice(0, remainingFromServer);
+  const skipped = files.length - cappedFiles.length;
+
+  const apiUrl = getConfiguredApiUrl().trim().replace(/\/+$/, "");
+  const uploadUrl = apiUrl ? `${apiUrl}/api/v1/SubirAdjuntoGestion` : "/api/v1/SubirAdjuntoGestion";
+
+  let uploaded = 0;
+  let failed = skipped > 0 ? skipped : 0;
+
+  for (const file of cappedFiles) {
+    try {
+      if (!isAllowedAdjuntoFile(file)) {
+        failed++;
+        continue;
+      }
+
+      const formData = new FormData();
+      formData.append("idGestion", String(idGestionFinal));
+      formData.append("archivo", file, file.name);
+
+      const headers: Record<string, string> = {
+        Accept: "*/*",
+        "X-Tenant-Id": tenantId,
+      };
+      if (token) {
+        headers.Authorization = `Bearer ${token}`;
+      }
+
+      const uploadRes = await fetch(uploadUrl, { method: "POST", headers, body: formData });
+      const uploadJson = (await uploadRes.json()) as ApiResponse<{
+        id: number;
+        idGestion: number;
+        fileName: string;
+        contentType: string;
+        sizeBytes: number;
+        publicUrl: string;
+      }>;
+
+      if (!uploadRes.ok || !uploadJson?.success) {
+        failed++;
+        continue;
+      }
+
+      uploaded++;
+    } catch {
+      failed++;
+    }
+  }
+
+  return { uploaded, failed };
+}
+
+function isAllowedAdjuntoFile(file: File): boolean {
+  const type = String(file?.type ?? "").toLowerCase();
+  return type === "application/pdf" || type.startsWith("image/");
+}
+
+function safeFileName(name: string): string {
+  const normalized = String(name ?? "").trim();
+  if (!normalized) {
+    return "archivo";
+  }
+
+  return normalized
+    .replace(/[\\/:*?"<>|]+/g, "_")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function buildUploadFileName(file: File): string {
+  const base = safeFileName(file.name);
+  const stamp = new Date().toISOString().replace(/[-:.TZ]/g, "");
+  const rand = Math.random().toString(16).slice(2, 8);
+
+  const dotIdx = base.lastIndexOf(".");
+  if (dotIdx > 0 && dotIdx < base.length - 1) {
+    const nameOnly = base.slice(0, dotIdx);
+    const ext = base.slice(dotIdx);
+    return `${nameOnly}_${stamp}_${rand}${ext}`;
+  }
+
+  return `${base}_${stamp}_${rand}`;
+}

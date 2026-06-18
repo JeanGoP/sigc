@@ -1,8 +1,11 @@
 import React, { ReactNode, useState, useEffect } from 'react';
 import {
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-  Paper, TablePagination, TextField, Box
+  TablePagination, TextField, Box, Tooltip, IconButton, Typography
 } from '@mui/material';
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faDownload } from "@fortawesome/free-solid-svg-icons";
+import { fmtCOP } from '../../../utils/formattersFunctions';
 
 export interface TableColumn {
   id: string;
@@ -15,6 +18,7 @@ interface DynamicTableProps {
   columns: TableColumn[];
   rows: any[];
   totalRows?: number;
+  totalSaldoCartera?: number;
   searchText: string;
   onSearchChange: (value: string) => void;
   rowsPerPage: number;
@@ -29,12 +33,15 @@ interface DynamicTableProps {
   /** NUEVOS */
   onRowEnter?: (row: any) => void;
   enableKeyboardNavigation?: boolean;
+  onExportToCsv?: () => void;
+  exporting?: boolean;
 }
 
 export const DynamicTablePaginationConsultaCartera: React.FC<DynamicTableProps> = ({
   columns,
   rows = [],
   totalRows,
+  totalSaldoCartera,
   searchText,
   onSearchChange,
   rowsPerPage,
@@ -47,6 +54,8 @@ export const DynamicTablePaginationConsultaCartera: React.FC<DynamicTableProps> 
   selectedPredicate,
   onRowEnter,
   enableKeyboardNavigation = true,
+  onExportToCsv,
+  exporting = false,
 }) => {
 
   const [navMode, setNavMode] = useState(false);
@@ -185,6 +194,61 @@ export const DynamicTablePaginationConsultaCartera: React.FC<DynamicTableProps> 
         rowsPerPageOptions={rowPageOptions}
         labelRowsPerPage="Filas por página"
       />
+      {onExportToCsv && (
+        <Box
+          display="flex"
+          alignItems="center"
+          justifyContent="space-between"
+          gap={2}
+          px={2}
+          pb={1.25}
+          pt={0.25}
+          sx={{
+            minHeight: 44,
+            borderTop: "1px solid rgba(52, 58, 64, 0.08)",
+          }}
+        >
+          <Tooltip title={exporting ? "Exportando CSV..." : "Exportar a CSV"}>
+            <span>
+              <IconButton
+                size="small"
+                onClick={onExportToCsv}
+                disabled={exporting}
+                aria-label="Exportar a CSV"
+                sx={{
+                  width: 34,
+                  height: 34,
+                  border: "1px solid",
+                  borderColor: "primary.main",
+                  color: "primary.main",
+                  borderRadius: 1.5,
+                  backgroundColor: "rgba(25, 118, 210, 0.04)",
+                  "&:hover": {
+                    backgroundColor: "rgba(25, 118, 210, 0.1)",
+                  },
+                }}
+              >
+                <FontAwesomeIcon icon={faDownload} style={{ fontSize: 14 }} />
+              </IconButton>
+            </span>
+          </Tooltip>
+          {typeof totalSaldoCartera === "number" && (
+            <Typography
+              component="span"
+              sx={{
+                fontSize: 13,
+                lineHeight: 1.2,
+                fontWeight: 600,
+                color: "#4f86c6",
+                textAlign: "right",
+                whiteSpace: "nowrap",
+              }}
+            >
+              Saldo Total: {fmtCOP(totalSaldoCartera)}
+            </Typography>
+          )}
+        </Box>
+      )}
     </div>
   );
 };
