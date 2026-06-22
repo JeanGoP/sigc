@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { Alert, Button, Spinner } from "react-bootstrap";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faExternalLinkAlt } from "@fortawesome/free-solid-svg-icons";
 import { AGE_BUCKET_BY_KEY } from "@app/constants/ageBuckets";
 import { fmtCOP } from "../../utils/formattersFunctions";
+import { buildConsultaCarteraUrl } from "../../utils/consultaCarteraNavigation";
 import { computeAsesorLiteDashboardKpis, type AnyRow } from "./domain/kpis";
 import { useAsesorLiteDashboard } from "./hooks/useAsesorLiteDashboard";
 import "./asesorLiteDashboard.css";
@@ -37,12 +40,16 @@ type WorkingMonthInfo = {
 
 type TaskCard = {
   cliente: string;
+  cuenta: string;
+  factura: string;
   meta: string;
   monto: number;
   tagLabel: string;
   tagTone: "v" | "a" | "b";
   action: string;
   description: string;
+  fechaProgramada: string;
+  horaProgramada: string;
 };
 
 type AccountOption = {
@@ -507,28 +514,42 @@ function buildTaskDescription(row: AnyRow): { action: string; description: strin
 }
 
 function buildTaskCards(rows: AnyRow[]): TaskCard[] {
-  return rows.slice(0, 8).map((row) => {
-    const diasVencidos = Math.max(0, readNumber(row.diasVencidos ?? row.DiasVencidosCalc));
-    const tramo = readString(row.tramo ?? row.TramoCodigoCalc) || "—";
-    const cliente = readString(row.cliente) || "Cliente sin identificar";
-    const cuenta = readString(row.cuenta) || "—";
-    const factura = readString(row.factura) || "—";
-    const monto = Math.max(
-      0,
-      readNumber(row.saldoPendiente ?? row.SaldoPendiente) || readNumber(row.montoCompromiso ?? row.MontoCompromiso),
-    );
-    const { action, description } = buildTaskDescription(row);
+  return rows
+    .map((row) => {
+      const diasVencidos = Math.max(0, readNumber(row.diasVencidos ?? row.DiasVencidosCalc));
+      const tramo = readString(row.tramo ?? row.TramoCodigoCalc) || "—";
+      const cliente = readString(row.cliente) || "Cliente sin identificar";
+      const cuenta = readString(row.cuenta) || "—";
+      const factura = readString(row.factura) || "—";
+      const monto = Math.max(
+        0,
+        readNumber(row.saldoPendiente ?? row.SaldoPendiente) || readNumber(row.montoCompromiso ?? row.MontoCompromiso),
+      );
+      const { action, description } = buildTaskDescription(row);
+      const fechaHoraRaw = readString(row.FechaHoraProgramada ?? row.fechaHoraProgramada ?? row.fechaProgramada);
+      const fechaRaw = readDateKey(fechaHoraRaw);
+      const horaRaw = fechaHoraRaw.length >= 16 ? fechaHoraRaw.slice(11, 16) : "—";
 
-    return {
-      cliente,
-      meta: `Cuenta ${cuenta} · factura ${factura} · tramo ${tramo}`,
-      monto,
-      tagLabel: tramo === "PV" ? "Por vencer" : `${diasVencidos} días mora`,
-      tagTone: tramo === "PV" ? "v" : diasVencidos >= 90 || tramo === "+90" ? "b" : "a",
-      action,
-      description,
-    };
-  });
+      return {
+        cliente,
+        cuenta,
+        factura,
+        meta: `Cuenta ${cuenta} · factura ${factura} · tramo ${tramo}`,
+        monto,
+        tagLabel: tramo === "PV" ? "Por vencer" : `${diasVencidos} días mora`,
+        tagTone: tramo === "PV" ? "v" : diasVencidos >= 90 || tramo === "+90" ? "b" : "a",
+        action,
+        description,
+        fechaProgramada: fechaRaw || "—",
+        horaProgramada: horaRaw,
+      };
+    })
+    .sort((a, b) => {
+      const dateA = a.fechaProgramada === "—" ? "9999-99-99" : a.fechaProgramada;
+      const dateB = b.fechaProgramada === "—" ? "9999-99-99" : b.fechaProgramada;
+      if (dateA !== dateB) return dateA.localeCompare(dateB);
+      return a.horaProgramada.localeCompare(b.horaProgramada);
+    });
 }
 
 function resolvePuntoVentaLabel(recaudos: AnyRow[]): string {
@@ -654,6 +675,7 @@ export function AsesorLiteDashboardPage() {
   const kpiAvancePct = meta > 0 ? clampPct(recaudado / meta) : 0;
   const monthAvancePct = meta > 0 ? clampPct(cubierto / meta) : 0;
   const expectedPct = clampPct(workingMonth.progressPct);
+  const expectedAmount = meta * expectedPct;
   const aheadPts = monthAvancePct - expectedPct;
   const dailyRequired = faltante > 0 ? faltante / Math.max(1, workingMonth.remainingIncludingToday) : 0;
 
@@ -823,9 +845,9 @@ export function AsesorLiteDashboardPage() {
               <thead>
                 <tr>
                   <th>Edad de cartera</th>
-                  <th>Saldo</th>
-                  <th>%</th>
                   <th>Meta</th>
+                  <th>%</th>
+                  <th>Saldo Actual</th>
                   <th>Recaudado</th>
                   <th>Falta</th>
                 </tr>
@@ -840,9 +862,9 @@ export function AsesorLiteDashboardPage() {
                         {row.label}
                         {row.pill && <span className={`pill ${row.pill.tone}`}>{row.pill.label}</span>}
                       </td>
-                      <td>{fmtCOP(row.saldo)}</td>
-                      <td>{formatPercent(row.pct)}</td>
                       <td>{fmtCOP(row.meta)}</td>
+                      <td>{formatPercent(row.pct)}</td>
+                      <td>{fmtCOP(row.saldo)}</td>
                       <td className="asesor-mockup-text--green">{fmtCOP(row.recaudado)}</td>
                       <td className={getFaltaTextClass(row.falta)}>{formatSignedMoney(row.falta)}</td>
                     </tr>
@@ -850,9 +872,9 @@ export function AsesorLiteDashboardPage() {
                 })}
                 <tr className="total">
                   <td>Total general</td>
-                  <td>{fmtCOP(totalCartera)}</td>
-                  <td>100,0%</td>
                   <td>{fmtCOP(currentMeta)}</td>
+                  <td>100,0%</td>
+                  <td>{fmtCOP(totalCartera)}</td>
                   <td className="asesor-mockup-text--green">{fmtCOP(currentRecaudado)}</td>
                   <td className={getFaltaTextClass(currentFaltante)}>{formatSignedMoney(currentFaltante)}</td>
                 </tr>
@@ -870,7 +892,7 @@ export function AsesorLiteDashboardPage() {
           </div>
           <div className="asesor-mockup-gline">
             <span className="av">Avance de la meta <b>{formatPercent(monthAvancePct)}</b></span>
-            <span className="av">Ritmo esperado a hoy: <b className="asesor-mockup-expected">{formatPercent(expectedPct)}</b></span>
+            <span className="av">Ritmo esperado a hoy: <b className="asesor-mockup-expected">{fmtCOP(expectedAmount)} ({formatPercent(expectedPct)})</b></span>
           </div>
           <div className="asesor-mockup-bar" aria-label="Avance frente a la meta">
             <div className="fill" style={{ width: `${Math.round(monthAvancePct * 100)}%` }}>
@@ -962,7 +984,7 @@ export function AsesorLiteDashboardPage() {
                 <span className="chev">&#9660;</span>
               </span>
             </summary>
-            <div className="asesor-mockup-tlist">
+            <div className="asesor-mockup-tlist asesor-mockup-tlist--scroll">
               {tasks.length === 0 ? (
                 <div className="asesor-mockup-empty asesor-mockup-empty--tasks">No hay tareas priorizadas para hoy.</div>
               ) : (
@@ -971,7 +993,10 @@ export function AsesorLiteDashboardPage() {
                     <div className="head">
                       <div>
                         <div className="cli">{task.cliente}</div>
-                        <div className="cmeta">{task.meta}</div>
+                        <div className="cmeta">
+                          {task.meta}
+                          <span className="cmeta-time">{task.horaProgramada}</span>
+                        </div>
                       </div>
                       <div className="right">
                         <div className="monto">{fmtCOP(task.monto)}</div>
@@ -981,6 +1006,26 @@ export function AsesorLiteDashboardPage() {
                     <div className="desc">
                       <span className="act">{task.action}</span>
                       {task.description}
+                      <button
+                        type="button"
+                        className="asesor-mockup-task-link"
+                        aria-label={`Abrir consulta de cartera para ${task.cliente}`}
+                        title={`Abrir consulta de cartera: ${task.cliente}`}
+                        onClick={() => {
+                          const url = buildConsultaCarteraUrl({
+                            cuenta: task.cuenta,
+                            factura: task.factura,
+                            identificacionCliente: task.cliente,
+                          });
+                          window.open(
+                            `${window.location.origin}${window.location.pathname}#${url}`,
+                            "_blank",
+                            "noopener,noreferrer",
+                          );
+                        }}
+                      >
+                        <FontAwesomeIcon icon={faExternalLinkAlt} />
+                      </button>
                     </div>
                   </div>
                 ))

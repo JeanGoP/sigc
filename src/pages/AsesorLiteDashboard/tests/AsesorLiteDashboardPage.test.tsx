@@ -102,6 +102,27 @@ function getRemainingWorkingDays(now: Date): number {
   return remainingIncludingToday;
 }
 
+function getExpectedWorkingProgressPct(now: Date): number {
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const today = now.getDate();
+  const lastDay = new Date(year, month + 1, 0).getDate();
+  const holidayKeys = getColombiaHolidayKeys(year);
+  let total = 0;
+  let elapsedClosed = 0;
+
+  for (let day = 1; day <= lastDay; day += 1) {
+    const currentDate = new Date(year, month, day);
+    const weekDay = currentDate.getDay();
+    if (weekDay === 0) continue;
+    if (holidayKeys.has(getDateKey(currentDate))) continue;
+    total += 1;
+    if (day < today) elapsedClosed += 1;
+  }
+
+  return total > 0 ? elapsedClosed / total : 0;
+}
+
 function getExpectedWorkingProgress(now: Date): string {
   const year = now.getFullYear();
   const month = now.getMonth();
@@ -145,6 +166,7 @@ const mockData = {
       cliente: "1001",
       numefac: "FAC-011",
       FechaGestion: currentDateKey,
+      FechaHoraProgramada: `${currentDateKey}T10:00:00`,
       HoraGestion: "09:30:00",
       TipoContactoNombre: "Llamada",
       TipoContactoGrupo: "contacto efectivo",
@@ -169,6 +191,7 @@ const mockData = {
       cliente: "2002",
       numefac: "FAC-007",
       FechaGestion: currentDateKey,
+      FechaHoraProgramada: `${currentDateKey}T11:00:00`,
       HoraGestion: "10:15:00",
       TipoContactoNombre: "WhastsApp",
       TipoContactoGrupo: "contacto efectivo",
@@ -379,7 +402,9 @@ describe("AsesorLiteDashboardPage", () => {
     expect(within(diarioCard!).getByText(fmtCOP(overdueFaltante / remainingDays))).toBeInTheDocument();
     expect(within(monthCard!).getAllByText(coveredPct).length).toBeGreaterThan(0);
     expect(within(monthCard!).getByText(`${fmtCOP(coveredAmount)} · ${coveredPct}`)).toBeInTheDocument();
-    expect(within(monthCard!).getByText(expectedWorkingProgress)).toBeInTheDocument();
+    const expectedPctNum = getExpectedWorkingProgressPct(new Date());
+    const expectedExpectedStr = `${fmtCOP(expectedMeta * expectedPctNum)} (${expectedWorkingProgress})`;
+    expect(within(monthCard!).getByText(expectedExpectedStr)).toBeInTheDocument();
   });
 
   it("removes the monthly breakdown when the filter is global", () => {
@@ -409,6 +434,8 @@ describe("AsesorLiteDashboardPage", () => {
     expect(screen.getByText("Llamadas")).toBeInTheDocument();
     expect(screen.getByText("1001")).toBeInTheDocument();
     expect(screen.getByText(fmtCOP(250000))).toBeInTheDocument();
+    expect(screen.getByLabelText("Abrir consulta de cartera para 1001")).toBeInTheDocument();
+    expect(screen.getByText("10:00")).toBeInTheDocument();
   });
 
   it("preserves negative falta values in the age table, total row and top kpi", () => {

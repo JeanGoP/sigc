@@ -32,6 +32,7 @@ export const ConsultaCartera: React.FC = () => {
 
   const inputRef = useRef<HTMLInputElement>(null);
   const currentUser = useAppSelector((state) => state.auth.currentUser);
+  const isAdmin = String(currentUser?.role ?? "").trim().toLowerCase() === "administrador";
 
   const {
     loading: loadingCliente,
@@ -337,7 +338,7 @@ export const ConsultaCartera: React.FC = () => {
               onToggleCollapsed={collapseHandler}
               onRowsPerPageChange={setTablaRowsPerPage}
               onPageChange={setTablaPage}
-              onExportToCsv={exportToCsv}
+              onExportToCsv={isAdmin ? exportToCsv : undefined}
               exporting={exporting}
               onRowEnter={(row) => {
                 handleClicLupaBuscar(row);

@@ -109,6 +109,7 @@ export type GestionPrioritaria = {
   montoCompromiso: number;
   totalPagado: number;
   saldoPendiente: number;
+  fechaProgramada: string;
 };
 
 export type KpiStatus = "positive" | "neutral" | "negative";
@@ -254,6 +255,8 @@ function buildPrioridades(gestiones: AnyRow[], limit: number): GestionPrioritari
     const tipoEvento = readString(row.NombreTipoEvento ?? row.nombreTipoEvento);
     const estadoPago = readString(row.EstadoPagoCompromiso ?? row.estadoPagoCompromiso);
     const saldoItem = Math.max(0, Math.max(0, monto) - Math.max(0, pagado));
+    const fechaHoraProgramada = readString(row.FechaHoraProgramada ?? row.fechaHoraProgramada);
+    const fechaProgramada = readDateKey(fechaHoraProgramada) || "";
 
     const hasKeyData = Boolean(clienteId && (cuenta || factura));
     if (hasKeyData) {
@@ -291,6 +294,7 @@ function buildPrioridades(gestiones: AnyRow[], limit: number): GestionPrioritari
             montoCompromiso: Math.max(0, monto),
             totalPagado: Math.max(0, pagado),
             saldoPendiente: saldoItem,
+            fechaProgramada: fechaHoraProgramada,
           },
         });
       }
@@ -534,8 +538,14 @@ export function computeAsesorLiteDashboardKpis(params: {
       totalPagadoMTD += Math.max(0, readNumber(row.TotalPagado ?? row.totalPagado));
     }
 
-    if (fechaGestion && fechaGestion === todayKey) {
+    const fechaProgramada = readDateKey(row.FechaHoraProgramada ?? row.fechaHoraProgramada);
+    const fechaEfectivaHoy = (fechaProgramada || fechaGestion) === todayKey;
+
+    if (fechaEfectivaHoy) {
       hoyRows.push(row);
+    }
+
+    if (fechaGestion && fechaGestion === todayKey) {
       totalGestionesHoy += 1;
       if (clienteId) {
         uniqueClientesHoy.add(clienteId);

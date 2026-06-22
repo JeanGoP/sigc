@@ -959,6 +959,39 @@
   white-space: nowrap;
 }
 
+.asesor-mockup-titem .cmeta-time {
+  color: var(--gris2);
+  margin-left: 10px;
+  font-weight: 600;
+}
+
+.asesor-mockup-task-link {
+  border: 1px solid rgba(30, 95, 191, 0.2);
+  background: transparent;
+  color: var(--azul);
+  border-radius: 8px;
+  height: 34px;
+  width: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  cursor: pointer;
+  margin-left: auto;
+  flex-shrink: 0;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.asesor-mockup-task-link:hover {
+  background: #eef4ff;
+  border-color: rgba(30, 95, 191, 0.3);
+}
+
+.asesor-mockup-tlist--scroll {
+  max-height: 420px;
+  overflow-y: auto;
+}
+
 .asesor-mockup-empty {
   font-size: 12px;
   color: var(--gris2);
