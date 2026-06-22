@@ -211,9 +211,10 @@ describe("consulta cartera helpers", () => {
     });
   });
 
-  it("reads SACTMORA as the suggested event amount when available", () => {
+  it("builds the suggested event amount as saldo en mora minus interes de mora", () => {
     expect(buildFacturaMontoSuggestion({ SACTMORA: 12345 })).toBe(12345);
-    expect(buildFacturaMontoSuggestion({ sactmora: "98,765" })).toBe(98765);
+    expect(buildFacturaMontoSuggestion({ SACTMORA: 12345, VALMORA: 345 })).toBe(12000);
+    expect(buildFacturaMontoSuggestion({ sactmora: "98,765", valmora: "765" })).toBe(98000);
     expect(buildFacturaMontoSuggestion({ SACTMORA: "" })).toBeUndefined();
     expect(buildFacturaMontoSuggestion(null)).toBeUndefined();
   });

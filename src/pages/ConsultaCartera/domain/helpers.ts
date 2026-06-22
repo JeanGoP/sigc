@@ -346,7 +346,14 @@ export function buildFacturaSelection(
 export function buildFacturaMontoSuggestion(
   row: Record<string, unknown> | null | undefined
 ): number | undefined {
-  return readOptionalNumber(row?.SACTMORA ?? row?.sactmora);
+  const saldoMora = readOptionalNumber(row?.SACTMORA ?? row?.sactmora);
+  const interesMora = readOptionalNumber(row?.VALMORA ?? row?.valmora);
+
+  if (typeof saldoMora !== "number") {
+    return undefined;
+  }
+
+  return saldoMora - (interesMora ?? 0);
 }
 
 export function buildEventosXml(

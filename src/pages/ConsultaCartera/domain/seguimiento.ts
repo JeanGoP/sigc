@@ -18,6 +18,9 @@ interface BuildSeguimientoDraftStorageKeyInput {
   tenantId?: string | number | null;
   userId?: string | number | null;
   sessionRef?: string | null;
+  cliente?: string | number | null;
+  factura?: string | number | null;
+  cuenta?: string | number | null;
 }
 
 interface SaveSeguimientoBlockedState {
@@ -131,16 +134,29 @@ export function buildSeguimientoDraftStorageKey({
   tenantId,
   userId,
   sessionRef,
+  cliente,
+  factura,
+  cuenta,
 }: BuildSeguimientoDraftStorageKeyInput): string | undefined {
   const normalizedTenantId = normalizeText(tenantId);
   const normalizedUserId = normalizeText(userId);
   const normalizedSessionRef = normalizeText(sessionRef);
+  const normalizedCliente = normalizeText(cliente);
+  const normalizedFactura = normalizeText(factura);
+  const normalizedCuenta = normalizeText(cuenta);
 
-  if (!normalizedTenantId || !normalizedUserId || !normalizedSessionRef) {
+  if (
+    !normalizedTenantId ||
+    !normalizedUserId ||
+    !normalizedSessionRef ||
+    !normalizedCliente ||
+    !normalizedFactura ||
+    !normalizedCuenta
+  ) {
     return undefined;
   }
 
-  return `sigc.gestion.seguimiento-draft:${normalizedTenantId}:${normalizedUserId}:${normalizedSessionRef}`;
+  return `sigc.gestion.seguimiento-draft:${normalizedTenantId}:${normalizedUserId}:${normalizedSessionRef}:${normalizedCliente}:${normalizedFactura}:${normalizedCuenta}`;
 }
 
 export function buildSaveSeguimientoBlockedReason(

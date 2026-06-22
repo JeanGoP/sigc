@@ -168,6 +168,9 @@ export function useConsultaCarteraSeguimiento({
     tenantId: currentUser?.tenantId,
     userId: currentUser?.id,
     sessionRef: activeGestionSession?.sessionRef,
+    cliente: selectedSelection?.cliente,
+    factura: selectedSelection?.factura,
+    cuenta: selectedSelection?.cuenta,
   });
 
   const cargarGestiones = useCallback(

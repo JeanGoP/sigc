@@ -95,16 +95,33 @@ describe("seguimiento domain helpers", () => {
         tenantId: "tenant-a",
         userId: 8,
         sessionRef: "session-1",
+        cliente: "123",
+        factura: "F001",
+        cuenta: "C001",
       })
-    ).toBe("sigc.gestion.seguimiento-draft:tenant-a:8:session-1");
+    ).toBe("sigc.gestion.seguimiento-draft:tenant-a:8:session-1:123:F001:C001");
 
     expect(
       buildSeguimientoDraftStorageKey({
         tenantId: "tenant-a",
         userId: 8,
         sessionRef: "",
+        cliente: "123",
+        factura: "F001",
+        cuenta: "C001",
       })
     ).toBeUndefined();
+
+    expect(
+      buildSeguimientoDraftStorageKey({
+        tenantId: "tenant-a",
+        userId: 8,
+        sessionRef: "session-1",
+        cliente: "123",
+        factura: "F002",
+        cuenta: "C001",
+      })
+    ).toBe("sigc.gestion.seguimiento-draft:tenant-a:8:session-1:123:F002:C001");
   });
 
   it("computes the save block reason and canSaveSeguimiento", () => {
