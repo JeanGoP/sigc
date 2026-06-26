@@ -194,20 +194,20 @@ export const DynamicTablePaginationConsultaCartera: React.FC<DynamicTableProps> 
         rowsPerPageOptions={rowPageOptions}
         labelRowsPerPage="Filas por página"
       />
-      {onExportToCsv && (
-        <Box
-          display="flex"
-          alignItems="center"
-          justifyContent="space-between"
-          gap={2}
-          px={2}
-          pb={1.25}
-          pt={0.25}
-          sx={{
-            minHeight: 44,
-            borderTop: "1px solid rgba(52, 58, 64, 0.08)",
-          }}
-        >
+      <Box
+        display="flex"
+        alignItems="center"
+        justifyContent="space-between"
+        gap={2}
+        px={2}
+        pb={1.25}
+        pt={0.25}
+        sx={{
+          minHeight: 44,
+          borderTop: "1px solid rgba(52, 58, 64, 0.08)",
+        }}
+      >
+        {onExportToCsv ? (
           <Tooltip title={exporting ? "Exportando CSV..." : "Exportar a CSV"}>
             <span>
               <IconButton
@@ -232,23 +232,25 @@ export const DynamicTablePaginationConsultaCartera: React.FC<DynamicTableProps> 
               </IconButton>
             </span>
           </Tooltip>
-          {typeof totalSaldoCartera === "number" && (
-            <Typography
-              component="span"
-              sx={{
-                fontSize: 13,
-                lineHeight: 1.2,
-                fontWeight: 600,
-                color: "#4f86c6",
-                textAlign: "right",
-                whiteSpace: "nowrap",
-              }}
-            >
-              Saldo Total: {fmtCOP(totalSaldoCartera)}
-            </Typography>
-          )}
-        </Box>
-      )}
+        ) : (
+          <span />
+        )}
+        {typeof totalSaldoCartera === "number" && (
+          <Typography
+            component="span"
+            sx={{
+              fontSize: 13,
+              lineHeight: 1.2,
+              fontWeight: 600,
+              color: "#4f86c6",
+              textAlign: "right",
+              whiteSpace: "nowrap",
+            }}
+          >
+            Saldo Total: {fmtCOP(totalSaldoCartera)}
+          </Typography>
+        )}
+      </Box>
     </div>
   );
 };
