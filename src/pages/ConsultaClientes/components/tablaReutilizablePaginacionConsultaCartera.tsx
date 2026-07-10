@@ -247,7 +247,7 @@ export const DynamicTablePaginationConsultaCartera: React.FC<DynamicTableProps> 
               whiteSpace: "nowrap",
             }}
           >
-            Saldo Total: {fmtCOP(totalSaldoCartera)}
+            Mora Total: {fmtCOP(totalSaldoCartera)}
           </Typography>
         )}
       </Box>

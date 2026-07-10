@@ -135,7 +135,7 @@ export function useConsultaCarteraController({
               typeof responseData.total === "number" ? responseData.total : resultRows.length
             );
             setTotalSaldoCartera(
-              typeof responseData.totalSaldoCartera === "number" ? responseData.totalSaldoCartera : 0
+              typeof responseData.totalValorMora === "number" ? responseData.totalValorMora : 0
             );
           } else {
             setTablaRows([]);
