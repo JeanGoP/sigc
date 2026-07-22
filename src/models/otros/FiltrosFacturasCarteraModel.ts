@@ -12,6 +12,19 @@ function normalizeSinGestionDiasOption(value: unknown): number {
     : DEFAULT_SIN_GESTION_DIAS_OPTION;
 }
 
+function normalizeOptionalNonNegativeInt(value: unknown): number | null {
+  if (value === null || value === undefined || value === "") {
+    return null;
+  }
+
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return null;
+  }
+
+  return Math.trunc(parsed);
+}
+
 export class FiltrosFacturasCarteraModel {
   checkIncluirSaldosCero: boolean = false;
   checkSoloAsignadas: boolean = false;
@@ -22,6 +35,8 @@ export class FiltrosFacturasCarteraModel {
   tipoEvento: string | null = "X";
   etiqueta: string | null = "X";
   cuenta: string | null = "";
+  minValorCuota: number | null = null;
+  maxValorCuota: number | null = null;
 
   constructor(init?: Partial<FiltrosFacturasCarteraModel>) {
     if (init) {
@@ -29,5 +44,7 @@ export class FiltrosFacturasCarteraModel {
     }
 
     this.sinGestionDias = normalizeSinGestionDiasOption(this.sinGestionDias);
+    this.minValorCuota = normalizeOptionalNonNegativeInt(this.minValorCuota);
+    this.maxValorCuota = normalizeOptionalNonNegativeInt(this.maxValorCuota);
   }
 }

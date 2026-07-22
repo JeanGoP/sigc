@@ -7,6 +7,8 @@ export type {
   ParametrizacionRolePermission,
   ParametrizacionUser,
   SaveUserPayload,
+  ReporteRolePermission,
+  UpdateReportePermissionsPayload,
 } from "./types";
 
 export function useParametrizacionService() {
@@ -127,6 +129,27 @@ export function useParametrizacionService() {
     [request]
   );
 
+  const obtenerPermisosReportesRol = useCallback(
+    (roleId: number) => {
+      return request({
+        url: `/parametrizacion/roles/${roleId}/permisos-reportes`,
+        method: "GET",
+      });
+    },
+    [request]
+  );
+
+  const actualizarPermisosReportesRol = useCallback(
+    (roleId: number, reportesIds: number[]) => {
+      return request({
+        url: `/parametrizacion/roles/${roleId}/permisos-reportes`,
+        method: "PUT",
+        data: { reportesIds },
+      });
+    },
+    [request]
+  );
+
   return {
     loading,
     error,
@@ -141,5 +164,7 @@ export function useParametrizacionService() {
     eliminarRol,
     obtenerPermisosRol,
     actualizarPermisosRol,
+    obtenerPermisosReportesRol,
+    actualizarPermisosReportesRol,
   };
 }

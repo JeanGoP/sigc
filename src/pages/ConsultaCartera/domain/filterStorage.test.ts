@@ -87,6 +87,8 @@ describe("consulta cartera filter storage", () => {
       tipoEvento: "X",
       etiqueta: "X",
       cuenta: "",
+      minValorCuota: null,
+      maxValorCuota: null,
     });
     expect(storage.setItem).toHaveBeenCalledTimes(1);
     expect(hasConsultaCarteraStoredFilters(storage)).toBe(true);

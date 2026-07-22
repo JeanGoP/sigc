@@ -15,6 +15,8 @@ export interface FacturasFiltroLike {
   tipoEvento?: string | null;
   filtroPorVencimiento?: string | null;
   etiqueta?: string | null;
+  minValorCuota?: number | null;
+  maxValorCuota?: number | null;
 }
 
 export interface BuildFacturasListParamsInput {
@@ -39,6 +41,8 @@ export interface FacturasListParams {
   filtroEventos?: string | null;
   filtroPorVencimiento: string;
   filtroPorEtiqueta?: string | null;
+  minValorCuota?: number | null;
+  maxValorCuota?: number | null;
   page: number;
   numPage: number;
   filter: string;
@@ -269,6 +273,8 @@ export function buildFacturasListParams({
     filtroEventos: filtros.tipoEvento,
     filtroPorVencimiento: filtros.filtroPorVencimiento ?? "",
     filtroPorEtiqueta: filtros.etiqueta,
+    minValorCuota: filtros.minValorCuota ?? null,
+    maxValorCuota: filtros.maxValorCuota ?? null,
     page: Math.max(1, tablaPage + 1),
     numPage: tablaRowsPerPage,
     filter: filterOverride !== undefined ? filterOverride : tablaSearch,

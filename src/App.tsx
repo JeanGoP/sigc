@@ -36,6 +36,7 @@ import RolesPermisosPage from "@app/modules/parametrizacion/roles-permisos/Roles
 import { ModificacionEventos } from "./pages/ModificacionEventos/ModificacionEventos";
 import Unauthorized from "./pages/Unauthorized";
 import CambiarContrasena from "./pages/CambiarContrasena";
+import ReportesPage from "@pages/Reportes/ReportesPage";
 const AsesorLiteDashboardPageLazy = lazy(() =>
   import("@app/pages/AsesorLiteDashboard/AsesorLiteDashboardPage").then((m) => ({
     default: m.AsesorLiteDashboardPage,
@@ -201,6 +202,14 @@ const App = () => {
             />
             <Route path="/campanas" element={<Navigate to="/profile" replace />} />
             <Route path="/unauthorized" element={<Unauthorized />} />
+            <Route
+              path="/reportes"
+              element={
+                <PermissionRoute permission="reportes.view">
+                  <ReportesPage />
+                </PermissionRoute>
+              }
+            />
             <Route
               index
               element={

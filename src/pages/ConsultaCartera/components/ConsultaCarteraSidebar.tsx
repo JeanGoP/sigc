@@ -32,7 +32,7 @@ interface ConsultaCarteraSidebarProps {
   onRowsPerPageChange: (rowsPerPage: number) => void;
   onPageChange: (page: number) => void;
   onRowEnter: (row: ConsultaCarteraRow) => void;
-  onExportToCsv: () => void;
+  onExportToCsv?: () => void;
   exporting: boolean;
 }
 

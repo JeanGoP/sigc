@@ -70,6 +70,7 @@ export function useSessionBootstrap(): boolean {
             setSecurityData({
               menuTree: mustChangePassword ? [] : securityResponse.data.menuTree ?? [],
               permissions: mustChangePassword ? [] : securityResponse.data.permissions ?? [],
+              reportesPermitidos: mustChangePassword ? [] : securityResponse.data.reportesPermitidos ?? [],
             })
           );
 

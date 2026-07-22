@@ -15,12 +15,14 @@ export interface SecurityMenuItem {
 export interface SecurityState {
   menuTree: SecurityMenuItem[];
   permissions: string[];
+  reportesPermitidos: string[]; // Códigos de reportes permitidos
   loaded: boolean;
 }
 
 const initialState: SecurityState = {
   menuTree: [],
   permissions: [],
+  reportesPermitidos: [],
   loaded: false,
 };
 
@@ -36,16 +38,19 @@ export const securitySlice = createSlice({
         payload: {
           menuTree: SecurityMenuItem[];
           permissions: string[];
+          reportesPermitidos?: string[];
         };
       }
     ) => {
       state.menuTree = payload.menuTree ?? [];
       state.permissions = payload.permissions ?? [];
+      state.reportesPermitidos = payload.reportesPermitidos ?? [];
       state.loaded = true;
     },
     clearSecurity: (state) => {
       state.menuTree = [];
       state.permissions = [];
+      state.reportesPermitidos = [];
       state.loaded = false;
     },
   },

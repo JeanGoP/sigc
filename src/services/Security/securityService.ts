@@ -13,6 +13,7 @@ export interface SecurityMeData {
   telephonyEnabled: boolean;
   menuTree: SecurityMenuItem[];
   permissions: string[];
+  reportesPermitidos?: string[]; // Códigos de reportes a los que tiene acceso el usuario
 }
 
 export function useSecurityService() {

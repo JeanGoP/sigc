@@ -11,7 +11,9 @@ import {
 import {
   AdvisorInternalStateOrder,
   getAdvisorInternalStateLabel,
+  getStoredAdvisorInternalState,
   mapAdvisorInternalStateToCommsAvailability,
+  setStoredAdvisorInternalState,
 } from "@app/services/GestionLlamadas";
 import {
   WebRtcUiError,
@@ -148,7 +150,9 @@ export default function WebRtcDialer({
   const [isMuted, setIsMuted] = useState(false);
   const [presenceStatus, setPresenceStatus] = useState<"offline" | "online" | "busy" | "error">("offline");
   const [advisorInternalState, setAdvisorInternalStateValue] =
-    useState<AdvisorInternalState>("disponible");
+    useState<AdvisorInternalState>(
+      () => getStoredAdvisorInternalState() ?? "disponible"
+    );
   const [advisorStateChangedAt, setAdvisorStateChangedAt] = useState<string>("");
   const connectionStatusRef = useRef<ConnectionStatus>("disconnected");
   const softphoneStatusRef = useRef<"disabled" | "initializing" | "registered" | "error">(
@@ -171,6 +175,10 @@ export default function WebRtcDialer({
       ) ?? COUNTRY_DIAL_OPTIONS[0],
     [selectedCountryIso2]
   );
+
+  useEffect(() => {
+    setStoredAdvisorInternalState(advisorInternalState);
+  }, [advisorInternalState]);
 
   useEffect(() => {
     connectionStatusRef.current = connectionStatus;

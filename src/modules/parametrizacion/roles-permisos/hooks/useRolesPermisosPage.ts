@@ -6,6 +6,7 @@ import { useParametrizacionService } from "@app/services/Parametrizacion/paramet
 import type {
   ParametrizacionRole,
   ParametrizacionRolePermission,
+  ReporteRolePermission,
 } from "@app/services/Parametrizacion/types";
 import {
   FILTRO_PERMISOS_OPTIONS,
@@ -40,6 +41,8 @@ export function useRolesPermisosPage() {
     eliminarRol,
     obtenerPermisosRol,
     actualizarPermisosRol,
+    obtenerPermisosReportesRol,
+    actualizarPermisosReportesRol,
   } = useParametrizacionService();
 
   const [roles, setRoles] = useState<ParametrizacionRole[]>([]);
@@ -54,9 +57,17 @@ export function useRolesPermisosPage() {
   const [initialPermissionsMap, setInitialPermissionsMap] = useState<Record<number, boolean>>({});
   const [collapsedMenus, setCollapsedMenus] = useState<Record<number, boolean>>({});
 
+  // Estado para permisos de reportes
+  const [roleReportPermissions, setRoleReportPermissions] = useState<ReporteRolePermission[]>([]);
+  const [initialReportPermissionsMap, setInitialReportPermissionsMap] = useState<Record<number, boolean>>({});
+  const [reportSearch, setReportSearch] = useState(""); // Búsqueda para reportes
+  const [isLoadingReportPermissions, setIsLoadingReportPermissions] = useState(false);
+  const [isSavingReportPermissions, setIsSavingReportPermissions] = useState(false);
+
   const [isLoadingPermissions, setIsLoadingPermissions] = useState(false);
   const [isSubmittingRole, setIsSubmittingRole] = useState(false);
   const [isSavingPermissions, setIsSavingPermissions] = useState(false);
+  const [activeTab, setActiveTab] = useState<'permisos' | 'reportes'>('permisos'); // Pestaña activa
 
   const selectedRole = useMemo(
     () => roles.find((role) => role.roleId === selectedRoleId) ?? null,
@@ -87,6 +98,53 @@ export function useRolesPermisosPage() {
         initialPermissionsMap,
       }),
     [initialPermissionsMap, permissionsFilter, permissionsSearch, rolePermissions]
+  );
+
+  // Helper para construir el mapa inicial de permisos de reportes
+  const buildInitialReportPermissionsMap = useCallback(
+    (permissions: ReporteRolePermission[]) => {
+      return Object.fromEntries(
+        permissions.map((permission) => [permission.reporteId, permission.hasAccess])
+      );
+    },
+    []
+  );
+
+  // Helper para verificar si un permiso de reporte ha cambiado
+  const isReportPermissionChanged = useCallback(
+    (permission: ReporteRolePermission, initialMap: Record<number, boolean>) => {
+      return (initialMap[permission.reporteId] ?? false) !== permission.hasAccess;
+    },
+    []
+  );
+
+  // Helper para contar cambios pendientes en permisos de reportes
+  const countPendingReportPermissionChanges = useCallback(
+    (permissions: ReporteRolePermission[], initialMap: Record<number, boolean>) => {
+      return permissions.filter((permission) =>
+        isReportPermissionChanged(permission, initialMap)
+      ).length;
+    },
+    [isReportPermissionChanged]
+  );
+
+  // Filtrar reportes por búsqueda
+  const filteredReportPermissions = useMemo(() => {
+    const search = reportSearch.trim().toLowerCase();
+    if (!search) return roleReportPermissions;
+
+    return roleReportPermissions.filter(
+      (report) =>
+        report.nombre.toLowerCase().includes(search) ||
+        report.descripcion?.toLowerCase().includes(search) ||
+        report.tipo.toLowerCase().includes(search)
+    );
+  }, [roleReportPermissions, reportSearch]);
+
+  // Calcular cambios pendientes en permisos de reportes
+  const pendingReportChangesCount = useMemo(
+    () => countPendingReportPermissionChanges(roleReportPermissions, initialReportPermissionsMap),
+    [countPendingReportPermissionChanges, roleReportPermissions, initialReportPermissionsMap]
   );
 
   const loadRoles = useCallback(async (roleIdToSync?: number | null) => {
@@ -135,19 +193,40 @@ export function useRolesPermisosPage() {
     [obtenerPermisosRol]
   );
 
+  const loadReportPermissions = useCallback(
+    async (roleId: number) => {
+      try {
+        setIsLoadingReportPermissions(true);
+        const response = await obtenerPermisosReportesRol(roleId);
+
+        if (response?.success) {
+          const nextReportPermissions: ReporteRolePermission[] = response.data ?? [];
+          setRoleReportPermissions(nextReportPermissions);
+          setInitialReportPermissionsMap(buildInitialReportPermissionsMap(nextReportPermissions));
+          return;
+        }
+
+        toast.error(response?.message || "No fue posible cargar permisos de reportes del rol");
+      } finally {
+        setIsLoadingReportPermissions(false);
+      }
+    },
+    [obtenerPermisosReportesRol, buildInitialReportPermissionsMap]
+  );
+
   useEffect(() => {
     void loadRoles(null);
   }, [loadRoles]);
 
   const confirmarDescartarCambios = useCallback(() => {
-    if (pendingChangesCount === 0) {
+    if (pendingChangesCount === 0 && pendingReportChangesCount === 0) {
       return true;
     }
 
     return window.confirm(
       "Tienes cambios sin guardar. Si continuas, se perderan. Deseas continuar?"
     );
-  }, [pendingChangesCount]);
+  }, [pendingChangesCount, pendingReportChangesCount]);
 
   const handleSelectRole = useCallback(
     async (role: ParametrizacionRole) => {
@@ -163,9 +242,14 @@ export function useRolesPermisosPage() {
       setRoleName(role.roleName);
       setPermissionsSearch("");
       setPermissionsFilter("todos");
-      await loadPermissions(role.roleId);
+      setReportSearch("");
+      setActiveTab('permisos');
+      await Promise.all([
+        loadPermissions(role.roleId),
+        loadReportPermissions(role.roleId)
+      ]);
     },
-    [confirmarDescartarCambios, loadPermissions, selectedRoleId]
+    [confirmarDescartarCambios, loadPermissions, loadReportPermissions, selectedRoleId]
   );
 
   const handleNewRole = useCallback(() => {
@@ -180,6 +264,10 @@ export function useRolesPermisosPage() {
     setPermissionsSearch("");
     setPermissionsFilter("todos");
     setCollapsedMenus({});
+    setRoleReportPermissions([]);
+    setInitialReportPermissionsMap({});
+    setReportSearch("");
+    setActiveTab('permisos');
   }, [confirmarDescartarCambios]);
 
   const handleSaveRole = useCallback(
@@ -291,6 +379,43 @@ export function useRolesPermisosPage() {
     }));
   }, []);
 
+  // Togglear permiso de reporte
+  const toggleReportPermission = useCallback(
+    (targetPermission: ReporteRolePermission) => {
+      setRoleReportPermissions((prev) =>
+        prev.map((perm) =>
+          perm.reporteId === targetPermission.reporteId
+            ? { ...perm, hasAccess: !perm.hasAccess }
+            : perm
+        )
+      );
+    },
+    []
+  );
+
+  // Aplicar preset a reportes (todos o ninguno)
+  const applyReportPreset = useCallback(
+    (preset: 'todos' | 'ninguno') => {
+      setRoleReportPermissions((prev) =>
+        prev.map((perm) => ({
+          ...perm,
+          hasAccess: preset === 'todos',
+        }))
+      );
+    },
+    []
+  );
+
+  // Descartar cambios en permisos de reportes
+  const discardReportChanges = useCallback(() => {
+    setRoleReportPermissions((prev) =>
+      prev.map((perm) => ({
+        ...perm,
+        hasAccess: initialReportPermissionsMap[perm.reporteId] ?? false,
+      }))
+    );
+  }, [initialReportPermissionsMap]);
+
   const handleSavePermissions = useCallback(async () => {
     if (!selectedRoleId) {
       toast.error("Selecciona un rol para actualizar permisos");
@@ -324,6 +449,43 @@ export function useRolesPermisosPage() {
     canEditPermissions,
     loadPermissions,
     rolePermissions,
+    selectedRoleId,
+  ]);
+
+  // Guardar permisos de reportes
+  const handleSaveReportPermissions = useCallback(async () => {
+    if (!selectedRoleId) {
+      toast.error("Selecciona un rol para actualizar permisos de reportes");
+      return;
+    }
+
+    if (!canEditPermissions) {
+      toast.error("No tienes permisos para actualizar permisos de rol");
+      return;
+    }
+
+    const reportesIds = roleReportPermissions
+      .filter((permission) => permission.hasAccess)
+      .map((permission) => permission.reporteId);
+
+    try {
+      setIsSavingReportPermissions(true);
+      const response = await actualizarPermisosReportesRol(selectedRoleId, reportesIds);
+      if (response?.success) {
+        toast.success(response.message || "Permisos de reportes actualizados exitosamente");
+        await loadReportPermissions(selectedRoleId);
+        return;
+      }
+
+      toast.error(response?.message || "No fue posible actualizar los permisos de reportes");
+    } finally {
+      setIsSavingReportPermissions(false);
+    }
+  }, [
+    actualizarPermisosReportesRol,
+    canEditPermissions,
+    loadReportPermissions,
+    roleReportPermissions,
     selectedRoleId,
   ]);
 
@@ -368,5 +530,22 @@ export function useRolesPermisosPage() {
     handleSavePermissions,
     isPermissionChanged: (permission: ParametrizacionRolePermission) =>
       isPermissionChanged(permission, initialPermissionsMap),
+    // Nuevos para permisos de reportes
+    activeTab,
+    setActiveTab,
+    roleReportPermissions,
+    initialReportPermissionsMap,
+    filteredReportPermissions,
+    reportSearch,
+    setReportSearch,
+    isLoadingReportPermissions,
+    isSavingReportPermissions,
+    pendingReportChangesCount,
+    toggleReportPermission,
+    applyReportPreset,
+    discardReportChanges,
+    handleSaveReportPermissions,
+    isReportPermissionChanged: (permission: ReporteRolePermission) =>
+      isReportPermissionChanged(permission, initialReportPermissionsMap),
   };
 }

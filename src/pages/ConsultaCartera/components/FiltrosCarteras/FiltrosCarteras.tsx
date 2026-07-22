@@ -97,6 +97,20 @@ export const FiltrosCarteras: React.FC<FiltrosCarterasProps> = ({
     update("cuenta", value);
   };
 
+  const handleChangeValorCuota = (
+    key: "minValorCuota" | "maxValorCuota",
+    value: string
+  ) => {
+    const trimmedValue = value.trim();
+    if (!trimmedValue) {
+      update(key, null);
+      return;
+    }
+
+    const numericValue = Number(trimmedValue);
+    update(key, Number.isFinite(numericValue) && numericValue >= 0 ? Math.trunc(numericValue) : null);
+  };
+
   return (
     <div>
       <Card>
@@ -173,7 +187,7 @@ export const FiltrosCarteras: React.FC<FiltrosCarterasProps> = ({
                   options={SIN_GESTION_DIAS_OPTIONS}
                   selectedValue={filtros.sinGestionDias}
                   onChange={handleChangeSinGestionDias}
-                  label="Días sin gestión"
+                  label="Dï¿½as sin gestiï¿½n"
                 />
               </Col>
 
@@ -183,6 +197,34 @@ export const FiltrosCarteras: React.FC<FiltrosCarterasProps> = ({
                   label="Fecha de Vencimiento"
                   onDateChange={(date) => update("filtroPorVencimiento", date)}
                 />
+              </Col>
+
+              <Col md={6}>
+                <Form.Group>
+                  <Form.Label>Valor cuota minimo</Form.Label>
+                  <Form.Control
+                    type="number"
+                    min={0}
+                    step={1}
+                    value={filtros.minValorCuota ?? ""}
+                    placeholder="Sin minimo"
+                    onChange={(e) => handleChangeValorCuota("minValorCuota", e.target.value)}
+                  />
+                </Form.Group>
+              </Col>
+
+              <Col md={6}>
+                <Form.Group>
+                  <Form.Label>Valor cuota maximo</Form.Label>
+                  <Form.Control
+                    type="number"
+                    min={0}
+                    step={1}
+                    value={filtros.maxValorCuota ?? ""}
+                    placeholder="Sin maximo"
+                    onChange={(e) => handleChangeValorCuota("maxValorCuota", e.target.value)}
+                  />
+                </Form.Group>
               </Col>
             </Row>
 

@@ -75,6 +75,8 @@ describe("consulta cartera helpers", () => {
           tipoEvento: "EV",
           filtroPorVencimiento: null,
           etiqueta: "VIP",
+          minValorCuota: 12000,
+          maxValorCuota: 45000,
         },
         currentUserId: "42",
         tablaPage: 0,
@@ -93,6 +95,8 @@ describe("consulta cartera helpers", () => {
       filtroEventos: "EV",
       filtroPorVencimiento: "",
       filtroPorEtiqueta: "VIP",
+      minValorCuota: 12000,
+      maxValorCuota: 45000,
       page: 1,
       numPage: 50,
       filter: "cliente",
@@ -108,6 +112,8 @@ describe("consulta cartera helpers", () => {
           checkSoloAsignadas: false,
           checkSoloEventosPendientes: false,
           sinGestionDias: 0,
+          minValorCuota: null,
+          maxValorCuota: null,
         },
         tablaPage: -5,
         tablaRowsPerPage: 20,
@@ -115,6 +121,8 @@ describe("consulta cartera helpers", () => {
         filterOverride: "",
       })
     ).toMatchObject({
+      minValorCuota: null,
+      maxValorCuota: null,
       page: 1,
       filter: "",
     });

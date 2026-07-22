@@ -106,7 +106,7 @@ export function useWebRtcPresenceSync({
 
       const payload: ConnectWebRtcPresencePayload = {
         sessionRef: presenceSessionRef.current,
-        ttlSeconds: 60,
+        ttlSeconds: 75,
         isAvailable,
         currentCallSid: currentCallSid ?? undefined,
       };
@@ -155,7 +155,7 @@ export function useWebRtcPresenceSync({
 
       const payload: HeartbeatWebRtcPresencePayload = {
         sessionRef: presenceSessionRef.current,
-        ttlSeconds: 60,
+        ttlSeconds: 75,
         isAvailable,
       };
 
@@ -195,7 +195,7 @@ export function useWebRtcPresenceSync({
       const payload: SetWebRtcPresenceAvailabilityPayload = {
         availability,
         currentCallSid: currentCallSid ?? undefined,
-        ttlSeconds: availability === "offline" ? undefined : 60,
+        ttlSeconds: availability === "offline" ? undefined : 75,
       };
 
       const response = await setPresenceAvailabilityRequest(payload);
@@ -285,7 +285,7 @@ export function useWebRtcPresenceSync({
         sessionRef: runtimeSessionRef ?? undefined,
         tabId: runtimeTabId ?? undefined,
         currentCallSid: currentCallSid ?? undefined,
-        ttlSeconds: 60,
+        ttlSeconds: 75,
       });
 
       if (response?.success && response.data) {
@@ -492,7 +492,7 @@ export function useWebRtcPresenceSync({
     };
 
     send();
-    const interval = window.setInterval(send, 20000);
+    const interval = window.setInterval(send, 25000);
     return () => window.clearInterval(interval);
   }, [
     advisorInternalState,
