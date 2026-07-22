@@ -1,5 +1,5 @@
 {
-  "packageManager": "pnpm@7.33.7",
+  "packageManager": "pnpm@11.13.1",
   "name": "adminlte-3-react",
   "version": "0.3.2",
   "private": true,
