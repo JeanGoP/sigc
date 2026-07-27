@@ -11,11 +11,15 @@ import {
   loadDashboardCarteraDataset,
   saveDashboardCarteraDataset,
 } from "../domain/storage";
+import { downloadCarteraCsv } from "../domain/csvExport";
 
 export function useCarteraBoard() {
   const [fecha, setFecha] = useState(() => new Date().toISOString().slice(0, 10));
   const [data, setData] = useState<CarteraRow[]>(
     () => loadDashboardCarteraDataset()?.data ?? [],
+  );
+  const [rawData, setRawData] = useState<Record<string, unknown>[]>(
+    () => loadDashboardCarteraDataset()?.rawData ?? [],
   );
   const [lastFecha, setLastFecha] = useState<string | null>(
     () => loadDashboardCarteraDataset()?.fecha ?? null,
@@ -46,10 +50,19 @@ export function useCarteraBoard() {
     if (response?.success && Array.isArray(response.data)) {
       const mapped = mapApiRowsToCarteraRows(response.data);
       setData(mapped);
+      setRawData(response.data);
       setLastFecha(fecha);
-      saveDashboardCarteraDataset({ fecha, data: mapped });
+      saveDashboardCarteraDataset({ fecha, data: mapped, rawData: response.data });
     }
   }, [fecha, request]);
+
+  const handleDescargarCsv = useCallback(() => {
+    if (rawData.length === 0) {
+      toast.info("No hay datos para descargar. Consulta primero una fecha.");
+      return;
+    }
+    downloadCarteraCsv(rawData, lastFecha);
+  }, [rawData, lastFecha]);
 
   const loadCuentasExcluidas = useCallback(async () => {
     const response = await listarCuentasExcluidas();
@@ -123,6 +136,7 @@ export function useCarteraBoard() {
     errorCuentasExcluidas,
     handleFechaChange,
     handleConsultar,
+    handleDescargarCsv,
     handleAgregarCuentaExcluida,
     handleEliminarCuentaExcluida,
     loadCuentasExcluidas,

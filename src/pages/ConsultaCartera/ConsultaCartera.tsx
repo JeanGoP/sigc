@@ -317,7 +317,7 @@ export const ConsultaCartera: React.FC = () => {
       {/* <ContentHeader title="Consulta de Cartera" /> */}
       <section className="content">
         <div className="container-fluid">
-          <div className="row" style={{ height: "100vh" }}>
+          <div className="row cartera-row" style={{ height: "100vh" }}>
             <ConsultaCarteraSidebar
               collapsed={collapsed}
               menuFiltrosState={MenuFiltrosState}

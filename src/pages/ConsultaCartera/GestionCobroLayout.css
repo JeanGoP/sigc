@@ -101,4 +101,52 @@
     min-width: 100%;
   }
 }
-  
+
+/* === LAYOUT CARTERA RESPONSIVE — PRUEBA === */
+/* Solo aplica a la pantalla de Consulta de Cartera (.cartera-row). */
+/* Para revertir: borrar este bloque y quitar la clase "cartera-row" del row en ConsultaCartera.tsx. */
+
+/* PC / tablet: los dos paneles lado a lado, sin bajarse (sin wrap). */
+.cartera-row {
+  flex-wrap: nowrap;
+  align-items: stretch;
+}
+
+/* El panel derecho puede encogerse por debajo del ancho de su contenido */
+/* (los flex-items traen min-width:auto y eso es lo que provocaba el hueco). */
+.cartera-row .main-panel {
+  min-width: 0;
+}
+
+/* Contenido ancho (tablas, timeline, etc.) hace scroll dentro de su caja */
+/* en vez de empujar el layout y forzar el salto de línea. */
+.cartera-row .main-panel .table-responsive,
+.cartera-row .main-panel .MuiDataGrid-root,
+.cartera-row .main-panel .tab-content {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+/* Móvil: apilado intencional (Opción A) -> tabla de facturas arriba, */
+/* info del cliente / recibos / timeline abajo. Ambos a ancho completo. */
+@media (max-width: 767.98px) {
+  .cartera-row {
+    flex-wrap: wrap;
+    height: auto !important; /* evita comprimir todo dentro de un 100vh apilado */
+  }
+
+  .cartera-row .side-panel:not(.collapsed) {
+    flex: 0 0 100%;
+    max-width: 100%;
+    min-width: 0;
+    border-right: none;
+    border-bottom: 1px solid #dee2e6;
+  }
+
+  .cartera-row .main-panel {
+    flex: 0 0 100%;
+    max-width: 100%;
+  }
+}
+/* === FIN LAYOUT CARTERA RESPONSIVE — PRUEBA === */
+

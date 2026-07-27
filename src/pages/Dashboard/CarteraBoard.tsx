@@ -32,6 +32,7 @@ export default function CarteraBoard() {
     loadingCuentasExcluidas,
     handleFechaChange,
     handleConsultar,
+    handleDescargarCsv,
     handleAgregarCuentaExcluida,
     handleEliminarCuentaExcluida,
   } = useCarteraBoard();
@@ -84,7 +85,9 @@ export default function CarteraBoard() {
           loading={loading}
           error={error}
           cuentasExcluidasCount={cuentasExcluidas.length}
+          hasData={data.length > 0}
           onOpenExclusiones={() => setShowExclusionesModal(true)}
+          onDescargarCsv={handleDescargarCsv}
           onFechaChange={handleFechaChange}
           onConsultar={handleConsultar}
         />

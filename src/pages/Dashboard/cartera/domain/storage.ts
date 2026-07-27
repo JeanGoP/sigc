@@ -5,6 +5,7 @@ export const DASHBOARD_CARTERA_STORAGE_KEY = "dashboard_cartera_dataset";
 export interface PersistedDashboardCarteraDataset {
   fecha: string;
   data: CarteraRow[];
+  rawData?: Record<string, unknown>[];
 }
 
 type StorageReader = Pick<Storage, "getItem">;
@@ -32,6 +33,9 @@ export function parseDashboardCarteraDataset(
     return {
       fecha: parsed.fecha,
       data: parsed.data as CarteraRow[],
+      rawData: Array.isArray(parsed.rawData)
+        ? (parsed.rawData as Record<string, unknown>[])
+        : undefined,
     };
   } catch {
     return null;
