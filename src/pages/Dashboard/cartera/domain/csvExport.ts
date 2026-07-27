@@ -1,6 +1,97 @@
 const CSV_DELIMITER = ";";
 
 /**
+ * Columnas del CSV en orden explícito, con su etiqueta legible.
+ *
+ * IMPORTANTE: el orden se define aquí como un array (NO se deriva de
+ * Object.keys de la respuesta), porque JavaScript reordena las claves con
+ * forma de entero ("30", "60", "90") al inicio del objeto, rompiendo el orden
+ * original de la DB. `key` es el nombre de columna tal cual llega de la DB.
+ * Solo aplica al CSV descargado; los datos y el resto de la app usan los
+ * nombres crudos.
+ */
+const CSV_COLUMNS: { key: string; label: string }[] = [
+  { key: "CODICTA", label: "Código cuenta" },
+  { key: "DESCCTA", label: "Nombre cuenta" },
+
+  { key: "Obligaciones_Total", label: "Obligaciones - Total" },
+  { key: "Obligaciones_PV", label: "Obligaciones - Por vencer" },
+  { key: "Obligaciones_30", label: "Obligaciones - 30 días" },
+  { key: "Obligaciones_60", label: "Obligaciones - 60 días" },
+  { key: "Obligaciones_90", label: "Obligaciones - 90 días" },
+  { key: "Obligaciones_90_MAS", label: "Obligaciones - +90 días" },
+
+  { key: "total", label: "Saldo total" },
+  { key: "PV", label: "Saldo por vencer" },
+  { key: "30", label: "Saldo 30 días" },
+  { key: "60", label: "Saldo 60 días" },
+  { key: "90", label: "Saldo 90 días" },
+  { key: "+90", label: "Saldo +90 días" },
+  { key: "CarteraVencida", label: "Cartera vencida" },
+
+  { key: "PV_Porc", label: "% Por vencer" },
+  { key: "30_Porc", label: "% 30 días" },
+  { key: "60_Porc", label: "% 60 días" },
+  { key: "90_Porc", label: "% 90 días" },
+  { key: "+90_Porc", label: "% +90 días" },
+  { key: "CarteraVencida_Porc", label: "% Cartera vencida" },
+
+  { key: "total_Ant", label: "Saldo total (mes anterior)" },
+  { key: "PV_Ant", label: "Saldo por vencer (mes anterior)" },
+  { key: "30_Ant", label: "Saldo 30 días (mes anterior)" },
+  { key: "60_Ant", label: "Saldo 60 días (mes anterior)" },
+  { key: "90_Ant", label: "Saldo 90 días (mes anterior)" },
+  { key: "+90_Ant", label: "Saldo +90 días (mes anterior)" },
+  { key: "CarteraVencida_Ant", label: "Cartera vencida (mes anterior)" },
+
+  { key: "PV_Ant_Porc", label: "% Por vencer (mes anterior)" },
+  { key: "30_Ant_Porc", label: "% 30 días (mes anterior)" },
+  { key: "60_Ant_Porc", label: "% 60 días (mes anterior)" },
+  { key: "90_Ant_Porc", label: "% 90 días (mes anterior)" },
+  { key: "+90_Ant_Porc", label: "% +90 días (mes anterior)" },
+  { key: "CarteraVencida_Ant_Porc", label: "% Cartera vencida (mes anterior)" },
+
+  { key: "TotalRecaudoMesActual", label: "Recaudo mes actual" },
+  { key: "TotalRecaudoMesAnterior", label: "Recaudo mes anterior" },
+  { key: "Diferencia", label: "Diferencia recaudo" },
+  { key: "PorcentajeVariacion", label: "% Variación recaudo" },
+  { key: "IndiceRecaudo_Porc", label: "Índice de recaudo (%)" },
+
+  { key: "RecaudoMesActual_PV", label: "Recaudo - Por vencer" },
+  { key: "RecaudoMesActual_30", label: "Recaudo - 30 días" },
+  { key: "RecaudoMesActual_60", label: "Recaudo - 60 días" },
+  { key: "RecaudoMesActual_90", label: "Recaudo - 90 días" },
+  { key: "RecaudoMesActual_90_MAS", label: "Recaudo - +90 días" },
+  { key: "RecaudoMesActual_SinEdad", label: "Recaudo - Sin edad" },
+  { key: "RecaudoMesActual_Vencido", label: "Recaudo - Vencido" },
+
+  { key: "RecaudoMesActual_PV_Porc", label: "% Recaudo por vencer" },
+  { key: "RecaudoMesActual_30_Porc", label: "% Recaudo 30 días" },
+  { key: "RecaudoMesActual_60_Porc", label: "% Recaudo 60 días" },
+  { key: "RecaudoMesActual_90_Porc", label: "% Recaudo 90 días" },
+  { key: "RecaudoMesActual_90_MAS_Porc", label: "% Recaudo +90 días" },
+  { key: "RecaudoMesActual_SinEdad_Porc", label: "% Recaudo sin edad" },
+  { key: "RecaudoMesActual_Vencido_Porc", label: "% Recaudo vencido" },
+];
+
+/**
+ * Devuelve las columnas a exportar en orden: primero las definidas en
+ * CSV_COLUMNS (las presentes en la fila), y luego cualquier columna extra que
+ * la DB haya devuelto pero no esté mapeada (usando su nombre crudo).
+ */
+function resolveColumns(
+  sampleRow: Record<string, unknown>,
+): { key: string; label: string }[] {
+  const knownKeys = new Set(CSV_COLUMNS.map((column) => column.key));
+  const ordered = CSV_COLUMNS.filter((column) => column.key in sampleRow);
+  const extras = Object.keys(sampleRow)
+    .filter((key) => !knownKeys.has(key))
+    .map((key) => ({ key, label: key.trim() }));
+
+  return [...ordered, ...extras];
+}
+
+/**
  * Formatea un valor crudo devuelto por la DB para el CSV.
  * - Los strings se recortan (CODICTA viene con espacios de relleno).
  * - Los números enteros se muestran sin decimales; los demás sin ceros
@@ -53,22 +144,24 @@ function escapeCsvValue(value: string): string {
 
 /**
  * Construye el contenido CSV a partir de las filas crudas de la DB.
- * Mantiene todas las columnas en el orden en que llegan y aplica una
- * limpieza mínima de valores. Devuelve cadena vacía si no hay filas.
+ * El orden de columnas se toma de CSV_COLUMNS (orden explícito), no del
+ * orden de las claves de la respuesta. Aplica una limpieza mínima de
+ * valores. Devuelve cadena vacía si no hay filas.
  */
 export function buildCarteraCsv(rows: Record<string, unknown>[]): string {
   if (!rows || rows.length === 0) {
     return "";
   }
 
-  const headers = Object.keys(rows[0]).map((key) => key.trim());
-  const originalKeys = Object.keys(rows[0]);
+  const columns = resolveColumns(rows[0]);
 
-  const headerLine = headers.map(escapeCsvValue).join(CSV_DELIMITER);
+  const headerLine = columns
+    .map((column) => escapeCsvValue(column.label))
+    .join(CSV_DELIMITER);
 
   const dataLines = rows.map((row) =>
-    originalKeys
-      .map((key) => escapeCsvValue(formatCellValue(row[key])))
+    columns
+      .map((column) => escapeCsvValue(formatCellValue(row[column.key])))
       .join(CSV_DELIMITER),
   );
 
