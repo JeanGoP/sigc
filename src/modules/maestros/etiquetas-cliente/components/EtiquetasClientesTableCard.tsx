@@ -6,6 +6,7 @@ import {
   DynamicTablePagination,
   type TableColumn,
 } from "@app/pages/ConsultaClientes/components/tablaReutilizablePaginacion";
+import { useAppSelector } from "@app/store/store";
 import type { EtiquetaCliente } from "../domain/types";
 
 const StyledCard = styled.div`
@@ -40,6 +41,9 @@ export function EtiquetasClientesTableCard({
   setRowsPerPage,
   setSearchText,
 }: EtiquetasClientesTableCardProps) {
+  const screenSize = useAppSelector((state) => state.ui.screenSize);
+  const isMobile = screenSize === "xs";
+
   const columns = useMemo<TableColumn[]>(
     () => [
       { id: "id", label: "ID" },
@@ -61,11 +65,10 @@ export function EtiquetasClientesTableCard({
         id: "acciones",
         label: "Acciones",
         format: (_value: unknown, row: EtiquetaCliente) => (
-          <Box>
+          <Box sx={{ display: "flex", flexWrap: "wrap", justifyContent: isMobile ? "flex-end" : "flex-start", gap: 8 }}>
             <Button
               variant="info"
               size="sm"
-              className="mr-2"
               onClick={() => onOpenModal(row)}
             >
               <i className="fas fa-edit"></i>
@@ -81,7 +84,7 @@ export function EtiquetasClientesTableCard({
         ),
       },
     ],
-    [onDelete, onOpenModal],
+    [isMobile, onDelete, onOpenModal],
   );
 
   return (
@@ -90,7 +93,7 @@ export function EtiquetasClientesTableCard({
         <Row>
           <Col xs={12} lg={12} md={12}>
             <Button
-              className="float-end"
+              className="float-right"
               variant="primary"
               onClick={() => onOpenModal()}
             >
@@ -109,6 +112,7 @@ export function EtiquetasClientesTableCard({
           onRowsPerPageChange={setRowsPerPage}
           page={page}
           onPageChange={setPage}
+          enableMobileCards
         />
       </div>
     </StyledCard>

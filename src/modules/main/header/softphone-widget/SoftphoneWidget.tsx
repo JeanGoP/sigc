@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type ChangeEvent } from "react";
 import { Badge } from "react-bootstrap";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
+  faCaretDown,
   faMicrophone,
   faMicrophoneSlash,
   faPhone,
@@ -46,6 +47,7 @@ export default function SoftphoneWidget() {
   const [endedCallSummary, setEndedCallSummary] = useState<EndedCallSummary | null>(null);
   const { activeSession } = useGestionSessionContext();
   const currentUser = useAppSelector((state) => state.auth.currentUser);
+  const isMobile = useAppSelector((state) => state.ui.screenSize) === "xs";
   const canViewSoftphoneButton = isAdministratorRole(currentUser?.role);
 
   const ownership = useWebRtcSoftphoneOwnership({
@@ -163,46 +165,69 @@ export default function SoftphoneWidget() {
       <li className="nav-item d-flex align-items-center">
         {callDisplayState.showLiveHeaderCard && (
           <div
-            className="d-flex align-items-center me-2 px-2 py-1 border rounded"
+            className="d-flex align-items-center mr-2 px-2 py-1 border rounded"
             style={{
-              minWidth: 250,
-              maxWidth: 320,
+              /* En móvil la tarjeta se compacta a ícono + cronómetro + controles:
+                 con el nombre y el avatar (minWidth 250) desbordaba el header en 375px. */
+              minWidth: isMobile ? 0 : 250,
+              maxWidth: isMobile ? 150 : 320,
               background: "#f8fafc",
               borderColor: "rgba(0,0,0,0.12)",
               height: 40,
             }}
             title={callDisplayState.activeContactName}
           >
-            <span
-              style={{
-                width: 24,
-                height: 24,
-                minWidth: 24,
-                borderRadius: "50%",
-                background: "#e5e7eb",
-                color: "#4b5563",
-                fontSize: 10,
-                fontWeight: 600,
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-                marginRight: 8,
-              }}
-            >
-              {callDisplayState.activeContactInitials}
-            </span>
-
-            <div className="d-flex flex-column flex-grow-1" style={{ minWidth: 0 }}>
+            {!isMobile && (
               <span
-                className="text-truncate"
-                style={{ fontSize: "0.78rem", fontWeight: 600, lineHeight: 1.05 }}
+                style={{
+                  width: 24,
+                  height: 24,
+                  minWidth: 24,
+                  borderRadius: "50%",
+                  background: "#e5e7eb",
+                  color: "#4b5563",
+                  fontSize: 10,
+                  fontWeight: 600,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  marginRight: 8,
+                }}
               >
-                {callDisplayState.activeContactName}
+                {callDisplayState.activeContactInitials}
               </span>
-              <span style={{ fontSize: "0.74rem", color: "#6b7280", lineHeight: 1.1 }}>
+            )}
+
+            {isMobile ? (
+              <span
+                className="d-flex align-items-center flex-grow-1"
+                style={{
+                  fontSize: "0.74rem",
+                  color: "#374151",
+                  fontWeight: 600,
+                  minWidth: 0,
+                  gap: 4,
+                }}
+              >
+                <FontAwesomeIcon
+                  icon={faPhone}
+                  style={{ fontSize: "0.7rem", color: "#16a34a" }}
+                />
                 {callClockText}
               </span>
-            </div>
+            ) : (
+              <div className="d-flex flex-column flex-grow-1" style={{ minWidth: 0 }}>
+                <span
+                  className="text-truncate"
+                  style={{ fontSize: "0.78rem", fontWeight: 600, lineHeight: 1.05 }}
+                >
+                  {callDisplayState.activeContactName}
+                </span>
+                <span style={{ fontSize: "0.74rem", color: "#6b7280", lineHeight: 1.1 }}>
+                  {callClockText}
+                </span>
+              </div>
+            )}
 
             <button
               type="button"
@@ -232,26 +257,77 @@ export default function SoftphoneWidget() {
           </div>
         )}
 
-        <div className="d-flex align-items-center me-2" title={advisorStateDotTitle}>
+        {/* Selector de estado del asesor.
+            En móvil se colapsa a una pastilla de solo punto + caret: el <select> nativo
+            sigue siendo el control real (conserva el picker del sistema operativo), pero
+            se superpone invisible sobre la pastilla, porque un <select> siempre pinta el
+            texto de la opción elegida y "Desconectado"/"En pausa" ensanchaban el header. */}
+        <div
+          className="d-flex align-items-center mr-2"
+          style={
+            isMobile
+              ? {
+                  position: "relative",
+                  /* Sin esto el área tocable serían solo el punto y el caret (~24x11px). */
+                  justifyContent: "center",
+                  minWidth: 42,
+                  minHeight: 32,
+                  padding: "0 8px",
+                  border: "1px solid rgba(0,0,0,0.15)",
+                  borderRadius: 4,
+                  background: "#fff",
+                }
+              : undefined
+          }
+          title={advisorStateDotTitle}
+        >
           <span
             style={{
               width: 10,
               height: 10,
+              minWidth: 10,
               borderRadius: "50%",
               backgroundColor: advisorStateDotColor,
               display: "inline-block",
-              marginRight: 8,
+              marginRight: isMobile ? 4 : 8,
               boxShadow: "0 0 0 1px rgba(0,0,0,0.2)",
             }}
           />
+
+          {isMobile && (
+            <FontAwesomeIcon
+              icon={faCaretDown}
+              style={{
+                fontSize: "0.7rem",
+                color: stateSelectorDisabled ? "#adb5bd" : "#6c757d",
+              }}
+            />
+          )}
+
           <select
             className="form-control form-control-sm"
-            style={{ width: 170 }}
+            style={
+              isMobile
+                ? {
+                    /* Invisible pero encima de la pastilla: el toque abre el picker nativo. */
+                    position: "absolute",
+                    top: 0,
+                    left: 0,
+                    width: "100%",
+                    height: "100%",
+                    opacity: 0,
+                    padding: 0,
+                    border: "none",
+                    cursor: stateSelectorDisabled ? "default" : "pointer",
+                  }
+                : { width: 170 }
+            }
             value={runtimeSnapshot.advisorInternalState || "disponible"}
             onChange={(event) => {
               void handleAdvisorStateChange(event);
             }}
             disabled={stateSelectorDisabled}
+            aria-label={advisorStateDotTitle}
             title={
               ownership.isOwner
                 ? "Cambiar estado del asesor"
@@ -276,16 +352,17 @@ export default function SoftphoneWidget() {
             style={{ position: "relative" }}
           >
             <FontAwesomeIcon icon={faPhone} />
+            {/* Badges de estado 'ready/busy' y 'owner': ocultos en móvil (<768px), visibles en tablet/desktop. */}
             <Badge
               variant={runtimeSnapshot.inProgress ? "danger" : "success"}
-              className="ms-1"
+              className="ml-1 d-none d-md-inline-block"
               style={{ fontSize: "0.62rem", verticalAlign: "middle" }}
             >
               {runtimeSnapshot.inProgress ? "busy" : "ready"}
             </Badge>
             <Badge
               variant={ownership.isOwner ? "primary" : "secondary"}
-              className="ms-1"
+              className="ml-1 d-none d-md-inline-block"
               style={{ fontSize: "0.58rem", verticalAlign: "middle" }}
             >
               {ownershipLabel}
@@ -318,7 +395,7 @@ export default function SoftphoneWidget() {
             <div><strong>Hacia:</strong> {callDisplayState.incomingTo}</div>
           </div>
 
-          <div className="d-flex gap-2 mt-3">
+          <div className="d-flex mt-3" style={{ gap: 8 }}>
             <button
               type="button"
               className="btn btn-success btn-sm flex-fill"

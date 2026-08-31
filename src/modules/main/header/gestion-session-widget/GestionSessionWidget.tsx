@@ -9,6 +9,7 @@ import {
 } from "@app/services/GestionSessionService";
 import { useGestionSessionContext } from "@app/modules/main/gestion-session/GestionSessionContext";
 import { buildConsultaCarteraUrl } from "@app/utils/consultaCarteraNavigation";
+import { useAppSelector } from "@app/store/store";
 
 function formatElapsed(seconds: number): string {
   const safe = Math.max(0, Math.floor(seconds));
@@ -90,6 +91,8 @@ export default function GestionSessionWidget() {
     loading,
   } = useGestionSessionContext();
   const { transitionGestionSession } = useGestionSessionService();
+  // En móvil (xs) el widget se compacta a solo el badge de estado para no chocar con la hamburguesa.
+  const isMobile = useAppSelector((state) => state.ui.screenSize) === "xs";
   const [show, setShow] = useState(false);
   const [nowMs, setNowMs] = useState(Date.now());
   const [switchingSessionRef, setSwitchingSessionRef] = useState<string | null>(null);
@@ -224,29 +227,31 @@ export default function GestionSessionWidget() {
           className="nav-link btn btn-link d-flex align-items-center px-2"
           style={{
             textDecoration: "none",
-            minWidth: 220,
-            maxWidth: 320,
+            minWidth: isMobile ? 0 : 220,
+            maxWidth: isMobile ? undefined : 320,
             color: "inherit",
           }}
         >
-          <span
-            className="d-flex flex-column align-items-start"
-            style={{ minWidth: 0, lineHeight: 1.1 }}
-          >
+          {!isMobile && (
             <span
-              className="text-truncate"
-              style={{ fontSize: "0.78rem", fontWeight: 700, maxWidth: 250 }}
-              title={activeTitle}
+              className="d-flex flex-column align-items-start"
+              style={{ minWidth: 0, lineHeight: 1.1 }}
             >
-              {activeTitle}
+              <span
+                className="text-truncate"
+                style={{ fontSize: "0.78rem", fontWeight: 700, maxWidth: 250 }}
+                title={activeTitle}
+              >
+                {activeTitle}
+              </span>
+              <span style={{ fontSize: "0.72rem", color: "#6b7280" }}>
+                {activeSession ? activeElapsedText : "Sin gestiones en curso"}
+              </span>
             </span>
-            <span style={{ fontSize: "0.72rem", color: "#6b7280" }}>
-              {activeSession ? activeElapsedText : "Sin gestiones en curso"}
-            </span>
-          </span>
+          )}
           <Badge
             variant={activeSession ? "success" : "secondary"}
-            className="ms-2"
+            className="ml-2"
             style={{ fontSize: "0.62rem" }}
           >
             {activeSession ? "Activa" : "Idle"}
@@ -254,7 +259,7 @@ export default function GestionSessionWidget() {
           {pausedSessions.length > 0 && (
             <Badge
               variant="warning"
-              className="ms-1 text-dark"
+              className="ml-1 text-dark"
               style={{ fontSize: "0.62rem" }}
             >
               +{pausedSessions.length}
@@ -265,7 +270,10 @@ export default function GestionSessionWidget() {
         <Dropdown.Menu
           alignRight
           style={{
-            width: 380,
+            /* width:380 fijo desbordaba cualquier móvil (380 > 375, y hasta 60px
+               de exceso a 320px); en móvil se acota al viewport con margen. */
+            width: isMobile ? "calc(100vw - 24px)" : 380,
+            maxWidth: isMobile ? undefined : "calc(100vw - 24px)",
             padding: "0.75rem",
             borderRadius: 12,
           }}
@@ -291,7 +299,11 @@ export default function GestionSessionWidget() {
             <div className="mb-3">
               <div className="small text-uppercase text-muted mb-2">Activa</div>
               <div className="border rounded p-2">
-                <div style={{ fontWeight: 700, fontSize: "0.86rem" }}>
+                <div
+                  className="text-truncate"
+                  style={{ fontWeight: 700, fontSize: "0.86rem" }}
+                  title={buildSessionTitle(activeSession)}
+                >
                   {buildSessionTitle(activeSession)}
                 </div>
                 <div className="small text-muted mt-1">
@@ -300,7 +312,10 @@ export default function GestionSessionWidget() {
                 <div className="small text-muted">
                   Tiempo activo: {activeElapsedText}
                 </div>
-                <div className="d-flex justify-content-end mt-2 gap-2">
+                <div
+                  className="d-flex justify-content-end mt-2"
+                  style={{ gap: 8 }}
+                >
                   <SessionActionButton
                     iconClassName={
                       cancelingSessionRef === activeSession.sessionRef
@@ -330,12 +345,16 @@ export default function GestionSessionWidget() {
           {pausedSessions.length > 0 && (
             <div>
               <div className="small text-uppercase text-muted mb-2">En pausa</div>
-              <div className="d-flex flex-column gap-2">
+              <div className="d-flex flex-column" style={{ gap: 8 }}>
                 {pausedSessions.map((session) => {
                   const isSwitching = switchingSessionRef === session.sessionRef;
                   return (
                     <div key={session.sessionRef} className="border rounded p-2">
-                      <div style={{ fontWeight: 700, fontSize: "0.84rem" }}>
+                      <div
+                        className="text-truncate"
+                        style={{ fontWeight: 700, fontSize: "0.84rem" }}
+                        title={buildSessionTitle(session)}
+                      >
                         {buildSessionTitle(session)}
                       </div>
                       <div className="small text-muted mt-1">
@@ -346,7 +365,10 @@ export default function GestionSessionWidget() {
                           calculateGestionSessionElapsedSeconds(session, nowMs)
                         )}
                       </div>
-                      <div className="d-flex justify-content-end mt-2 gap-2">
+                      <div
+                        className="d-flex justify-content-end mt-2"
+                        style={{ gap: 8 }}
+                      >
                         <SessionActionButton
                           iconClassName={
                             cancelingSessionRef === session.sessionRef
@@ -385,7 +407,10 @@ export default function GestionSessionWidget() {
         centered
       >
         <Modal.Body>
-          <div className="d-flex justify-content-between align-items-start gap-3 mb-3">
+          <div
+            className="d-flex justify-content-between align-items-start mb-3"
+            style={{ gap: 12 }}
+          >
             <div>
               <div style={{ fontSize: "1rem", fontWeight: 700, color: "#1f2937" }}>
                 Cancelar gestion
@@ -425,7 +450,7 @@ export default function GestionSessionWidget() {
               Esta gestion tiene llamadas asociadas. ¿Deseas cancelarla de todas formas junto con sus llamadas?
             </div>
           )}
-          <div className="d-flex justify-content-end gap-2 mt-4">
+          <div className="d-flex justify-content-end mt-4" style={{ gap: 8 }}>
             <Button
               variant="secondary"
               onClick={closeCancelModal}

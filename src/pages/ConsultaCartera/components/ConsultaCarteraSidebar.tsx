@@ -136,6 +136,7 @@ export function ConsultaCarteraSidebar({
           </div>
         ) : (
           <DynamicTablePaginationConsultaCartera
+            enableMobileCards
             columns={columns}
             rows={tablaRows}
             totalRows={tablaTotalRows}

@@ -38,9 +38,9 @@ export const CalendarioDiaModal: React.FC<CalendarioDiaModalProps> = ({
           <ListGroup variant="flush">
             {eventosDelDia.map((evento, index) => (
               <ListGroup.Item key={index}>
-                <div className="d-flex justify-content-between align-items-center">
+                <div className="d-flex justify-content-between align-items-center flex-wrap">
                   <div>
-                    <div className="row">
+                    <div className="d-flex align-items-center flex-wrap" style={{ gap: 6 }}>
                       <strong>{evento.title}</strong>{" "}
                       <span className="text-muted">({evento.usuario})</span>
                       <BotonGestionCartera type="B" evento={evento} />
@@ -52,7 +52,7 @@ export const CalendarioDiaModal: React.FC<CalendarioDiaModalProps> = ({
                     <br />
                     <small className="text-secondary">{evento.descripcion}</small>
                   </div>
-                  <div className="d-flex flex-column align-items-end gap-2">
+                  <div className="d-flex flex-column align-items-end" style={{ gap: 8 }}>
                     <span
                       className="badge"
                       style={{

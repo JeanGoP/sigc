@@ -3,6 +3,7 @@ import { Rnd } from "react-rnd";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faCommentDots, faSearch, faTimes } from "@fortawesome/free-solid-svg-icons";
 import { useNotasClienteService } from "@app/services/ConsultaCartera/NotasClienteService";
+import { useAppSelector } from "@app/store/store";
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
 
@@ -72,6 +73,8 @@ export const StickyNote: React.FC<Props> = ({
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [pos, setPos] = useState({ x: 0, y: 0 });
   const [size, setSize] = useState({ width: 320, height: 420 });
+  const screenSize = useAppSelector((state) => state.ui.screenSize);
+  const isMobile = screenSize === "xs";
   const [, tick] = useState(0);
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
@@ -201,10 +204,16 @@ export const StickyNote: React.FC<Props> = ({
       {visible && (
         <div style={{ position: "fixed", top: 0, left: 0, zIndex: 9999, pointerEvents: "none" }}>
         <Rnd
-          size={size}
-          position={pos}
-          minWidth={320}
-          minHeight={420}
+          /* En móvil el panel deja de flotar: ocupa la pantalla completa y se
+             desactivan drag y resize (arrastrar una nota de 320x420 en un viewport
+             de 375px no es usable, y los 420px de alto no caben en landscape). */
+          size={isMobile ? { width: "100vw", height: "100dvh" } : size}
+          position={isMobile ? { x: 0, y: 0 } : pos}
+          minWidth={isMobile ? 0 : 320}
+          minHeight={isMobile ? 0 : 420}
+          bounds={isMobile ? undefined : "window"}
+          disableDragging={isMobile}
+          enableResizing={!isMobile}
           onDragStop={(_, d) => setPos({ x: d.x, y: d.y })}
           onResizeStop={(_, __, ref, ___, position) => {
             setSize({ width: ref.offsetWidth, height: ref.offsetHeight });
@@ -219,10 +228,10 @@ export const StickyNote: React.FC<Props> = ({
               height: "100%",
               display: "flex",
               flexDirection: "column",
-              borderRadius: 10,
+              borderRadius: isMobile ? 0 : 10,
               overflow: "hidden",
-              boxShadow: "0 8px 32px rgba(0,0,0,0.22)",
-              border: "1px solid #e0e0e0",
+              boxShadow: isMobile ? "none" : "0 8px 32px rgba(0,0,0,0.22)",
+              border: isMobile ? "none" : "1px solid #e0e0e0",
               background: "#fff",
             }}
           >
@@ -236,7 +245,7 @@ export const StickyNote: React.FC<Props> = ({
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "space-between",
-                cursor: "grab",
+                cursor: isMobile ? "default" : "grab",
                 userSelect: "none",
                 flexShrink: 0,
               }}
@@ -254,9 +263,11 @@ export const StickyNote: React.FC<Props> = ({
                   border: "none",
                   color: "#aaa",
                   cursor: "pointer",
-                  fontSize: 18,
+                  fontSize: isMobile ? 24 : 18,
                   lineHeight: 1,
-                  padding: "4px 6px",
+                  /* En móvil es la única forma de cerrar el panel (ya no hay
+                     drag ni área alrededor), así que necesita área de toque real. */
+                  padding: isMobile ? "8px 14px" : "4px 6px",
                   borderRadius: 4,
                 }}
               >

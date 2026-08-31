@@ -157,15 +157,16 @@ export function CarteraCuentaMultiSelect({
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
+            flexWrap: "wrap",
             gap: 8,
             padding: "6px 8px",
             borderBottom: "1px solid #eef2f6",
           }}
         >
-          <span style={{ fontSize: 11, color: "#6c757d", whiteSpace: "nowrap" }}>
+          <span style={{ fontSize: 11, color: "#6c757d", minWidth: 0, wordBreak: "break-word" }}>
             {label}: {countLabel}
           </span>
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <div style={{ display: "flex", alignItems: "center", flexShrink: 0, gap: 6 }}>
             <button
               type="button"
               onClick={handleSelectAll}
@@ -209,7 +210,7 @@ export function CarteraCuentaMultiSelect({
   return (
     <div
       ref={anchorRef}
-      style={{ width: 260, marginBottom: 8 }}
+      style={{ width: 260, maxWidth: "100%", marginBottom: 8 }}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >

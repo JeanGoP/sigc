@@ -38,8 +38,10 @@ export function SeguimientoCard({
       <div
         style={{
           display: "flex",
+          flexWrap: "wrap",
           alignItems: "center",
           justifyContent: "space-between",
+          gap: 8,
           marginBottom: 8,
         }}
       >

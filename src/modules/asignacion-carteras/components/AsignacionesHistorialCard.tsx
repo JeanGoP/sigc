@@ -32,7 +32,7 @@ export function AsignacionesHistorialCard({
             onChange={(event) =>
               onChangeFilter("fechaInicio", event.target.value)
             }
-            style={{ width: 160 }}
+            style={{ minWidth: 140, flex: "1 1 140px" }}
           />
           <Form.Control
             type="date"
@@ -40,7 +40,7 @@ export function AsignacionesHistorialCard({
             onChange={(event) =>
               onChangeFilter("fechaFin", event.target.value)
             }
-            style={{ width: 160 }}
+            style={{ minWidth: 140, flex: "1 1 140px" }}
           />
           <Button variant="outline-dark" onClick={onRefresh}>
             Actualizar historial

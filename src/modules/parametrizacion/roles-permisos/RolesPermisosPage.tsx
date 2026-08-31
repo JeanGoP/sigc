@@ -1,10 +1,16 @@
+import { useState } from "react";
 import { Col, Row, Nav } from "react-bootstrap";
+import { useAppSelector } from "@app/store/store";
 import { useRolesPermisosPage } from "./hooks/useRolesPermisosPage";
 import PermissionsCard from "./ui/PermissionsCard";
 import RolesSidebarCard from "./ui/RolesSidebarCard";
 import ReportPermissionsCard from "./ui/ReportPermissionsCard";
 
 const RolesPermisosPage = () => {
+  const screenSize = useAppSelector((state) => state.ui.screenSize);
+  const isMobile = screenSize === "xs";
+  const [mobileView, setMobileView] = useState<"list" | "detail">("list");
+
   const {
     canCreate,
     canEdit,
@@ -62,30 +68,52 @@ const RolesPermisosPage = () => {
     isReportPermissionChanged,
   } = useRolesPermisosPage();
 
+  const effectiveMobileView = selectedRoleId ? mobileView : "list";
+
+  const handleSelectRoleMobile: typeof handleSelectRole = (role) => {
+    const selection = handleSelectRole(role);
+    if (isMobile) setMobileView("detail");
+    return selection;
+  };
+
   return (
     <Row className="mt-3">
-      <Col lg={4}>
-        <RolesSidebarCard
-          loading={loading}
-          roles={roles}
-          filteredRoles={filteredRoles}
-          selectedRoleId={selectedRoleId}
-          roleName={roleName}
-          roleSearch={roleSearch}
-          isSubmittingRole={isSubmittingRole}
-          canCreate={canCreate}
-          canEdit={canEdit}
-          canDelete={canDelete}
-          onRoleNameChange={setRoleName}
-          onRoleSearchChange={setRoleSearch}
-          onSelectRole={handleSelectRole}
-          onNewRole={handleNewRole}
-          onSaveRole={handleSaveRole}
-          onDeleteRole={handleDeleteRole}
-        />
-      </Col>
+      {(!isMobile || effectiveMobileView === "list") && (
+        <Col xs={12} lg={4}>
+          <RolesSidebarCard
+            loading={loading}
+            roles={roles}
+            filteredRoles={filteredRoles}
+            selectedRoleId={selectedRoleId}
+            roleName={roleName}
+            roleSearch={roleSearch}
+            isSubmittingRole={isSubmittingRole}
+            canCreate={canCreate}
+            canEdit={canEdit}
+            canDelete={canDelete}
+            onRoleNameChange={setRoleName}
+            onRoleSearchChange={setRoleSearch}
+            onSelectRole={handleSelectRoleMobile}
+            onNewRole={handleNewRole}
+            onSaveRole={handleSaveRole}
+            onDeleteRole={handleDeleteRole}
+          />
+        </Col>
+      )}
 
-      <Col lg={8} className="mt-3 mt-lg-0">
+      {(!isMobile || effectiveMobileView === "detail") && (
+      <Col xs={12} lg={8} className="mt-3 mt-lg-0">
+        {isMobile && (
+          <button
+            type="button"
+            onClick={() => setMobileView("list")}
+            className="btn btn-link px-0 mb-2"
+            style={{ textDecoration: "none" }}
+          >
+            <i className="fas fa-arrow-left mr-2" />
+            Volver a roles
+          </button>
+        )}
         {selectedRoleId && (
           <Nav variant="tabs" className="mb-3">
             <Nav.Item>
@@ -161,6 +189,7 @@ const RolesPermisosPage = () => {
           />
         )}
       </Col>
+      )}
     </Row>
   );
 };

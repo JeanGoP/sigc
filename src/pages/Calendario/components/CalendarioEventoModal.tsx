@@ -30,7 +30,7 @@ export const CalendarioEventoModal: React.FC<CalendarioEventoModalProps> = ({
         {eventoSeleccionado && (
           <div className="p-2">
             <h5 className="mb-3 text-primary">
-              <i className="fas fa-calendar-alt me-2" />
+              <i className="fas fa-calendar-alt mr-2" />
               {" " + eventoSeleccionado.tipoEvento}
             </h5>
             <ListGroup variant="flush">

@@ -49,7 +49,7 @@ const UsuariosPage = () => {
 
   return (
     <Row className="mt-3">
-      <Col xl={12}>
+      <Col xs={12}>
         <UsuariosOverviewCard
           puedeCrear={puedeCrear}
           estadisticas={estadisticas}

@@ -5,6 +5,7 @@ import {
   DynamicTablePagination,
   TableColumn,
 } from "@app/pages/ConsultaClientes/components/tablaReutilizablePaginacion";
+import { useAppSelector } from "@app/store/store";
 import type { TipoGestion } from "../domain/types";
 import { StyledCard } from "./styled";
 
@@ -33,6 +34,9 @@ export default function TiposGestionesTableCard({
   onEditarTipoGestion,
   onEliminarTipoGestion,
 }: TiposGestionesTableCardProps) {
+  const screenSize = useAppSelector((state) => state.ui.screenSize);
+  const isMobile = screenSize === "xs";
+
   const columns = useMemo<TableColumn[]>(
     () => [
       { id: "id", label: "ID" },
@@ -52,14 +56,14 @@ export default function TiposGestionesTableCard({
         id: "acciones",
         label: "Acciones",
         format: (_value: unknown, row: TipoGestion) => (
-          <Box>
+          <Box sx={{ display: "flex", flexWrap: "wrap", justifyContent: isMobile ? "flex-end" : "flex-start", gap: 8 }}>
             <Button
               variant="info"
               size="sm"
               onClick={() => onEditarTipoGestion(row)}
             >
               <i className="fas fa-edit"></i>
-            </Button>{" "}
+            </Button>
             <Button
               variant="danger"
               size="sm"
@@ -73,7 +77,7 @@ export default function TiposGestionesTableCard({
         ),
       },
     ],
-    [onEditarTipoGestion, onEliminarTipoGestion]
+    [isMobile, onEditarTipoGestion, onEliminarTipoGestion]
   );
 
   return (
@@ -97,6 +101,7 @@ export default function TiposGestionesTableCard({
           onRowsPerPageChange={onFilasPorPaginaChange}
           page={pagina}
           onPageChange={onPaginaChange}
+          enableMobileCards
         />
       </div>
     </StyledCard>

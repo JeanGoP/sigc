@@ -67,7 +67,13 @@ export const RecibosCajaTable: React.FC<RecibosCajaTableProps> = ({ rows }) => {
 
 
     <>
-      <DynamicTable columns={columns} rows={rows} />
+      <DynamicTable
+        columns={columns}
+        rows={rows}
+        showTittle={true}
+        tittle={{ tittleText: 'Recibos de Caja', iconClass: 'fas fa-receipt' }}
+        enableMobileCards
+      />
       {openVerAsiento && selectedRow && (
         <Box mt={2}>
           <VerAsientoContableTable

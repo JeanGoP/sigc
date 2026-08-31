@@ -6,6 +6,7 @@ import {
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faDownload } from "@fortawesome/free-solid-svg-icons";
 import { fmtCOP } from '../../../utils/formattersFunctions';
+import { useAppSelector } from '@app/store/store';
 
 export interface TableColumn {
   id: string;
@@ -35,6 +36,9 @@ interface DynamicTableProps {
   enableKeyboardNavigation?: boolean;
   onExportToCsv?: () => void;
   exporting?: boolean;
+
+  /** Muestra las filas como tarjetas apiladas en móvil (screenSize === 'xs'). Patrón híbrido. */
+  enableMobileCards?: boolean;
 }
 
 export const DynamicTablePaginationConsultaCartera: React.FC<DynamicTableProps> = ({
@@ -56,7 +60,11 @@ export const DynamicTablePaginationConsultaCartera: React.FC<DynamicTableProps> 
   enableKeyboardNavigation = true,
   onExportToCsv,
   exporting = false,
+  enableMobileCards = false,
 }) => {
+
+  const screenSize = useAppSelector((state) => state.ui.screenSize);
+  const showCards = enableMobileCards && screenSize === 'xs';
 
   const [navMode, setNavMode] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -133,6 +141,88 @@ export const DynamicTablePaginationConsultaCartera: React.FC<DynamicTableProps> 
         </Box>
       )}
 
+      {showCards ? (
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 8,
+            padding: "4px 2px",
+          }}
+        >
+          {paginatedRows.length === 0 && (
+            <div style={{ textAlign: "center", color: "#9aa1ad", padding: "24px 0", fontSize: 13 }}>
+              Sin resultados
+            </div>
+          )}
+          {paginatedRows.map((row, rowIndex) => {
+            const isSelectedRow = navMode && rowIndex === selectedIndex;
+            const isSelected = selectedPredicate ? selectedPredicate(row) : false;
+            const active = isSelected || isSelectedRow;
+            const headCols = columns.filter((c) => !c.label);
+            const bodyCols = columns.filter((c) => c.label);
+            return (
+              <div
+                key={rowIndex}
+                ref={(el) => (rowRefs.current[rowIndex] = el as any)}
+                role="button"
+                tabIndex={0}
+                onClick={() => onRowEnter && onRowEnter(row)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && onRowEnter) onRowEnter(row);
+                }}
+                style={{
+                  border: "1px solid",
+                  borderColor: active ? "#4f86c6" : "#e6e8ec",
+                  borderRadius: 10,
+                  padding: "10px 12px",
+                  background: active ? "#e3f2fd" : "#fff",
+                  boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
+                  cursor: onRowEnter ? "pointer" : "default",
+                }}
+              >
+                {headCols.length > 0 && (
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 10,
+                      marginBottom: bodyCols.length ? 8 : 0,
+                    }}
+                  >
+                    {headCols.map((column) => (
+                      <span key={column.id} style={{ display: "inline-flex", alignItems: "center" }}>
+                        {column.format ? column.format(row[column.id], row) : row[column.id]}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                {bodyCols.map((column, i) => (
+                  <div
+                    key={column.id}
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      gap: 12,
+                      fontSize: 13,
+                      padding: "4px 0",
+                      borderTop: i === 0 ? "none" : "1px solid #f0f3f8",
+                    }}
+                  >
+                    <span style={{ color: "#6b7280", fontWeight: 500, flexShrink: 0 }}>
+                      {column.label}
+                    </span>
+                    <span style={{ textAlign: "right", fontWeight: 600, minWidth: 0, wordBreak: "break-word" }}>
+                      {column.format ? column.format(row[column.id], row) : row[column.id]}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            );
+          })}
+        </div>
+      ) : (
       <TableContainer sx={{ maxHeight: maxHeight }}>
         <Table stickyHeader size="small">
           <TableHead>
@@ -180,6 +270,7 @@ export const DynamicTablePaginationConsultaCartera: React.FC<DynamicTableProps> 
           </TableBody>
         </Table>
       </TableContainer>
+      )}
 
       <TablePagination
         component="div"

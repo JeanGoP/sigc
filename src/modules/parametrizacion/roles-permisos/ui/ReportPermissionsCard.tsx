@@ -74,8 +74,8 @@ const ReportPermissionsCard: React.FC<ReportPermissionsCardProps> = ({
           <>
             {/* Barra de búsqueda y botones de preset */}
             <div className="mb-4">
-              <div className="row g-3">
-                <div className="col-md-6">
+              <div className="row">
+                <div className="col-md-6 mb-2 mb-md-0">
                   <input
                     type="text"
                     className="form-control form-control-sm"
@@ -84,7 +84,10 @@ const ReportPermissionsCard: React.FC<ReportPermissionsCardProps> = ({
                     onChange={(e) => onReportSearchChange(e.target.value)}
                   />
                 </div>
-                <div className="col-md-6 d-flex gap-2 justify-content-end">
+                <div
+                  className="col-md-6 d-flex flex-wrap justify-content-md-end"
+                  style={{ gap: 8 }}
+                >
                   <button
                     className="btn btn-outline-primary btn-sm"
                     disabled={!canEditPermissions}
@@ -127,9 +130,10 @@ const ReportPermissionsCard: React.FC<ReportPermissionsCardProps> = ({
                         <button
                           key={report.reporteId}
                           type="button"
-                          className={`list-group-item list-group-item-action d-flex align-items-center gap-3 ${
+                          className={`list-group-item list-group-item-action d-flex flex-wrap align-items-center ${
                             isPermissionChanged(report) ? 'list-group-item-warning' : ''
                           }`}
+                          style={{ gap: 12 }}
                           disabled={!canEditPermissions}
                           onClick={() => onTogglePermission(report)}
                         >
@@ -166,7 +170,10 @@ const ReportPermissionsCard: React.FC<ReportPermissionsCardProps> = ({
             </div>
 
             {/* Botones de acción */}
-            <div className="mt-4 pt-3 border-top d-flex gap-2 justify-content-end">
+            <div
+              className="mt-4 pt-3 border-top d-flex flex-wrap justify-content-end"
+              style={{ gap: 8 }}
+            >
               {pendingChangesCount > 0 && (
                 <button
                   className="btn btn-outline-secondary btn-sm"

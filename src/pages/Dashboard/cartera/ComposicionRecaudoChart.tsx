@@ -68,6 +68,8 @@ export default function ComposicionRecaudoChart({ data }: { data: CarteraRow[] }
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
+            flexWrap: "wrap",
+            gap: 8,
             marginBottom: 8,
           }}
         >

@@ -391,7 +391,7 @@ export const TablaEventosPorClave: React.FC<TablaEventosPorClaveProps> = ({
     <>
       {/* ===== RESUMEN ===== */}
      {resumen && (
-  <div className="d-flex flex-wrap gap-2 mb-3">
+  <div className="d-flex flex-wrap mb-3" style={{ gap: 8 }}>
     <div className="p-2 border rounded">
       <div className="text-muted" style={{ fontSize: 12 }}>
         Total compromisos
@@ -462,6 +462,7 @@ export const TablaEventosPorClave: React.FC<TablaEventosPorClaveProps> = ({
         columns={columns}
         rows={rows}
         showTittle
+        enableMobileCards
         // tittle={{
         //   tittleText: "Compromisos de pago",
         //   iconClass: "fas fa-hand-holding-usd",

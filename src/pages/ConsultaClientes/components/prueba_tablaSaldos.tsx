@@ -97,10 +97,14 @@ const EstadoClienteTable = (props: any) => {
         </Typography>
 
         </div>
-      <DynamicTable columns={columns_saldos} rows={props.rows.map((row: any) => {
-        // Aquí pasas la fila completa a las funciones de formato sin necesidad de agregar el campo __row__
-        return row;
-      })} />
+      <DynamicTable
+        columns={columns_saldos}
+        rows={props.rows.map((row: any) => {
+          // Aquí pasas la fila completa a las funciones de formato sin necesidad de agregar el campo __row__
+          return row;
+        })}
+        enableMobileCards
+      />
     </Box>
   );
 };

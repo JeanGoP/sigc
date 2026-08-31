@@ -22,7 +22,7 @@ export const CalendarioFilters: React.FC<CalendarioFiltersProps> = ({
     <Card className="shadow-sm border-0 mb-4">
       <Card.Body>
         <Row>
-          <Col md={4}>
+          <Col xs={12} sm={6} md={4}>
             <SingleSelect
               label="Filtrar por usuario"
               options={usuarios}
@@ -31,7 +31,7 @@ export const CalendarioFilters: React.FC<CalendarioFiltersProps> = ({
               placeholder="Seleccione un usuario"
             />
           </Col>
-          <Col md={4}>
+          <Col xs={12} sm={6} md={4}>
             <BuscadorCuentas
               opcion="CU"
               op="CLIENTE"

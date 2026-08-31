@@ -117,7 +117,7 @@ const ReportesPage: React.FC = () => {
   };
 
   return (
-    <div style={{ height: "100vh", display: "flex", flexDirection: "column" }}>
+    <div style={{ height: "100dvh", minHeight: "100vh", display: "flex", flexDirection: "column" }}>
       <section className="content" style={{ flex: 1, overflow: "hidden", paddingTop: 12, paddingBottom: 12 }}>
         <div className="container-fluid" style={{ height: "100%", display: "flex", flexDirection: "column" }}>
           {/* Selector de reporte - combobox desplegable */}
@@ -133,7 +133,7 @@ const ReportesPage: React.FC = () => {
               onClick={() => setSelectorAbierto((v) => !v)}
               disabled={cargando}
             >
-              <span className="d-flex align-items-center gap-2 text-truncate">
+              <span className="d-flex align-items-center text-truncate" style={{ gap: 8 }}>
                 {cargando ? (
                   "Cargando reportes..."
                 ) : reporteSeleccionado ? (
@@ -172,7 +172,7 @@ const ReportesPage: React.FC = () => {
                 transition: "opacity 0.15s ease, transform 0.15s ease",
               }}
             >
-              <div className="p-2 d-flex flex-column flex-sm-row gap-2 border-bottom">
+              <div className="p-2 d-flex flex-column flex-sm-row border-bottom" style={{ gap: 8 }}>
                 <select
                   className="form-control form-control-sm"
                   style={{ maxWidth: 160, flexShrink: 0 }}
@@ -223,9 +223,10 @@ const ReportesPage: React.FC = () => {
                         else itemRefs.current.delete(r.codigoReporte);
                       }}
                       type="button"
-                      className={`list-group-item list-group-item-action d-flex align-items-center gap-2 ${
+                      className={`list-group-item list-group-item-action d-flex align-items-center ${
                         esSeleccionado ? "active" : esActivo ? "bg-light" : ""
                       }`}
+                      style={{ gap: 8 }}
                       onMouseEnter={() => setIndiceActivo(index)}
                       onClick={() => handleSeleccionarReporte(r.codigoReporte)}
                     >
@@ -263,12 +264,12 @@ const ReportesPage: React.FC = () => {
               ) : filtros.length === 0 ? (
                 <p className="text-muted text-center py-3">Este reporte no tiene filtros configurados.</p>
               ) : (
-                <div className="row g-3">
+                <div className="row" style={{ rowGap: "1rem" }}>
                   {filtros.map((f) => (
-                    <div key={f.filtroId} className="col-md-4 col-lg-3">
+                    <div key={f.filtroId} className="col-12 col-sm-6 col-md-4 col-lg-3">
                       <label className="form-label small fw-semibold">
                         {f.label}
-                        {f.obligatorio && <span className="text-danger ms-1">*</span>}
+                        {f.obligatorio && <span className="text-danger ml-1">*</span>}
                       </label>
                       {f.tipoFiltro === "select" ? (
                         <BuscadorSelect
@@ -364,7 +365,7 @@ const ReportesPage: React.FC = () => {
                   </div>
                   <iframe
                     src={pdfPreviewUrl}
-                    style={{ width: "100%", height: "85vh", border: "1px solid #dee2e6", borderRadius: "4px" }}
+                    style={{ width: "100%", height: "70dvh", minHeight: 320, border: "1px solid #dee2e6", borderRadius: "4px" }}
                     title="PDF Preview"
                   />
                 </div>

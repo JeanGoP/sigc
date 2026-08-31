@@ -159,7 +159,13 @@ export const TablaFacturas = (props: Props) => {
 
   return (
     <Box>
-      <DynamicTable columns={columns} rows={props.rows.map((row) => row)} showTittle={true} tittle={{tittleText: 'Facturas', iconClass:'fas fa-file-invoice-dollar'}} />
+      <DynamicTable
+        columns={columns}
+        rows={props.rows.map((row) => row)}
+        showTittle={true}
+        tittle={{ tittleText: 'Facturas', iconClass: 'fas fa-file-invoice-dollar' }}
+        enableMobileCards
+      />
     </Box>
   );
 };

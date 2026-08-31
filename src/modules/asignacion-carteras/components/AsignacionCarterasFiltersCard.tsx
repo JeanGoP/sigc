@@ -53,7 +53,7 @@ export function AsignacionCarterasFiltersCard({
       </Card.Header>
       <Card.Body>
         <Row>
-          <Col md={4} className="mb-2 mb-md-0">
+          <Col xs={12} sm={6} md={4} className="mb-2 mb-md-0">
             <BuscadorCuentas
               opcion="CU"
               op="CLIENTE"
@@ -64,7 +64,7 @@ export function AsignacionCarterasFiltersCard({
               onSelect={() => {}}
             />
           </Col>
-          <Col md={4} className="mb-2 mb-md-0">
+          <Col xs={12} sm={6} md={4} className="mb-2 mb-md-0">
             <Form.Group>
               <Form.Label>Tramo</Form.Label>
               <Form.Control
@@ -83,7 +83,7 @@ export function AsignacionCarterasFiltersCard({
               </Form.Control>
             </Form.Group>
           </Col>
-          <Col md={4}>
+          <Col xs={12} sm={6} md={4}>
             <Form.Group>
               <Form.Label>Asesor</Form.Label>
               <Form.Control

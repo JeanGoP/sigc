@@ -92,7 +92,7 @@ export function GestionDetalleModal({
 
           <Modal.Body>
             <Row>
-              <Col md={3}>
+              <Col xs={12} sm={6} md={3}>
                 <Form.Group>
                   <Form.Label>Usuario</Form.Label>
                   <Form.Control
@@ -102,7 +102,7 @@ export function GestionDetalleModal({
                   />
                 </Form.Group>
               </Col>
-              <Col md={3}>
+              <Col xs={12} sm={6} md={3}>
                 <Form.Group>
                   <Form.Label>Fecha / Hora</Form.Label>
                   <Form.Control
@@ -112,7 +112,7 @@ export function GestionDetalleModal({
                   />
                 </Form.Group>
               </Col>
-              <Col md={3}>
+              <Col xs={12} sm={6} md={3}>
                 <Form.Group>
                   <Form.Label>Cliente</Form.Label>
                   <Form.Control
@@ -122,7 +122,7 @@ export function GestionDetalleModal({
                   />
                 </Form.Group>
               </Col>
-              <Col md={3}>
+              <Col xs={12} sm={6} md={3}>
                 <Form.Group>
                   <Form.Label>Factura</Form.Label>
                   <Form.Control
@@ -134,7 +134,7 @@ export function GestionDetalleModal({
               </Col>
             </Row>
             <Row className="mt-2">
-              <Col md={3}>
+              <Col xs={12} sm={6} md={3}>
                 <Form.Group>
                   <Form.Label>Cuenta</Form.Label>
                   <Form.Control type="text" value={drawerGestion.cuenta} readOnly />

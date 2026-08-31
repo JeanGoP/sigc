@@ -883,13 +883,21 @@ const EventsDropdown: React.FC = () => {
                         )}
                       </div>
                       <div className="media-body">
-                        <h3 className="dropdown-item-title mb-1 d-flex align-items-center" style={{ fontSize: '0.9rem' }}>
+                        <h3
+                          className="dropdown-item-title mb-1 d-flex align-items-center flex-wrap"
+                          style={{ fontSize: '0.9rem', rowGap: 4 }}
+                        >
                           {active && <span className="event-active-dot" />}
-                          <span>{event.type}</span>
+                          <span className="text-truncate" style={{ minWidth: 0 }}>
+                            {event.type}
+                          </span>
                           {active && <span className="ml-2 badge-live">{t('events.inProgress', 'En curso')}</span>}
                         </h3>
                         <p className="text-sm mb-0">{event.client}</p>
-                        <div className="d-flex justify-content-between mt-1">
+                        <div
+                          className="d-flex justify-content-between flex-wrap mt-1"
+                          style={{ columnGap: 8 }}
+                        >
                           <p className="text-sm text-muted mb-0">
                             <i className="far fa-clock mr-1" />
                             {getHour(event.date)}
@@ -921,6 +929,8 @@ const EventsDropdown: React.FC = () => {
               borderTop: '1px solid #e9ecef',
               padding: '0.5rem',
               display: 'flex',
+              flexWrap: 'wrap',
+              gap: 6,
               justifyContent: 'space-between',
               alignItems: 'center',
             }}

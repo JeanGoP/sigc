@@ -250,6 +250,7 @@ export function NuevoSeguimientoModal({
             <div
               style={{
                 display: "flex",
+                flexWrap: "wrap",
                 alignItems: "center",
                 justifyContent: "space-between",
                 gap: 12,

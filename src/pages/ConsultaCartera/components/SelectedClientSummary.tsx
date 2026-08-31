@@ -11,6 +11,7 @@ import {
 import { faWhatsapp } from "@fortawesome/free-brands-svg-icons";
 import type { ClienteInfo } from "@app/services/ClienteService";
 import { StickyNote } from "./StickyNote/StickyNote";
+import { useAppSelector } from "@app/store/store";
 
 interface MailTemplateOption {
   key: string;
@@ -74,6 +75,8 @@ export function SelectedClientSummary({
   onDismissWrongNumberInbound,
   onWrongNumHoverChange,
 }: SelectedClientSummaryProps) {
+  const screenSize = useAppSelector((state) => state.ui.screenSize);
+  const isMobile = screenSize === "xs";
   const words = (clienteInfo.razonSocial || "").trim().split(/\s+/);
   const initials = words
     .slice(0, 2)
@@ -148,7 +151,7 @@ export function SelectedClientSummary({
         </div>
 
         <div
-          className="d-flex align-items-center gap-3 py-2"
+          className={`d-flex gap-3 py-2 ${isMobile ? "flex-column align-items-stretch" : "align-items-center"}`}
           style={{
             borderTop: "1px solid #f0f0f0",
             borderBottom: "1px solid #f0f0f0",
@@ -190,7 +193,10 @@ export function SelectedClientSummary({
               </div>
             </div>
           </div>
-          <div className="d-flex align-items-center gap-2 flex-shrink-0">
+          <div
+            className="d-flex align-items-center gap-2 flex-wrap"
+            style={isMobile ? undefined : { flexShrink: 0 }}
+          >
             {telephonyEnabled && (
               <Button
                 variant="outline-primary"
@@ -241,7 +247,7 @@ export function SelectedClientSummary({
                   onPlantillaChange(event.target.value)
                 }
                 style={{
-                  minWidth: 180,
+                  minWidth: isMobile ? 130 : 180,
                   display: "inline-block",
                 }}
               >

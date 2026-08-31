@@ -117,7 +117,7 @@ export const FiltrosCarteras: React.FC<FiltrosCarterasProps> = ({
         <Card.Body>
           <Form>
             <div className="row">
-              <div className="col mb-2 mt-2">
+              <div className="col-12 col-md-4 mb-2 mt-2">
                 <Form.Label>Incluir Carteras con saldo cero</Form.Label>
                 <Form.Check
                   type="switch"
@@ -129,7 +129,7 @@ export const FiltrosCarteras: React.FC<FiltrosCarterasProps> = ({
                 />
               </div>
 
-              <div className="col mb-2 mt-2">
+              <div className="col-12 col-md-4 mb-2 mt-2">
                 <Form.Label>Solo carteras asignadas</Form.Label>
                 <Form.Check
                   type="switch"
@@ -140,7 +140,7 @@ export const FiltrosCarteras: React.FC<FiltrosCarterasProps> = ({
                   }
                 />
               </div>
-              <div className="col mb-2 mt-2">
+              <div className="col-12 col-md-4 mb-2 mt-2">
                 <Form.Label>Mostrar ya gestionados</Form.Label>
                 <Form.Check
                   type="switch"
@@ -164,7 +164,7 @@ export const FiltrosCarteras: React.FC<FiltrosCarterasProps> = ({
             />
 
             <Row>
-              <Col md={6}>
+              <Col xs={12} sm={6}>
                 <BuscadorTiposEvento
                   label="Filtro por Tipo de Evento"
                   value={filtros.tipoEvento ?? undefined}
@@ -173,7 +173,7 @@ export const FiltrosCarteras: React.FC<FiltrosCarterasProps> = ({
                 />
               </Col>
 
-              <Col md={6}>
+              <Col xs={12} sm={6}>
                 <BuscadorEtiquetasCliente
                   label="Filtro por Etiquetas"
                   value={filtros.etiqueta ?? undefined}
@@ -182,7 +182,7 @@ export const FiltrosCarteras: React.FC<FiltrosCarterasProps> = ({
                 />
               </Col>
 
-              <Col md={6}>
+              <Col xs={12} sm={6}>
                 <SingleSelect
                   options={SIN_GESTION_DIAS_OPTIONS}
                   selectedValue={filtros.sinGestionDias}
@@ -191,7 +191,7 @@ export const FiltrosCarteras: React.FC<FiltrosCarterasProps> = ({
                 />
               </Col>
 
-              <Col md={6}>
+              <Col xs={12} sm={6}>
                 <CustomDatePicker
                   selectedDate={filtros.filtroPorVencimiento ?? ""}
                   label="Fecha de Vencimiento"
@@ -199,7 +199,7 @@ export const FiltrosCarteras: React.FC<FiltrosCarterasProps> = ({
                 />
               </Col>
 
-              <Col md={6}>
+              <Col xs={12} sm={6}>
                 <Form.Group>
                   <Form.Label>Valor cuota minimo</Form.Label>
                   <Form.Control
@@ -213,7 +213,7 @@ export const FiltrosCarteras: React.FC<FiltrosCarterasProps> = ({
                 </Form.Group>
               </Col>
 
-              <Col md={6}>
+              <Col xs={12} sm={6}>
                 <Form.Group>
                   <Form.Label>Valor cuota maximo</Form.Label>
                   <Form.Control
@@ -268,7 +268,7 @@ export const FiltrosCarteras: React.FC<FiltrosCarterasProps> = ({
                   Aplicar Filtros
                 </button>
                 <button
-                  className="btn btn-secondary ms-2"
+                  className="btn btn-secondary"
                   type="button"
                   style={{ marginLeft: "10px" }}
                   onClick={limpiarFiltros}
@@ -278,7 +278,7 @@ export const FiltrosCarteras: React.FC<FiltrosCarterasProps> = ({
               </div>
             </div>
             {hasChanges && (
-              <span className="text-danger ms-2">
+              <span className="text-danger" style={{ marginLeft: 8 }}>
                 Tienes cambios sin guardar
               </span>
             )}

@@ -1,4 +1,5 @@
 import type { ReactElement } from "react";
+import { useAppSelector } from "@app/store/store";
 import type { Evento, Seguimiento } from "../domain/types";
 import { SeguimientoCard } from "./SeguimientoCard";
 
@@ -17,8 +18,17 @@ export function SeguimientosTimelineList({
   onAudio,
   onVerMas,
 }: SeguimientosTimelineListProps) {
+  const screenSize = useAppSelector((state) => state.ui.screenSize);
+  const isMobile = screenSize === "xs";
+
   return (
-    <div style={{ height: "75vh", overflowY: "auto", paddingRight: 12 }}>
+    <div
+      style={
+        isMobile
+          ? { paddingRight: 4 }
+          : { height: "75vh", overflowY: "auto", paddingRight: 12 }
+      }
+    >
       <div style={{ position: "relative" }}>
         {seguimientos.map((seguimiento, index) => (
           <div

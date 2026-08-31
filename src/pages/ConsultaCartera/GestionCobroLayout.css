@@ -147,6 +147,33 @@
     flex: 0 0 100%;
     max-width: 100%;
   }
+
+  /* Deja aire al final para que el FAB flotante "Iniciar gestión" no tape
+     la paginación ni el último contenido en móvil. */
+  .cartera-row .side-panel:not(.collapsed),
+  .cartera-row .main-panel {
+    padding-bottom: 88px;
+  }
+
+  /* Maestro-detalle en móvil: solo un panel visible a la vez.
+     'list' = listado de clientes; 'detail' = facturas/info del seleccionado. */
+  .cartera-row--mobile-list .main-panel {
+    display: none;
+  }
+  .cartera-row--mobile-detail .side-panel {
+    display: none;
+  }
+  .cartera-row--mobile-detail .main-panel {
+    flex: 0 0 100%;
+    max-width: 100%;
+  }
+}
+
+/* El botón "Volver al listado" solo tiene sentido en móvil (maestro-detalle). */
+@media (min-width: 768px) {
+  .cartera-mobile-back {
+    display: none;
+  }
 }
 /* === FIN LAYOUT CARTERA RESPONSIVE — PRUEBA === */
 

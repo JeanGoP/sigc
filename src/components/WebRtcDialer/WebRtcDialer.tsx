@@ -1076,7 +1076,10 @@ export default function WebRtcDialer({
             variant={isCompanionTab ? "secondary" : "success"}
             className="py-2 px-3 mb-3"
           >
-            <div className="d-flex justify-content-between align-items-start gap-2">
+            <div
+              className="d-flex flex-wrap justify-content-between align-items-start"
+              style={{ gap: 8 }}
+            >
               <div className="small">
                 <strong>{isCompanionTab ? "Modo acompañante" : "Pestaña dueña"}</strong>
                 <div>
@@ -1085,7 +1088,7 @@ export default function WebRtcDialer({
                     : "Esta pestaña controla conexión, llamadas entrantes y presencia WebRTC."}
                 </div>
               </div>
-              <div className="small text-muted text-end">
+              <div className="small text-muted text-right">
                 <div>
                   <strong>Tab actual:</strong> {runtimeTabId || "-"}
                 </div>
@@ -1098,8 +1101,8 @@ export default function WebRtcDialer({
         )}
         {showOutboundControls && (
           <>
-            <Row className="g-2 mb-2">
-              <Col md={4}>
+            <Row className="mb-2" style={{ rowGap: 8 }}>
+              <Col xs={12} md={4}>
                 <Form.Group controlId="webrtcDialerCountryCode">
                   <Form.Label className="mb-1">Extension</Form.Label>
                   <Dropdown>
@@ -1123,8 +1126,8 @@ export default function WebRtcDialer({
               </Col>
             </Row>
 
-            <Row className="g-2">
-              <Col md={7}>
+            <Row style={{ rowGap: 8 }}>
+              <Col xs={12} md={7}>
                 <Form.Group controlId="webrtcDialerDestination">
                   <Form.Label className="mb-1">Destino</Form.Label>
                   <Form.Control
@@ -1139,7 +1142,7 @@ export default function WebRtcDialer({
                   </Form.Text>
                 </Form.Group>
               </Col>
-              <Col md={5}>
+              <Col xs={12} md={5}>
                 <Form.Group controlId="webrtcDialerFrom">
                   <Form.Label className="mb-1">Origen opcional</Form.Label>
                   <Form.Control
@@ -1156,7 +1159,7 @@ export default function WebRtcDialer({
               </Col>
             </Row>
 
-            <div className="d-flex flex-wrap gap-2 mt-3">
+            <div className="d-flex flex-wrap mt-3" style={{ gap: 8 }}>
               {effectiveOutboundCallBlocked ? (
                 <OverlayTrigger
                   placement="top"
@@ -1225,7 +1228,7 @@ export default function WebRtcDialer({
           </>
         )}
 
-        <div className="d-flex flex-wrap gap-2 mt-3">
+        <div className="d-flex flex-wrap mt-3" style={{ gap: 8 }}>
           <Button
             variant="danger"
             onClick={handleHangup}
@@ -1317,7 +1320,7 @@ export default function WebRtcDialer({
                 <strong>Recibida:</strong> {formatWebRtcDate(incomingCall.receivedAt)}
               </div>
             </div>
-            <div className="d-flex gap-2 mt-2">
+            <div className="d-flex flex-wrap mt-2" style={{ gap: 8 }}>
               <Button
                 variant="success"
                 size="sm"

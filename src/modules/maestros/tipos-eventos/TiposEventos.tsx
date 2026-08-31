@@ -355,7 +355,7 @@ const TiposEventos: React.FC = () => {
 
             {/* Color e icono */}
             <Row>
-              <Col>
+              <Col xs={12} sm={6}>
                 <Form.Label>Color</Form.Label>
                 <ColorPickerModal
                   value={formData.color}
@@ -365,7 +365,7 @@ const TiposEventos: React.FC = () => {
                   }}
                 />
               </Col>
-              <Col>
+              <Col xs={12} sm={6} className="mt-3 mt-sm-0">
                 <Form.Label>Ícono</Form.Label>
                 <IconPickerModal
                   value={formData.icono}

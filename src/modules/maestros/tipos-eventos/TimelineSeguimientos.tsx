@@ -29,6 +29,7 @@ import { NuevoSeguimientoModal } from "./components/NuevoSeguimientoModal";
 import { SeguimientosTimelineList } from "./components/SeguimientosTimelineList";
 import { toast } from "react-toastify";
 import { useApi } from "@app/hooks/useApi";
+import { useAppSelector } from "@app/store/store";
 import { resolveStoredAuthSession } from "@app/services/Auth/authStorage";
 import type { ApiResponse } from "@app/models/apiResponse";
 import { getConfiguredApiUrl } from "@app/services/api/apiConfig";
@@ -99,6 +100,8 @@ export const TimelineSeguimientos: React.FC<TimelineSeguimientosProps> = ({
   draftStorageKey,
   montoSugeridoEvento,
 }) => {
+  const screenSize = useAppSelector((state) => state.ui.screenSize);
+  const isMobile = screenSize === "xs";
   const maxAdjuntosPorSeguimiento = 2;
   const [showModal, setShowModal] = React.useState(false);
   const [seguimientoActivo, setSeguimientoActivo] =
@@ -593,7 +596,7 @@ export const TimelineSeguimientos: React.FC<TimelineSeguimientosProps> = ({
   }
 
   return (
-    <div style={{ padding: 24 }}>
+    <div style={{ padding: isMobile ? 12 : 24 }}>
       {!ocultarBotonNuevo && (
         <Button
           variant="primary"

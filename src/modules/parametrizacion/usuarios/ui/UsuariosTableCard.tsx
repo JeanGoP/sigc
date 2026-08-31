@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { Badge, Button, ButtonGroup, Card, Spinner } from "react-bootstrap";
 import type { ParametrizacionUser } from "@app/services/Parametrizacion/types";
+import { useAppSelector } from "@app/store/store";
 import {
   DynamicTablePagination,
   TableColumn,
@@ -41,6 +42,9 @@ export default function UsuariosTableCard({
   onCambiarEstado,
   onAbrirModalCambioContrasena,
 }: UsuariosTableCardProps) {
+  const screenSize = useAppSelector((state) => state.ui.screenSize);
+  const isMobile = screenSize === "xs";
+
   const columnasTabla = useMemo<TableColumn[]>(
     () => [
       {
@@ -75,36 +79,60 @@ export default function UsuariosTableCard({
       {
         id: "acciones",
         label: "Acciones",
-        format: (_valor: unknown, fila: ParametrizacionUser) => (
-          <ButtonGroup size="sm">
-            <Button
-              variant="outline-primary"
-              onClick={() => onEditarUsuario(fila)}
-              disabled={!puedeEditar}
-            >
-              Editar
-            </Button>
-            <Button
-              variant={fila.isActive ? "outline-secondary" : "outline-success"}
-              onClick={() => {
-                void onCambiarEstado(fila);
+        format: (_valor: unknown, fila: ParametrizacionUser) => {
+          const botones = (
+            <>
+              <Button
+                size="sm"
+                variant="outline-primary"
+                onClick={() => onEditarUsuario(fila)}
+                disabled={!puedeEditar}
+              >
+                Editar
+              </Button>
+              <Button
+                size="sm"
+                variant={fila.isActive ? "outline-secondary" : "outline-success"}
+                onClick={() => {
+                  void onCambiarEstado(fila);
+                }}
+                disabled={!puedeEditar}
+              >
+                {fila.isActive ? "Desactivar" : "Activar"}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline-dark"
+                onClick={() => onAbrirModalCambioContrasena(fila)}
+                disabled={!puedeCambiarContrasena}
+              >
+                Contrasena
+              </Button>
+            </>
+          );
+
+          // En tarjeta móvil, ButtonGroup no envuelve y se corta; en su lugar
+          // usamos un contenedor flex con flexWrap para que los 3 botones
+          // bajen de línea si no caben en el ancho de la tarjeta.
+          return isMobile ? (
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                justifyContent: "flex-end",
+                gap: 6,
               }}
-              disabled={!puedeEditar}
             >
-              {fila.isActive ? "Desactivar" : "Activar"}
-            </Button>
-            <Button
-              variant="outline-dark"
-              onClick={() => onAbrirModalCambioContrasena(fila)}
-              disabled={!puedeCambiarContrasena}
-            >
-              Contrasena
-            </Button>
-          </ButtonGroup>
-        ),
+              {botones}
+            </div>
+          ) : (
+            <ButtonGroup size="sm">{botones}</ButtonGroup>
+          );
+        },
       },
     ],
     [
+      isMobile,
       onAbrirModalCambioContrasena,
       onCambiarEstado,
       onEditarUsuario,
@@ -132,6 +160,7 @@ export default function UsuariosTableCard({
           withSearch={false}
           maxHeight="520px"
           selectedPredicate={(fila) => usuarioSeleccionadoId === fila.userId}
+          enableMobileCards
         />
       )}
     </Card.Body>

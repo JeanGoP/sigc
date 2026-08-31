@@ -72,6 +72,17 @@ export const UserMenuDropdown = styled(StyledDropdown)`
 
 export const MessagesMenu = styled(StyledDropdown)`
   --pf-dropdown-menu-min-width: 18rem;
+
+  /* En pantallas muy angostas (≤360px, ej. iPhone SE) el mínimo de 18rem (288px)
+     más el offset del panel llega al borde del viewport: se baja el mínimo y se
+     acota el ancho del menú para que siempre quepa con margen. */
+  @media (max-width: 360px) {
+    --pf-dropdown-menu-min-width: 16rem;
+
+    .dropdown-menu {
+      max-width: calc(100vw - 24px);
+    }
+  }
 `;
 
 export const NotificationMenu = styled(StyledDropdown)`

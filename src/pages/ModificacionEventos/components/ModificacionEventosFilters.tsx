@@ -2,6 +2,7 @@ import { Button, Card, Col, Form, Row, Spinner } from "react-bootstrap";
 import BuscadorCuentas from "@app/components/BuscadorGeneral/BuscadorCuentas";
 import { SingleSelect } from "@app/components/singleSelect/singleSelect";
 import BuscadoClientes from "@app/pages/ConsultaClientes/components/BuscadoClientes";
+import { useAppSelector } from "@app/store/store";
 import type { FechaConsultaErrors } from "../domain/types";
 
 interface SelectOption {
@@ -48,12 +49,15 @@ export function ModificacionEventosFilters({
   onClearCliente,
   onConsultar,
 }: ModificacionEventosFiltersProps) {
+  const screenSize = useAppSelector((state) => state.ui.screenSize);
+  const isMobile = screenSize === "xs";
+
   return (
     <Card className="shadow-sm border-0 mb-4">
       <Card.Body>
         <Form>
           <Row>
-            <Col md={2}>
+            <Col xs={12} sm={6} md={2}>
               <Form.Group controlId="fechaInicio">
                 <Form.Label>Fecha inicio</Form.Label>
                 <Form.Control
@@ -70,7 +74,7 @@ export function ModificacionEventosFilters({
                 </Form.Control.Feedback>
               </Form.Group>
             </Col>
-            <Col md={2}>
+            <Col xs={12} sm={6} md={2}>
               <Form.Group controlId="fechaFin">
                 <Form.Label>Fecha fin</Form.Label>
                 <Form.Control
@@ -87,7 +91,7 @@ export function ModificacionEventosFilters({
                 </Form.Control.Feedback>
               </Form.Group>
             </Col>
-            <Col md={2}>
+            <Col xs={12} sm={6} md={2}>
               <SingleSelect
                 label="Usuario"
                 options={usuarios}
@@ -95,7 +99,7 @@ export function ModificacionEventosFilters({
                 onChange={onUsuarioFiltroChange}
               />
             </Col>
-            <Col md={3}>
+            <Col xs={12} sm={6} md={3}>
               <BuscadorCuentas
                 opcion="CU"
                 op="CLIENTE"
@@ -106,18 +110,18 @@ export function ModificacionEventosFilters({
                 onSelect={() => {}}
               />
             </Col>
-            <Col md={2}>
+            <Col xs={12} sm={6} md={2}>
               <BuscadoClientes
                 selectedValue={clienteFiltro}
                 onOpenModal={onOpenModalCliente}
                 onClear={onClearCliente}
               />
             </Col>
-            <Col md={1} className="d-flex align-items-center">
+            <Col xs={12} sm={6} md={1} className="d-flex align-items-center">
               <Button
                 variant="primary"
                 onClick={onConsultar}
-                style={{ marginTop: 14 }}
+                style={{ marginTop: isMobile ? 0 : 14, width: isMobile ? "100%" : undefined }}
                 disabled={loadingConsulta}
               >
                 {loadingConsulta ? (

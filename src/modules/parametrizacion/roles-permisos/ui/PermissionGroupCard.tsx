@@ -70,12 +70,13 @@ export default function PermissionGroupCard({
             return (
               <div
                 key={permission.actionId}
-                className="d-flex justify-content-between align-items-center border rounded px-3 py-2 mb-2"
-                style={
-                  changed
+                className="d-flex flex-wrap justify-content-between align-items-center border rounded px-3 py-2 mb-2"
+                style={{
+                  gap: 8,
+                  ...(changed
                     ? { borderColor: "#ffc107", backgroundColor: "#fffaf0" }
-                    : undefined
-                }
+                    : undefined),
+                }}
               >
                 <div>
                   <div className="d-flex align-items-center" style={{ gap: 6 }}>

@@ -81,7 +81,15 @@ export const CarteraToolbar: React.FC<CarteraToolbarProps> = ({
 
       {error && <span style={{ fontSize: 12, color: "#d9534f" }}>{error}</span>}
 
-      <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
+      <div
+        style={{
+          marginLeft: "auto",
+          display: "flex",
+          alignItems: "center",
+          flexWrap: "wrap",
+          gap: 8,
+        }}
+      >
         <button
           onClick={onDescargarCsv}
           disabled={!hasData}

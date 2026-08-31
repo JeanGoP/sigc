@@ -95,6 +95,8 @@ export default function ComparativoSaldoChart({ data }: { data: CarteraRow[] }) 
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
+            flexWrap: "wrap",
+            gap: 8,
             marginBottom: 8,
           }}
         >
@@ -114,7 +116,7 @@ export default function ComparativoSaldoChart({ data }: { data: CarteraRow[] }) 
             )}
           </h6>
 
-          <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 6, fontSize: 12 }}>
             <span style={{ color: "#aaa" }}>Ordenar:</span>
             {(["actual", "anterior", "delta"] as ComparativoSaldoSortKey[]).map(
               (key) => (

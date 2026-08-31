@@ -1,10 +1,7 @@
 import { ReactNode, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import {
-  toggleControlSidebar,
-  toggleSidebarMenu,
-} from '@app/store/reducers/ui';
+import { toggleSidebarMenu } from '@app/store/reducers/ui';
 import MessagesDropdown from '@app/modules/main/header/messages-dropdown/MessagesDropdown';
 import NotificationsDropdown from '@app/modules/main/header/notifications-dropdown/NotificationsDropdown';
 // import LanguagesDropdown from '@app/modules/main/header/languages-dropdown/LanguagesDropdown';
@@ -39,10 +36,6 @@ const Header = ({ containered, ...rest }: { containered?: boolean } & any) => {
 
   const handleToggleMenuSidebar = () => {
     dispatch(toggleSidebarMenu());
-  };
-
-  const handleToggleControlSidebar = () => {
-    dispatch(toggleControlSidebar());
   };
 
   const getContainerClasses = useCallback(() => {
@@ -135,15 +128,8 @@ const Header = ({ containered, ...rest }: { containered?: boolean } & any) => {
           {currentUser?.telephonyEnabled && <SoftphoneWidget />}
           <EventsDropdown />
           <UserDropdown />
-          <li className="nav-item">
-            <button
-              type="button"
-              className="nav-link"
-              onClick={handleToggleControlSidebar}
-            >
-              <i className="fas fa-th-large" />
-            </button>
-          </li>
+          {/* Botón de ControlSidebar retirado: <ControlSidebar /> está comentado en
+              Main.tsx, así que el toggle no montaba ningún panel (clic sin efecto). */}
         </ul>
       </div>
     </nav>

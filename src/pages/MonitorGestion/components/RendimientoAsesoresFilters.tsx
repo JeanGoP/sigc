@@ -13,8 +13,8 @@ export function RendimientoAsesoresFilters({
   onConsultar,
 }: RendimientoAsesoresFiltersProps) {
   return (
-    <Row className="g-2 align-items-end">
-      <Col md={3}>
+    <Row className="align-items-end" style={{ rowGap: 8 }}>
+      <Col xs={12} sm={6} md={3}>
         <Form.Group>
           <Form.Label>Fecha Inicial</Form.Label>
           <Form.Control
@@ -24,7 +24,7 @@ export function RendimientoAsesoresFilters({
           />
         </Form.Group>
       </Col>
-      <Col md={3}>
+      <Col xs={12} sm={6} md={3}>
         <Form.Group>
           <Form.Label>Fecha Final</Form.Label>
           <Form.Control
@@ -34,7 +34,7 @@ export function RendimientoAsesoresFilters({
           />
         </Form.Group>
       </Col>
-      <Col md={3}>
+      <Col xs={12} sm={6} md={3}>
         <Form.Group>
           <Button variant="primary" onClick={onConsultar}>
             Consultar

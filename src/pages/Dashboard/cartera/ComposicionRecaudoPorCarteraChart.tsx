@@ -110,6 +110,8 @@ export default function ComposicionRecaudoPorCarteraChart({
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
+            flexWrap: "wrap",
+            gap: 8,
             marginBottom: 8,
           }}
         >
@@ -117,7 +119,7 @@ export default function ComposicionRecaudoPorCarteraChart({
             Composicion del recaudo por cartera
           </h6>
 
-          <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13 }}>
+          <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 10, fontSize: 13 }}>
             <div style={{ display: "flex", gap: 6 }}>
               {(["barras", "dona"] as const).map((tipo) => (
                 <button

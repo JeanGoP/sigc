@@ -11,6 +11,7 @@ import {
   TableFooter,
   Typography,
 } from "@mui/material";
+import { useAppSelector } from "@app/store/store";
 
 export interface TableColumn {
   id: string;
@@ -26,6 +27,8 @@ interface DynamicTableProps {
   tittle?: { tittleText: string; iconClass?: string };
   showFooter?: boolean;
   footerIdentifier?: string; // Identifier for the footer row, default is "Total"
+  /** Muestra las filas como tarjetas apiladas en móvil (screenSize === 'xs'). Patrón híbrido del proyecto. */
+  enableMobileCards?: boolean;
 }
 
 export const DynamicTable: React.FC<DynamicTableProps> = ({
@@ -35,7 +38,11 @@ export const DynamicTable: React.FC<DynamicTableProps> = ({
   tittle = { tittleText: "", iconClass: "" },
   showFooter = false,
   footerIdentifier = "Totales",
+  enableMobileCards = false,
 }) => {
+  const screenSize = useAppSelector((state) => state.ui.screenSize);
+  const showCards = enableMobileCards && screenSize === "xs";
+
   const footerRow = rows.find((row) => row[columns[0].id] === footerIdentifier);
   const normalRows = rows.filter(
     (row) => row[columns[0].id] !== footerIdentifier
@@ -51,7 +58,7 @@ export const DynamicTable: React.FC<DynamicTableProps> = ({
           alignItems="center"
           fontFamily="Roboto, Helvetica, Arial, sans-serif"
           gap={1}
-          sx={{ color: "black", mb: 1 }}
+          sx={{ color: "black", mt: "2px", mb: 1 }}
         >
           <Box
             component="i"
@@ -69,6 +76,80 @@ export const DynamicTable: React.FC<DynamicTableProps> = ({
         </Typography>
       )}
 
+      {showCards ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {normalRows.length === 0 && (
+            <div style={{ textAlign: "center", color: "#9aa1ad", padding: "16px 0", fontSize: 13 }}>
+              Sin datos
+            </div>
+          )}
+          {normalRows.map((row, rowIndex) => (
+            <div
+              key={rowIndex}
+              style={{
+                border: "1px solid #e6e8ec",
+                borderRadius: 10,
+                padding: "10px 12px",
+                background: "#fff",
+                boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
+              }}
+            >
+              {columns.map((column, i) => (
+                <div
+                  key={column.id}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    gap: 12,
+                    fontSize: 13,
+                    padding: "4px 0",
+                    borderTop: i === 0 ? "none" : "1px solid #f0f3f8",
+                  }}
+                >
+                  <span style={{ color: "#6b7280", fontWeight: 500, flexShrink: 0 }}>
+                    {column.label}
+                  </span>
+                  <span style={{ textAlign: "right", fontWeight: 600, minWidth: 0, wordBreak: "break-word" }}>
+                    {column.format ? column.format(row[column.id], row) : row[column.id]}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ))}
+          {footerRow && (
+            <div
+              style={{
+                border: "1px solid #343A40",
+                borderRadius: 10,
+                padding: "10px 12px",
+                background: "#343A40",
+                color: "#fff",
+              }}
+            >
+              {columns.map((column, i) => (
+                <div
+                  key={column.id}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    gap: 12,
+                    fontSize: 13,
+                    padding: "4px 0",
+                    borderTop: i === 0 ? "none" : "1px solid rgba(255,255,255,0.15)",
+                  }}
+                >
+                  <span style={{ opacity: 0.85, fontWeight: 500 }}>{column.label}</span>
+                  <span style={{ textAlign: "right", fontWeight: 700 }}>
+                    {column.format ? column.format(footerRow[column.id], footerRow) : footerRow[column.id] ?? ""}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : (
       <TableContainer component={Paper} sx={{ maxHeight: 400, width: "100%" }}>
         <Table stickyHeader size="small" sx={{ width: "100%" }}>
           <TableHead>
@@ -129,6 +210,7 @@ export const DynamicTable: React.FC<DynamicTableProps> = ({
           )}
         </Table>
       </TableContainer>
+      )}
     </div>
   );
 };

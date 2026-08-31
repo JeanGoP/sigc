@@ -29,8 +29,12 @@ export const ConsultaCartera: React.FC = () => {
   const [collapsed, setCollapsed] = useState(false);
   const [intMora, setIntMora] = useState<string>("3.00");
   const [MenuFiltrosState, setMenuFiltrosState] = useState(false);
+  // Móvil (xs): vista maestro-detalle. 'list' = listado de clientes; 'detail' = facturas/info del seleccionado.
+  const [mobileView, setMobileView] = useState<"list" | "detail">("list");
 
   const inputRef = useRef<HTMLInputElement>(null);
+  const screenSize = useAppSelector((state) => state.ui.screenSize);
+  const isMobile = screenSize === "xs";
   const currentUser = useAppSelector((state) => state.auth.currentUser);
   const isAdmin = String(currentUser?.role ?? "").trim().toLowerCase() === "administrador";
 
@@ -317,7 +321,16 @@ export const ConsultaCartera: React.FC = () => {
       {/* <ContentHeader title="Consulta de Cartera" /> */}
       <section className="content">
         <div className="container-fluid">
-          <div className="row cartera-row" style={{ height: "100vh" }}>
+          <div
+            className={`row cartera-row ${
+              isMobile
+                ? mobileView === "detail"
+                  ? "cartera-row--mobile-detail"
+                  : "cartera-row--mobile-list"
+                : ""
+            }`}
+            style={{ height: "100vh" }}
+          >
             <ConsultaCarteraSidebar
               collapsed={collapsed}
               menuFiltrosState={MenuFiltrosState}
@@ -342,10 +355,20 @@ export const ConsultaCartera: React.FC = () => {
               exporting={exporting}
               onRowEnter={(row) => {
                 handleClicLupaBuscar(row);
+                setMobileView("detail");
               }}
             />
 
             <div className="col main-panel">
+              {isMobile && mobileView === "detail" && (
+                <button
+                  type="button"
+                  className="btn btn-outline-primary btn-sm mb-2 cartera-mobile-back"
+                  onClick={() => setMobileView("list")}
+                >
+                  <i className="fas fa-arrow-left" /> Volver al listado
+                </button>
+              )}
               <ConsultaCarteraTabsShell
                 activeTab={activeTab}
                 selectedFacturaLabel={String(registroSeleccionado?.numefac ?? "")}

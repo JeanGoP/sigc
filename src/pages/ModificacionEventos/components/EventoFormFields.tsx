@@ -43,7 +43,7 @@ export function EventoFormFields({
   return (
     <>
       <Row>
-        <Col md={3}>
+        <Col xs={12} sm={6} md={3}>
           <SingleSelect
             label="Usuario"
             options={usuarioOptions}
@@ -51,19 +51,19 @@ export function EventoFormFields({
             onChange={onUsuarioChange}
           />
         </Col>
-        <Col md={3}>
+        <Col xs={12} sm={6} md={3}>
           <Form.Group>
             <Form.Label>Cuenta</Form.Label>
             <Form.Control type="text" value={form.cuenta} readOnly />
           </Form.Group>
         </Col>
-        <Col md={3}>
+        <Col xs={12} sm={6} md={3}>
           <Form.Group>
             <Form.Label>Cliente</Form.Label>
             <Form.Control type="text" value={form.cliente} readOnly />
           </Form.Group>
         </Col>
-        <Col md={3}>
+        <Col xs={12} sm={6} md={3}>
           <SingleSelect
             label="Tipo de evento"
             options={tipoEventoOptions}
@@ -73,7 +73,7 @@ export function EventoFormFields({
         </Col>
       </Row>
       <Row className="mt-3">
-        <Col md={3}>
+        <Col xs={12} sm={6} md={3}>
           <Form.Group>
             <Form.Label>Fecha evento</Form.Label>
             <Form.Control
@@ -84,7 +84,7 @@ export function EventoFormFields({
             />
           </Form.Group>
         </Col>
-        <Col md={3}>
+        <Col xs={12} sm={6} md={3}>
           <Form.Group>
             <HoraSelectorEvento
               fecha={requiereHora ? form.fechaEvento : ""}
@@ -95,7 +95,7 @@ export function EventoFormFields({
             />
           </Form.Group>
         </Col>
-        <Col md={3}>
+        <Col xs={12} sm={6} md={3}>
           <Form.Group>
             <Form.Label>Monto</Form.Label>
             <Form.Control

@@ -130,7 +130,7 @@ const ModalSeguimientoDetalle: React.FC<Props> = ({
 
             <Row className="mb-3">
               <Col>
-                <div className="d-flex align-items-center justify-content-between gap-2">
+                <div className="d-flex align-items-center justify-content-between" style={{ gap: 8 }}>
                   <strong>Adjuntos:</strong>
                 </div>
 
@@ -153,7 +153,7 @@ const ModalSeguimientoDetalle: React.FC<Props> = ({
                     ) : (
                       adjuntos.map((adjunto) => (
                         <ListGroup.Item key={adjunto.id}>
-                          <div className="d-flex align-items-center justify-content-between gap-2">
+                          <div className="d-flex align-items-center justify-content-between flex-wrap" style={{ gap: 8 }}>
                             <a
                               href={adjunto.publicUrl}
                               target="_blank"
@@ -209,7 +209,7 @@ const ModalSeguimientoDetalle: React.FC<Props> = ({
 
                           return (
                             <ListGroup.Item key={idx}>
-                              <div className="d-flex align-items-center gap-2" style={{ fontWeight: "bold" }}>
+                              <div className="d-flex align-items-center flex-wrap" style={{ fontWeight: "bold", gap: 8 }}>
                                 <FontAwesomeIcon
                                   icon={IconMap[evento.icono || "home"]}
                                   color={evento.color}
@@ -221,8 +221,9 @@ const ModalSeguimientoDetalle: React.FC<Props> = ({
 
                                 {cumplidoLabel && (
                                   <span
-                                    className="d-flex align-items-center gap-1 ms-3"
+                                    className="d-flex align-items-center ml-3"
                                     style={{
+                                      gap: 4,
                                       color:
                                         cumplidoState === "done"
                                           ? "#388e3c"
@@ -244,7 +245,7 @@ const ModalSeguimientoDetalle: React.FC<Props> = ({
                                 )}
                               </div>
 
-                              <div className="ms-4 mt-1">
+                              <div className="ml-4 mt-1">
                                 {evento.fecha && <div>Fecha: {evento.fecha}</div>}
                                 {evento.hora && (
                                   <div>

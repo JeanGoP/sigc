@@ -65,11 +65,18 @@ const Main = () => {
     removeWindowClass('sidebar-closed');
     removeWindowClass('sidebar-collapse');
     removeWindowClass('sidebar-open');
-    if (menuSidebarCollapsed && screenSize === 'lg') {
+    /* El modo mini-icono del sidebar lo activa el SCSS en `media-breakpoint-up(lg)`
+       de Bootstrap, es decir >=992px (ver scss/_sidebar-mini.scss). Pero el bucket JS
+       `lg` de `calculateWindowSize` empieza en 1200px, así que el rango 992-1199
+       (bucket JS `md`) no entraba en ninguna rama de abajo: quedaba expandido al
+       cargar y el hamburguesa lo COLAPSABA, justo al revés que en >=1200px.
+       `isWideScreen` alinea la lógica JS con el breakpoint CSS que ya gobierna. */
+    const isWideScreen = screenSize === 'lg' || screenSize === 'md';
+    if (menuSidebarCollapsed && isWideScreen) {
       addWindowClass('sidebar-collapse');
     } else if (menuSidebarCollapsed && screenSize === 'xs') {
       addWindowClass('sidebar-open');
-    } else if (!menuSidebarCollapsed && screenSize !== 'lg') {
+    } else if (!menuSidebarCollapsed && !isWideScreen) {
       addWindowClass('sidebar-closed');
       addWindowClass('sidebar-collapse');
     }
