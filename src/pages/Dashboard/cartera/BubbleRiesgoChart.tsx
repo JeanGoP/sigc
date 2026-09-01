@@ -6,11 +6,13 @@ import type { CarteraRow } from "@app/Data/dashboardCarteraData";
 import {
   buildBubbleRiesgoChartData,
 } from "./domain/advancedChartBuilders";
+import { useAppSelector } from "@app/store/store";
 
 ChartJS.register(BubbleController);
 
 export default function BubbleRiesgoChart({ data }: { data: CarteraRow[] }) {
   const maximized = useMaximize();
+  const isMobile = useAppSelector((state) => state.ui.screenSize) === "xs";
   const chartModel = useMemo(
     () => buildBubbleRiesgoChartData(data, new Set()),
     [data],
@@ -48,7 +50,13 @@ export default function BubbleRiesgoChart({ data }: { data: CarteraRow[] }) {
           <small className="text-muted">Tamano = saldo total</small>
         </div>
 
-        <div style={{ height: maximized ? "calc(100vh - 320px)" : 380 }}>
+        {/* Acá sí se baja el alto en móvil: la leyenda está oculta, así que no
+          hay leyenda inferior que necesite espacio extra. */}
+      <div
+        style={{
+          height: maximized ? "calc(100vh - 320px)" : isMobile ? 300 : 380,
+        }}
+      >
           <Bubble data={{ datasets: chartModel.datasets }} options={options} />
         </div>
       </div>

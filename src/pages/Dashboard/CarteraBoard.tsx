@@ -6,11 +6,8 @@ import CarteraVencidaChart from "./cartera/CarteraVencidaChart";
 import RecaudoChart from "./cartera/RecaudoChart";
 import IndiceRecaudoChart from "./cartera/IndiceRecaudoChart";
 import ConcentracionCarteraChart from "./cartera/ConcentracionCarteraChart";
-import EficienciaRecuperacionChart from "./cartera/EficienciaRecuperacionChart";
 import ComposicionRecaudoPorCarteraChart from "./cartera/ComposicionRecaudoPorCarteraChart";
 import BubbleRiesgoChart from "./cartera/BubbleRiesgoChart";
-import MixedRecaudoIndiceChart from "./cartera/MixedRecaudoIndiceChart";
-import RadarSaludChart from "./cartera/RadarSaludChart";
 import ComparativoSaldoChart from "./cartera/ComparativoSaldoChart";
 import ComparativoAgingChart from "./cartera/ComparativoAgingChart";
 import MaximizeWrapper from "./cartera/MaximizeWrapper";
@@ -133,7 +130,7 @@ export default function CarteraBoard() {
 
             <KpisSection data={visibleData} />
 
-            <Row className="g-3 mb-3">
+            <Row className="mb-3" style={{ rowGap: 16 }}>
               <Col md={12}>
                 <MaximizeWrapper>
                   <ComparativoAgingChart data={visibleData} />
@@ -141,7 +138,7 @@ export default function CarteraBoard() {
               </Col>
             </Row>
 
-            <Row className="g-3">
+            <Row style={{ rowGap: 16 }}>
               <Col md={12}>
                 <MaximizeWrapper>
                   <RecaudoChart data={visibleData} />
@@ -149,7 +146,7 @@ export default function CarteraBoard() {
               </Col>
             </Row>
 
-            <Row className="g-3 mb-3">
+            <Row className="mb-3" style={{ rowGap: 16 }}>
               <Col md={12}>
                 <MaximizeWrapper>
                   <ComparativoSaldoChart data={visibleData} />
@@ -157,7 +154,7 @@ export default function CarteraBoard() {
               </Col>
             </Row>
 
-            <Row className="g-3 mb-3">
+            <Row className="mb-3" style={{ rowGap: 16 }}>
               <Col md={12}>
                 <MaximizeWrapper>
                   <DistribucionSaldoChart data={visibleData} />
@@ -170,28 +167,21 @@ export default function CarteraBoard() {
               </Col> */}
             </Row>
 
-            <Row className="g-3 mb-3">
-              <Col md={7}>
+            {/* RadarSaludChart ("Perfil de salud por cartera") retirado por
+                decisión del usuario. BubbleRiesgoChart pasa a ancho completo
+                para no dejar 5 columnas vacías a su derecha. */}
+            <Row className="mb-3" style={{ rowGap: 16 }}>
+              <Col md={12}>
                 <MaximizeWrapper>
                   <BubbleRiesgoChart data={visibleData} />
                 </MaximizeWrapper>
               </Col>
-              <Col md={5}>
-                <MaximizeWrapper>
-                  <RadarSaludChart data={visibleData} />
-                </MaximizeWrapper>
-              </Col>
             </Row>
 
-            <Row className="g-3 mb-3">
-              <Col md={12}>
-                <MaximizeWrapper>
-                  <EficienciaRecuperacionChart data={visibleData} />
-                </MaximizeWrapper>
-              </Col>
-            </Row>
+            {/* EficienciaRecuperacionChart ("Eficiencia de recuperacion -
+                Vencida vs Recaudo") retirado por decisión del usuario. */}
 
-            <Row className="g-3 mb-3">
+            <Row className="mb-3" style={{ rowGap: 16 }}>
               <Col md={12}>
                 <MaximizeWrapper>
                   <ComposicionRecaudoPorCarteraChart data={visibleData} />
@@ -199,15 +189,10 @@ export default function CarteraBoard() {
               </Col>
             </Row>
 
-            <Row className="g-3 mb-3">
-              <Col md={12}>
-                <MaximizeWrapper>
-                  <MixedRecaudoIndiceChart data={visibleData} />
-                </MaximizeWrapper>
-              </Col>
-            </Row>
+            {/* MixedRecaudoIndiceChart ("Recaudo vs Indice de recaudo por
+                cartera") retirado por decisión del usuario. */}
 
-            <Row className="g-3 mb-3">
+            <Row className="mb-3" style={{ rowGap: 16 }}>
               <Col md={12}>
                 <MaximizeWrapper>
                   <CarteraVencidaChart data={visibleData} />
@@ -215,7 +200,7 @@ export default function CarteraBoard() {
               </Col>
             </Row>
 
-            <Row className="g-3 mb-3">
+            <Row className="mb-3" style={{ rowGap: 16 }}>
               <Col md={12}>
                 <MaximizeWrapper>
                   <IndiceRecaudoChart data={visibleData} />

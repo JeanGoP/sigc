@@ -9,6 +9,7 @@ import {
   calculateDashboardPercentDelta,
   type ComparativoSaldoSortKey,
 } from "./domain/advancedChartBuilders";
+import { useAppSelector } from "@app/store/store";
 
 const deltaLabelPlugin: Plugin<"bar"> = {
   id: "deltaLabel",
@@ -48,6 +49,7 @@ const deltaLabelPlugin: Plugin<"bar"> = {
 
 export default function ComparativoSaldoChart({ data }: { data: CarteraRow[] }) {
   const maximized = useMaximize();
+  const isMobile = useAppSelector((state) => state.ui.screenSize) === "xs";
   const [sortBy, setSortBy] = useState<ComparativoSaldoSortKey>("actual");
   const chartModel = buildComparativoSaldoChartData(data, new Set(), sortBy);
 
@@ -82,10 +84,20 @@ export default function ComparativoSaldoChart({ data }: { data: CarteraRow[] }) 
     },
   };
 
-  const rowHeight = chartModel.hayAnt ? 46 : 26;
+  /* Móvil: menos alto por fila y techo, para que no crezca sin límite con
+     muchas carteras. El padding derecho de 64px NO se toca: está ajustado al
+     ancho real del texto de delta que dibuja deltaLabelPlugin. */
+  const rowHeight = isMobile
+    ? chartModel.hayAnt
+      ? 34
+      : 20
+    : chartModel.hayAnt
+      ? 46
+      : 26;
+  const naturalHeight = chartModel.rowCount * rowHeight + 60;
   const chartHeight = maximized
     ? "calc(100vh - 300px)"
-    : `${chartModel.rowCount * rowHeight + 60}px`;
+    : `${isMobile ? Math.min(naturalHeight, 800) : naturalHeight}px`;
 
   return (
     <div className="card">

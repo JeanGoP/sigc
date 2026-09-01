@@ -2,9 +2,11 @@ import { Bar } from "react-chartjs-2";
 import type { CarteraRow } from "@app/Data/dashboardCarteraData";
 import { useMaximize } from "./MaximizeContext";
 import { buildIndiceRecaudoChartData } from "./domain/chartBuilders";
+import { useAppSelector } from "@app/store/store";
 
 export default function IndiceRecaudoChart({ data }: { data: CarteraRow[] }) {
   const maximized = useMaximize();
+  const isMobile = useAppSelector((state) => state.ui.screenSize) === "xs";
   const chartModel = buildIndiceRecaudoChartData(data);
 
   const options = {
@@ -36,7 +38,11 @@ export default function IndiceRecaudoChart({ data }: { data: CarteraRow[] }) {
           style={{
             height: maximized
               ? "calc(100vh - 160px)"
-              : chartModel.labels.length * 28 + 40,
+              : /* Móvil: menos alto por fila y techo, para que no crezca sin
+                   límite con muchas carteras. */
+                isMobile
+                ? Math.min(chartModel.labels.length * 20 + 40, 800)
+                : chartModel.labels.length * 28 + 40,
           }}
         >
           <Bar

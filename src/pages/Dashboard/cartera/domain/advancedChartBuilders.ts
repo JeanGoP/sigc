@@ -285,6 +285,82 @@ export function buildComparativoAgingChartData(
   };
 }
 
+/**
+ * Datos para la vista de DONA de "Comparativo saldo por tramo".
+ *
+ * Una dona simple no puede expresar la comparación actual-vs-anterior (es una
+ * sola dimensión), y mostrar solo el periodo actual duplicaría la gráfica
+ * "Distribucion saldo por edad" que ya existe en el board. Por eso se arma
+ * como dona de DOS ANILLOS: el exterior es el periodo actual y el interior el
+ * anterior, así la comparación —que es el sentido de esta gráfica— sobrevive.
+ *
+ * Como la dona agrega, `codicta` permite acotar a una cartera concreta;
+ * `TOTAL_CARTERAS` suma todas (mismo patrón que ComposicionRecaudoPorCartera).
+ */
+export const COMPARATIVO_AGING_TOTAL_CARTERAS = "__TOTAL__";
+
+export function buildComparativoAgingDonaChartData(
+  rows: CarteraRow[],
+  codicta: string,
+) {
+  const scopedRows =
+    codicta === COMPARATIVO_AGING_TOTAL_CARTERAS
+      ? rows
+      : rows.filter((row) => row.codicta === codicta);
+
+  const sum = (pick: (row: CarteraRow) => number) =>
+    scopedRows.reduce((total, row) => total + (pick(row) ?? 0), 0);
+
+  const segments = [
+    { key: "pv", label: "PV", active: sum((r) => r.pv), previous: sum((r) => r.pvAnt) },
+    { key: "d30", label: "30d", active: sum((r) => r.d30), previous: sum((r) => r.d30Ant) },
+    { key: "d60", label: "60d", active: sum((r) => r.d60), previous: sum((r) => r.d60Ant) },
+    { key: "d90", label: "90d", active: sum((r) => r.d90), previous: sum((r) => r.d90Ant) },
+    {
+      key: "d90mas",
+      label: "+90d",
+      active: sum((r) => r.d90mas),
+      previous: sum((r) => r.d90masAnt),
+    },
+  ] as const;
+
+  const totalActual = segments.reduce((total, item) => total + item.active, 0);
+  const totalAnterior = segments.reduce((total, item) => total + item.previous, 0);
+  const hayAnt = totalAnterior > 0;
+
+  const colorFor = (key: (typeof segments)[number]["key"], previous: boolean) =>
+    previous
+      ? COMPARATIVO_AGING_SEGMENT_COLORS[key].previous
+      : COMPARATIVO_AGING_SEGMENT_COLORS[key].active;
+
+  return {
+    hayAnt,
+    totalActual,
+    totalAnterior,
+    /* Los labels son solo los 5 tramos: los anillos se distinguen por posición
+       (y por el tooltip), no duplicando 10 entradas en la leyenda. */
+    labels: segments.map((item) => item.label),
+    datasets: [
+      {
+        label: "Actual",
+        data: segments.map((item) => item.active),
+        backgroundColor: segments.map((item) => colorFor(item.key, false)),
+        borderWidth: 1,
+      },
+      ...(hayAnt
+        ? [
+            {
+              label: "Anterior",
+              data: segments.map((item) => item.previous),
+              backgroundColor: segments.map((item) => colorFor(item.key, true)),
+              borderWidth: 1,
+            },
+          ]
+        : []),
+    ],
+  };
+}
+
 export function getBubbleRiesgoColor(row: CarteraRow): string {
   if (row.carteraVencidaPorc > 15) {
     return "#d9534f";

@@ -6,20 +6,27 @@ import { useMaximize } from "./MaximizeContext";
 import {
   buildDistribucionSaldoChartData,
 } from "./domain/chartBuilders";
+import { useAppSelector } from "@app/store/store";
 
 export default function DistribucionSaldoChart({ data }: { data: CarteraRow[] }) {
   const maximized = useMaximize();
+  const isMobile = useAppSelector((state) => state.ui.screenSize) === "xs";
   const chartModel = buildDistribucionSaldoChartData(data, new Set());
+  /* En móvil se sube el alto porque la leyenda pasa de derecha a abajo. */
   const containerHeight = useMemo(
-    () => (maximized ? "calc(100vh - 220px)" : 240),
-    [maximized],
+    () => (maximized ? "calc(100vh - 220px)" : isMobile ? 300 : 240),
+    [maximized, isMobile],
   );
 
   const options = {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
-      legend: { position: "right" as const },
+      legend: {
+        /* A la derecha, la leyenda se comía ~40% del ancho en 375px. */
+        position: (isMobile ? "bottom" : "right") as "bottom" | "right",
+        labels: { boxWidth: isMobile ? 10 : undefined },
+      },
       tooltip: {
         callbacks: {
           label: (context: any) => ` ${context.label}: ${fmtCOP(context.raw as number)}`,

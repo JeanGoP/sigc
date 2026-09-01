@@ -6,11 +6,13 @@ import { useMaximize } from "./MaximizeContext";
 import {
   buildRecaudoChartData,
 } from "./domain/chartBuilders";
+import { useAppSelector } from "@app/store/store";
 
 const fmtPct = (value: number) => `${value >= 0 ? "+" : ""}${value.toFixed(1)}%`;
 
 export default function RecaudoChart({ data }: { data: CarteraRow[] }) {
   const maximized = useMaximize();
+  const isMobile = useAppSelector((state) => state.ui.screenSize) === "xs";
   const [modo, setModo] = useState<"valor" | "variacion">("valor");
   const chartModel = buildRecaudoChartData(data, new Set(), modo);
 
@@ -107,7 +109,11 @@ export default function RecaudoChart({ data }: { data: CarteraRow[] }) {
           style={{
             height: maximized
               ? "calc(100vh - 320px)"
-              : chartModel.rowCount * 36 + 60,
+              : /* Móvil: menos alto por fila y techo, para que no crezca sin
+                   límite con muchas carteras. */
+                isMobile
+                ? Math.min(chartModel.rowCount * 26 + 60, 800)
+                : chartModel.rowCount * 36 + 60,
           }}
         >
           <Bar

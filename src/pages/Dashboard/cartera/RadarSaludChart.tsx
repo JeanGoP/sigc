@@ -6,11 +6,13 @@ import type { CarteraRow } from "@app/Data/dashboardCarteraData";
 import {
   buildRadarSaludChartData,
 } from "./domain/advancedChartBuilders";
+import { useAppSelector } from "@app/store/store";
 
 ChartJS.register(RadarController, RadialLinearScale, Filler);
 
 export default function RadarSaludChart({ data }: { data: CarteraRow[] }) {
   const maximized = useMaximize();
+  const isMobile = useAppSelector((state) => state.ui.screenSize) === "xs";
   const selectedCodictas = useMemo(
     () => new Set(data.map((row) => row.codicta)),
     [data],
@@ -22,8 +24,9 @@ export default function RadarSaludChart({ data }: { data: CarteraRow[] }) {
     maintainAspectRatio: false,
     plugins: {
       legend: {
-        position: "right" as const,
-        labels: { font: { size: 11 } },
+        /* A la derecha, la leyenda se comía ~40% del ancho en 375px. */
+        position: (isMobile ? "bottom" : "right") as "bottom" | "right",
+        labels: { font: { size: 11 }, boxWidth: isMobile ? 10 : undefined },
       },
       tooltip: {
         callbacks: {
@@ -66,7 +69,13 @@ export default function RadarSaludChart({ data }: { data: CarteraRow[] }) {
             </span>
           </div>
         ) : (
-          <div style={{ height: maximized ? "calc(100vh - 320px)" : 360 }}>
+          <div
+            style={{
+              /* En móvil NO se baja la altura: la leyenda pasó de derecha a
+                 abajo, así que necesita alto extra para no comerle área al radar. */
+              height: maximized ? "calc(100vh - 320px)" : isMobile ? 400 : 360,
+            }}
+          >
             <Radar
               data={{
                 labels: chartModel.labels,

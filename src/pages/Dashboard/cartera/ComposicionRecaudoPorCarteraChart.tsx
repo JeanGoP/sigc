@@ -6,6 +6,7 @@ import type { CarteraRow } from "@app/Data/dashboardCarteraData";
 import { useMaximize } from "./MaximizeContext";
 import { buildComposicionRecaudoChartData } from "./domain/chartBuilders";
 import { buildComposicionRecaudoPorCarteraChartData } from "./domain/remainingChartBuilders";
+import { useAppSelector } from "@app/store/store";
 
 export default function ComposicionRecaudoPorCarteraChart({
   data,
@@ -13,6 +14,7 @@ export default function ComposicionRecaudoPorCarteraChart({
   data: CarteraRow[];
 }) {
   const maximized = useMaximize();
+  const isMobile = useAppSelector((state) => state.ui.screenSize) === "xs";
   const [modoPorc, setModoPorc] = useState(true);
   const [tipoGrafico, setTipoGrafico] = useState<"barras" | "dona">("barras");
   const [carteraDona, setCarteraDona] = useState<string>("__TOTAL__");
@@ -233,7 +235,11 @@ export default function ComposicionRecaudoPorCarteraChart({
             height: maximized
               ? "calc(100vh - 320px)"
               : tipoGrafico === "barras"
-                ? chartModelBarras.rowCount * 28 + 60
+                ? /* Móvil: menos alto por fila y techo, para que no crezca sin
+                     límite con muchas carteras. La dona no aplica (alto fijo). */
+                  isMobile
+                  ? Math.min(chartModelBarras.rowCount * 20 + 60, 800)
+                  : chartModelBarras.rowCount * 28 + 60
                 : 280,
           }}
         >

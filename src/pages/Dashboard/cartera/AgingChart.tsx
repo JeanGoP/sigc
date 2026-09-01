@@ -5,9 +5,11 @@ import type { CarteraRow } from "@app/Data/dashboardCarteraData";
 import { useMaximize } from "./MaximizeContext";
 import { CarteraCuentaMultiSelect } from "./components/CarteraCuentaMultiSelect";
 import { buildAgingChartData } from "./domain/remainingChartBuilders";
+import { useAppSelector } from "@app/store/store";
 
 export default function AgingChart({ data }: { data: CarteraRow[] }) {
   const maximized = useMaximize();
+  const isMobile = useAppSelector((state) => state.ui.screenSize) === "xs";
   const [modo, setModo] = useState<"valor" | "cantidad">("valor");
   const [ocultas, setOcultas] = useState<Set<string>>(new Set());
   const chartModel = buildAgingChartData(data, ocultas, modo);
@@ -137,7 +139,12 @@ export default function AgingChart({ data }: { data: CarteraRow[] }) {
           style={{
             height: maximized
               ? "calc(100vh - 320px)"
-              : chartModel.rowCount * 28 + 60,
+              : /* En móvil se reduce el alto por fila y se pone un techo: sin él,
+                   con muchas carteras la gráfica crecía sin límite (se veía
+                   larguísima al bajar). El techo solo entra en casos extremos. */
+                isMobile
+                ? Math.min(chartModel.rowCount * 20 + 60, 800)
+                : chartModel.rowCount * 28 + 60,
           }}
         >
           <Bar

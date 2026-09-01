@@ -4,6 +4,7 @@ import { type Plugin } from "chart.js";
 import type { CarteraRow } from "@app/Data/dashboardCarteraData";
 import { useMaximize } from "./MaximizeContext";
 import { buildCarteraVencidaChartData } from "./domain/remainingChartBuilders";
+import { useAppSelector } from "@app/store/store";
 
 const umbralPlugin: Plugin<"bar"> = {
   id: "umbralLine",
@@ -29,6 +30,7 @@ const umbralPlugin: Plugin<"bar"> = {
 
 export default function CarteraVencidaChart({ data }: { data: CarteraRow[] }) {
   const maximized = useMaximize();
+  const isMobile = useAppSelector((state) => state.ui.screenSize) === "xs";
   const [umbral, setUmbral] = useState(15);
   const [inputVal, setInputVal] = useState("15");
   const chartModel = buildCarteraVencidaChartData(data, new Set(), umbral);
@@ -105,7 +107,11 @@ export default function CarteraVencidaChart({ data }: { data: CarteraRow[] }) {
           style={{
             height: maximized
               ? "calc(100vh - 320px)"
-              : chartModel.rowCount * 28 + 40,
+              : /* Móvil: menos alto por fila y techo, para que no crezca sin
+                   límite con muchas carteras. */
+                isMobile
+                ? Math.min(chartModel.rowCount * 20 + 40, 800)
+                : chartModel.rowCount * 28 + 40,
           }}
         >
           <Bar

@@ -1,13 +1,16 @@
-import { useMemo } from "react";
-import { Bar } from "react-chartjs-2";
+import { useEffect, useMemo, useState } from "react";
+import { Bar, Doughnut } from "react-chartjs-2";
 import { type Plugin } from "chart.js";
 import { fmtCOP } from "@app/utils/formattersFunctions";
 import type { CarteraRow } from "@app/Data/dashboardCarteraData";
 import { useMaximize } from "./MaximizeContext";
 import {
   buildComparativoAgingChartData,
+  buildComparativoAgingDonaChartData,
   calculateDashboardPercentDelta,
+  COMPARATIVO_AGING_TOTAL_CARTERAS,
 } from "./domain/advancedChartBuilders";
+import { useAppSelector } from "@app/store/store";
 
 const gapPlugin: Plugin<"bar"> = {
   id: "gapPlugin",
@@ -55,7 +58,14 @@ const gapPlugin: Plugin<"bar"> = {
       const delta = sumActual - sumPrevious;
       const pct = calculateDashboardPercentDelta(sumActual, sumPrevious);
       const positive = delta >= 0;
-      const label = `${fmtCOP(delta, true)} (${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%)`;
+      /* En móvil se omite el monto y se deja solo el %: el label completo
+         obligaba a reservar 165px de padding derecho (44% del ancho en 375px). */
+      const compact =
+        (chart.options.plugins as any)?.gapPlugin?.compact === true;
+      const pctText = `${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%`;
+      const label = compact
+        ? pctText
+        : `${fmtCOP(delta, true)} (${pctText})`;
 
       const currentBar = chart.getDatasetMeta(0).data[index] as any;
       const previousBar = chart.getDatasetMeta(5).data[index] as any;
@@ -79,7 +89,96 @@ const gapPlugin: Plugin<"bar"> = {
 
 export default function ComparativoAgingChart({ data }: { data: CarteraRow[] }) {
   const maximized = useMaximize();
+  const isMobile = useAppSelector((state) => state.ui.screenSize) === "xs";
+  const [tipoGrafico, setTipoGrafico] = useState<"barras" | "dona">("barras");
+  const [carteraDona, setCarteraDona] = useState<string>(
+    COMPARATIVO_AGING_TOTAL_CARTERAS,
+  );
   const chartModel = buildComparativoAgingChartData(data, new Set(), "total");
+
+  const cuentaOptions = useMemo(
+    () =>
+      chartModel.chipRows.map((row) => ({
+        value: row.codicta,
+        label: row.desccta,
+      })),
+    [chartModel.chipRows],
+  );
+
+  /* Si el filtro global deja fuera la cartera elegida en la dona, se vuelve a
+     Total en vez de mostrar una dona vacía. */
+  useEffect(() => {
+    if (carteraDona === COMPARATIVO_AGING_TOTAL_CARTERAS) {
+      return;
+    }
+
+    if (!cuentaOptions.some((option) => option.value === carteraDona)) {
+      setCarteraDona(COMPARATIVO_AGING_TOTAL_CARTERAS);
+    }
+  }, [carteraDona, cuentaOptions]);
+
+  const chartModelDona = useMemo(
+    () => buildComparativoAgingDonaChartData(data, carteraDona),
+    [data, carteraDona],
+  );
+
+  /* Anillos ocultables. La leyenda de Chart.js aquí lista los 5 tramos, no los
+     datasets, así que el clic en leyenda no sirve para ocultar un periodo:
+     hacen falta controles propios. */
+  const [anillosOcultos, setAnillosOcultos] = useState<Set<string>>(new Set());
+
+  const anillosDisponibles = chartModelDona.datasets.map(
+    (dataset) => dataset.label,
+  );
+  const donaDatasetsVisibles = chartModelDona.datasets.filter(
+    (dataset) => !anillosOcultos.has(dataset.label),
+  );
+  /* Si al cambiar de cartera desaparece el periodo anterior y el oculto era
+     "Actual", el filtro dejaría la dona vacía: en ese caso se muestra todo. */
+  const donaDatasets =
+    donaDatasetsVisibles.length > 0
+      ? donaDatasetsVisibles
+      : chartModelDona.datasets;
+
+  const toggleAnillo = (label: string) => {
+    setAnillosOcultos((current) => {
+      const next = new Set(current);
+
+      if (next.has(label)) {
+        next.delete(label);
+        return next;
+      }
+
+      /* No se permite ocultar el último anillo visible: dejaría la dona vacía. */
+      if (anillosDisponibles.length - next.size <= 1) {
+        return current;
+      }
+
+      next.add(label);
+      return next;
+    });
+  };
+
+  const donaOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        /* Solo los 5 tramos: los anillos se distinguen por posición. */
+        position: (isMobile ? "bottom" : "right") as "bottom" | "right",
+        labels: { font: { size: 11 }, boxWidth: isMobile ? 10 : undefined },
+      },
+      tooltip: {
+        callbacks: {
+          /* El dataset dice de qué anillo/periodo es cada porción. */
+          label: (context: any) =>
+            ` ${context.dataset.label} · ${context.label}: ${fmtCOP(
+              context.raw as number,
+            )}`,
+        },
+      },
+    },
+  };
 
   const obligacionesPorTramo = useMemo(() => {
     return chartModel.visibleRows.reduce(
@@ -98,8 +197,9 @@ export default function ComparativoAgingChart({ data }: { data: CarteraRow[] }) 
     indexAxis: "y" as const,
     responsive: true,
     maintainAspectRatio: false,
-    layout: { padding: { right: 165 } },
+    layout: { padding: { right: isMobile ? 60 : 165 } },
     plugins: {
+      gapPlugin: { compact: isMobile },
       legend: {
         display: true,
         position: "top" as const,
@@ -198,10 +298,32 @@ export default function ComparativoAgingChart({ data }: { data: CarteraRow[] }) 
     },
   };
 
-  const rowHeight = chartModel.hayAnt ? 52 : 28;
+  /* Móvil: menos alto por fila y techo, para que no crezca sin límite con
+     muchas carteras. Este gráfico apila actual+anterior, de ahí el rowHeight
+     doble cuando hay periodo anterior. */
+  const rowHeight = isMobile
+    ? chartModel.hayAnt
+      ? 38
+      : 20
+    : chartModel.hayAnt
+      ? 52
+      : 28;
+  /* En dona con una cartera concreta puede no haber periodo anterior aunque
+     sí lo haya en el total, así que el aviso se basa en el modelo visible. */
+  const hayAntVisible =
+    tipoGrafico === "dona" ? chartModelDona.hayAnt : chartModel.hayAnt;
+
+  /* La explicación "exterior/interior" solo aplica con los dos anillos a la
+     vista; con uno oculto sería engañosa (el que queda pasa a ser el exterior). */
+  const mostrarExplicacionPeriodos =
+    tipoGrafico === "dona"
+      ? hayAntVisible && donaDatasets.length > 1
+      : hayAntVisible;
+
+  const naturalHeight = chartModel.rowCount * rowHeight + 60;
   const chartHeight = maximized
     ? "calc(100vh - 320px)"
-    : `${chartModel.rowCount * rowHeight + 60}px`;
+    : `${isMobile ? Math.min(naturalHeight, 800) : naturalHeight}px`;
 
   return (
     <div className="card">
@@ -219,9 +341,102 @@ export default function ComparativoAgingChart({ data }: { data: CarteraRow[] }) 
           <h6 className="card-title text-muted mb-0">
             Comparativo saldo por tramo · Actual vs Anterior
           </h6>
+
+          {/* Mismo control que en "Composicion del recaudo por cartera", para
+              que el usuario encuentre el toggle en el mismo lugar. */}
+          <div style={{ display: "flex", gap: 6 }}>
+            {(["barras", "dona"] as const).map((tipo) => (
+              <button
+                key={tipo}
+                onClick={() => setTipoGrafico(tipo)}
+                style={{
+                  padding: "2px 10px",
+                  fontSize: 11,
+                  borderRadius: 12,
+                  border: "1px solid",
+                  borderColor: tipoGrafico === tipo ? "#4f86c6" : "#ddd",
+                  background: tipoGrafico === tipo ? "#4f86c6" : "#fff",
+                  color: tipoGrafico === tipo ? "#fff" : "#666",
+                  cursor: "pointer",
+                  transition: "all 0.15s",
+                }}
+              >
+                {tipo === "barras" ? "Barras" : "Dona"}
+              </button>
+            ))}
+          </div>
         </div>
 
-        {chartModel.hayAnt && (
+        {tipoGrafico === "dona" && (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              marginTop: 8,
+              marginBottom: 8,
+              flexWrap: "wrap",
+            }}
+          >
+            <span style={{ fontSize: 11, color: "#aaa" }}>Cartera:</span>
+            <select
+              value={carteraDona}
+              onChange={(event) => setCarteraDona(event.target.value)}
+              style={{
+                fontSize: 12,
+                padding: "4px 8px",
+                borderRadius: 8,
+                border: "1px solid #d0d5dd",
+                color: "#344054",
+                background: "#fff",
+                maxWidth: "100%",
+              }}
+            >
+              <option value={COMPARATIVO_AGING_TOTAL_CARTERAS}>Total</option>
+              {cuentaOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+
+            {anillosDisponibles.length > 1 && (
+              <>
+                <span style={{ fontSize: 11, color: "#aaa", marginLeft: 4 }}>
+                  Anillos:
+                </span>
+                {anillosDisponibles.map((label) => {
+                  const oculto = anillosOcultos.has(label);
+                  return (
+                    <button
+                      key={label}
+                      onClick={() => toggleAnillo(label)}
+                      title={
+                        oculto ? `Mostrar anillo ${label}` : `Ocultar anillo ${label}`
+                      }
+                      style={{
+                        padding: "2px 10px",
+                        fontSize: 11,
+                        borderRadius: 12,
+                        border: "1px solid",
+                        borderColor: oculto ? "#ddd" : "#4f86c6",
+                        background: oculto ? "#fff" : "#4f86c6",
+                        color: oculto ? "#999" : "#fff",
+                        textDecoration: oculto ? "line-through" : "none",
+                        cursor: "pointer",
+                        transition: "all 0.15s",
+                      }}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </>
+            )}
+          </div>
+        )}
+
+        {mostrarExplicacionPeriodos && (
           <div style={{ display: "flex", gap: 16, fontSize: 11, color: "#666", marginBottom: 6 }}>
             <span>
               <span
@@ -234,7 +449,15 @@ export default function ComparativoAgingChart({ data }: { data: CarteraRow[] }) 
                   marginRight: 4,
                 }}
               />
-              Barra <strong>superior</strong> = Actual
+              {tipoGrafico === "dona" ? (
+                <>
+                  Anillo <strong>exterior</strong> = Actual
+                </>
+              ) : (
+                <>
+                  Barra <strong>superior</strong> = Actual
+                </>
+              )}
             </span>
             <span>
               <span
@@ -247,12 +470,20 @@ export default function ComparativoAgingChart({ data }: { data: CarteraRow[] }) 
                   marginRight: 4,
                 }}
               />
-              Barra <strong>inferior</strong> = Anterior
+              {tipoGrafico === "dona" ? (
+                <>
+                  Anillo <strong>interior</strong> = Anterior
+                </>
+              ) : (
+                <>
+                  Barra <strong>inferior</strong> = Anterior
+                </>
+              )}
             </span>
           </div>
         )}
 
-        {!chartModel.hayAnt && (
+        {!hayAntVisible && (
           <div
             style={{
               fontSize: 11,
@@ -265,15 +496,38 @@ export default function ComparativoAgingChart({ data }: { data: CarteraRow[] }) 
           </div>
         )}
 
-        <div style={{ height: chartHeight }}>
-          <Bar
-            data={{
-              labels: chartModel.labels,
-              datasets: chartModel.distribucionDatasets,
-            }}
-            options={distributionOptions}
-            plugins={chartModel.hayAnt ? [gapPlugin] : []}
-          />
+        {/* La dona agrega, así que no depende de rowCount: alto fijo, mayor en
+            móvil porque ahí la leyenda va abajo y necesita espacio propio. */}
+        <div
+          style={{
+            height:
+              tipoGrafico === "dona"
+                ? maximized
+                  ? "calc(100vh - 320px)"
+                  : isMobile
+                    ? 360
+                    : 320
+                : chartHeight,
+          }}
+        >
+          {tipoGrafico === "dona" ? (
+            <Doughnut
+              data={{
+                labels: chartModelDona.labels,
+                datasets: donaDatasets,
+              }}
+              options={donaOptions}
+            />
+          ) : (
+            <Bar
+              data={{
+                labels: chartModel.labels,
+                datasets: chartModel.distribucionDatasets,
+              }}
+              options={distributionOptions}
+              plugins={chartModel.hayAnt ? [gapPlugin] : []}
+            />
+          )}
         </div>
       </div>
     </div>
