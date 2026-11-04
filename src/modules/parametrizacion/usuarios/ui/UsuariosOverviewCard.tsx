@@ -1,4 +1,7 @@
 import { Button, Card, Col, Row } from "react-bootstrap";
+import { Link } from "react-router-dom";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faHeadset } from "@fortawesome/free-solid-svg-icons";
 import type { UsuariosEstadisticas } from "../domain/types";
 
 interface UsuariosOverviewCardProps {
@@ -27,14 +30,24 @@ export default function UsuariosOverviewCard({
               Controla usuarios, estado de acceso y rol asignado.
             </small>
           </div>
-          <Button
-            variant="primary"
-            onClick={onCrearUsuario}
-            disabled={!puedeCrear}
-            style={{ minWidth: 140 }}
-          >
-            + Nuevo usuario
-          </Button>
+          <div className="d-flex align-items-center gap-2">
+            <Link
+              to="/parametros_generales"
+              className="btn btn-outline-primary d-inline-flex align-items-center"
+              style={{ minWidth: 160 }}
+            >
+              <FontAwesomeIcon icon={faHeadset} className="me-2" />
+              Extensiones Asterisk
+            </Link>
+            <Button
+              variant="primary"
+              onClick={onCrearUsuario}
+              disabled={!puedeCrear}
+              style={{ minWidth: 140 }}
+            >
+              + Nuevo usuario
+            </Button>
+          </div>
         </div>
 
         <Row className="mt-3">

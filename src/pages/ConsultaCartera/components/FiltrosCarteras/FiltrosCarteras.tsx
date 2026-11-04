@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Card, Row, Col, Form } from "react-bootstrap";
 
 // Tus componentes
@@ -27,6 +27,12 @@ import { useUnsavedChanges } from "@app/hooks/useUnsavedChanges";
 import MultiSelectSimple, {
   SelectOption,
 } from "@app/components/MultiSelectCheckBox/MultiselectNuevo";
+import { useAppSelector } from "@app/store/store";
+import { can } from "@app/utils/security";
+import {
+  useConsultaCarteraService,
+  CarteraFiltroAsesor,
+} from "@app/services/ConsultaCartera/ConsultaCarteraServices";
 
 export interface FiltrosCarterasProps {
   state: boolean;
@@ -43,6 +49,42 @@ export type FiltrosCarterasRef = {
 export const FiltrosCarteras: React.FC<FiltrosCarterasProps> = ({
   onApply,
 }: FiltrosCarterasProps) => {
+  // ------------------------------------------------------
+  // PERMISOS Y ROLES
+  // ------------------------------------------------------
+  const currentUser = useAppSelector((state) => state.auth.currentUser);
+  const permissions = useAppSelector((state) => state.security.permissions);
+  const role = (currentUser?.role ?? "").toLowerCase();
+  const isAdmin = role === "administrador" || role === "admin";
+  const canFilterByUser =
+    isAdmin || can(permissions, "consulta_carteras.filter_by_user");
+
+  const { getAsesoresFiltro } = useConsultaCarteraService();
+  const [asesores, setAsesores] = useState<CarteraFiltroAsesor[]>([]);
+  const [cargandoAsesores, setCargandoAsesores] = useState(false);
+
+  useEffect(() => {
+    if (!canFilterByUser) return;
+    let isMounted = true;
+    setCargandoAsesores(true);
+    getAsesoresFiltro()
+      .then((res) => {
+        if (isMounted && res?.data) {
+          setAsesores(res.data);
+        }
+      })
+      .catch((err) => {
+        console.error("Error al cargar asesores para filtro:", err);
+      })
+      .finally(() => {
+        if (isMounted) setCargandoAsesores(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [canFilterByUser]);
+
   // ------------------------------------------------------
   // VALOR INICIAL DESDE LOCAL STORAGE
   // ------------------------------------------------------
@@ -108,7 +150,12 @@ export const FiltrosCarteras: React.FC<FiltrosCarterasProps> = ({
     }
 
     const numericValue = Number(trimmedValue);
-    update(key, Number.isFinite(numericValue) && numericValue >= 0 ? Math.trunc(numericValue) : null);
+    update(
+      key,
+      Number.isFinite(numericValue) && numericValue >= 0
+        ? Math.trunc(numericValue)
+        : null
+    );
   };
 
   return (
@@ -135,11 +182,17 @@ export const FiltrosCarteras: React.FC<FiltrosCarterasProps> = ({
                   type="switch"
                   id="switch-solo-asignadas"
                   checked={filtros.checkSoloAsignadas}
-                  onChange={(e) =>
-                    update("checkSoloAsignadas", e.target.checked)
-                  }
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setFiltros({
+                      ...filtros,
+                      checkSoloAsignadas: checked,
+                      ...(!checked ? { asesorAsignadoId: null } : {}),
+                    });
+                  }}
                 />
               </div>
+
               <div className="col-12 col-md-4 mb-2 mt-2">
                 <Form.Label>Mostrar ya gestionados</Form.Label>
                 <Form.Check
@@ -153,6 +206,34 @@ export const FiltrosCarteras: React.FC<FiltrosCarterasProps> = ({
               </div>
             </div>
 
+            {filtros.checkSoloAsignadas && canFilterByUser && (
+              <Form.Group className="mb-2">
+                <Form.Label>Asesor asignado</Form.Label>
+                <Form.Control
+                  as="select"
+                  value={filtros.asesorAsignadoId ?? ""}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    update("asesorAsignadoId", val ? Number(val) : null);
+                  }}
+                  disabled={cargandoAsesores}
+                >
+                  <option value="">Mi cartera (Asignadas a mí)</option>
+                  {asesores.map((asesor) => (
+                    <option key={asesor.userId} value={asesor.userId}>
+                      {asesor.fullName}
+                      {asesor.roleName ? ` (${asesor.roleName})` : ""}
+                    </option>
+                  ))}
+                </Form.Control>
+                {cargandoAsesores && (
+                  <small className="text-muted d-block mt-1">
+                    Cargando asesores...
+                  </small>
+                )}
+              </Form.Group>
+            )}
+
             <BuscadorCuentas
               opcion="CU"
               op="CLIENTE"
@@ -160,7 +241,6 @@ export const FiltrosCarteras: React.FC<FiltrosCarterasProps> = ({
               placeholder="Buscar cuenta..."
               label="Cuenta"
               onChange={(v) => handleChangeFiltroCuenta(v)}
-              // onSelect={(v) => handleChangeFiltroCuenta(v)}
             />
 
             <Row>
@@ -187,7 +267,7 @@ export const FiltrosCarteras: React.FC<FiltrosCarterasProps> = ({
                   options={SIN_GESTION_DIAS_OPTIONS}
                   selectedValue={filtros.sinGestionDias}
                   onChange={handleChangeSinGestionDias}
-                  label="D�as sin gesti�n"
+                  label="Días sin gestión"
                 />
               </Col>
 
@@ -208,7 +288,9 @@ export const FiltrosCarteras: React.FC<FiltrosCarterasProps> = ({
                     step={1}
                     value={filtros.minValorCuota ?? ""}
                     placeholder="Sin minimo"
-                    onChange={(e) => handleChangeValorCuota("minValorCuota", e.target.value)}
+                    onChange={(e) =>
+                      handleChangeValorCuota("minValorCuota", e.target.value)
+                    }
                   />
                 </Form.Group>
               </Col>
@@ -222,29 +304,14 @@ export const FiltrosCarteras: React.FC<FiltrosCarterasProps> = ({
                     step={1}
                     value={filtros.maxValorCuota ?? ""}
                     placeholder="Sin maximo"
-                    onChange={(e) => handleChangeValorCuota("maxValorCuota", e.target.value)}
+                    onChange={(e) =>
+                      handleChangeValorCuota("maxValorCuota", e.target.value)
+                    }
                   />
                 </Form.Group>
               </Col>
             </Row>
 
-            <Row>
-              {/* <div className="col">
-                <SingleSelect
-                  options={[
-                    { label: "Todos", value: "todos" },
-                    { label: "Por vencer", value: "PV" },
-                    { label: "30", value: "30" },
-                    { label: "60", value: "60" },
-                    { label: "90", value: "90" },
-                    { label: "+90", value: "+90" },
-                  ]}
-                  selectedValue={filtros.filtroEdadMora}
-                  onChange={(v) => update("filtroEdadMora", v)}
-                  label="Filtrar por edad"
-                />
-              </div> */}
-            </Row>
             <Form.Label>Edad de mora</Form.Label>
             <MultiSelectSimple
               options={EDAD_MORA_OPTIONS}
@@ -256,31 +323,26 @@ export const FiltrosCarteras: React.FC<FiltrosCarterasProps> = ({
               }}
             />
 
-            <div className="row">
-              <div className="col"></div>
-              <div className="col">
-                <button
-                  className="btn btn-primary"
-                  type="button"
-                  style={{ margin: "auto" }}
-                  onClick={aplicarFiltros}
-                >
-                  Aplicar Filtros
-                </button>
-                <button
-                  className="btn btn-secondary"
-                  type="button"
-                  style={{ marginLeft: "10px" }}
-                  onClick={limpiarFiltros}
-                >
-                  Limpiar Filtros
-                </button>
-              </div>
+            <div className="d-flex align-items-center justify-content-end mt-3">
+              <button
+                className="btn btn-secondary mr-2"
+                type="button"
+                onClick={limpiarFiltros}
+              >
+                Limpiar Filtros
+              </button>
+              <button
+                className="btn btn-primary"
+                type="button"
+                onClick={aplicarFiltros}
+              >
+                Aplicar Filtros
+              </button>
             </div>
             {hasChanges && (
-              <span className="text-danger" style={{ marginLeft: 8 }}>
+              <div className="text-danger small mt-2 text-right">
                 Tienes cambios sin guardar
-              </span>
+              </div>
             )}
           </Form>
         </Card.Body>

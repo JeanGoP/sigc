@@ -14,5 +14,12 @@ export function RendimientoAsesoresTable({
     return null;
   }
 
-  return <DynamicTable columns={columns} rows={rows} showFooter={true} />;
+  return (
+    <DynamicTable
+      columns={columns}
+      rows={rows}
+      showFooter={true}
+      maxHeight="calc(100vh - 270px)"
+    />
+  );
 }

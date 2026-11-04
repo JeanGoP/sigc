@@ -24,6 +24,7 @@ import {
   aplicarReseteosPorRequerimientosEvento,
   estaHoraOcupada,
 } from "@app/utils/eventosCompartidos";
+import { validarDiaParaEvento } from "@app/utils/colombianHolidays";
 import ModalSeguimientoDetalle from "./components/VerMasComponent";
 import { NuevoSeguimientoModal } from "./components/NuevoSeguimientoModal";
 import { SeguimientosTimelineList } from "./components/SeguimientosTimelineList";
@@ -308,9 +309,17 @@ export const TimelineSeguimientos: React.FC<TimelineSeguimientosProps> = ({
     const tipoObj = tiposEvento.find((t) => t.nombre === formEvento.tipo);
     const idUsuario = contextoEvento?.idUsuario;
 
-    if (!tipoObj?.requiereHora || !fecha || !idUsuario) {
+    if (
+      !tipoObj?.requiereHora ||
+      !fecha ||
+      !idUsuario ||
+      validarDiaParaEvento(fecha).noHabil
+    ) {
       setHorasDisponibles([]);
       horasFechaRef.current = "";
+      if (fecha && validarDiaParaEvento(fecha).noHabil) {
+        setFormEvento((prev) => (prev.hora ? { ...prev, hora: null } : prev));
+      }
       return;
     }
 

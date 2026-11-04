@@ -1,3 +1,7 @@
+import {
+  validarDiaParaEvento,
+  getMensajeDiaInvalidoEvento,
+} from "@app/utils/colombianHolidays";
 import { isDuplicateEvento } from "./helpers";
 import type {
   Evento,
@@ -83,6 +87,27 @@ export function buildDuplicateEventoValidationResult(
     ok: false,
     message: DUPLICATE_EVENTO_MESSAGE,
     toastMessage: DUPLICATE_EVENTO_MESSAGE,
+    toastType: "warn",
+  };
+}
+
+export function buildFechaNoHabilEventoValidationResult(
+  fecha?: string | null
+): EventoValidationResult | null {
+  if (!fecha) {
+    return null;
+  }
+  const validacion = validarDiaParaEvento(fecha);
+  if (!validacion.noHabil) {
+    return null;
+  }
+  const mensaje =
+    getMensajeDiaInvalidoEvento(fecha) ||
+    "No se pueden programar eventos en domingos ni festivos nacionales.";
+  return {
+    ok: false,
+    message: mensaje,
+    toastMessage: mensaje,
     toastType: "warn",
   };
 }

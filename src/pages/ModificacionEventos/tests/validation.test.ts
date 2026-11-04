@@ -214,4 +214,32 @@ describe("modificacion eventos validation", () => {
       })
     ).toEqual({ ok: false, message: "Datos invalidos." });
   });
+
+  it("rejects event creation or update on Sundays and national holidays", () => {
+    // 2026-05-01 es Día del Trabajo (Festivo Nacional)
+    const festivoResult = validateEventoForm({
+      form: { ...baseForm, fechaEvento: "2026-05-01" },
+      requirements: {
+        requiereFecha: true,
+        requiereHora: true,
+        requiereMonto: true,
+      },
+      mode: "add",
+      now,
+    });
+    expect(festivoResult).toContain("Día del Trabajo");
+
+    // 2026-05-03 es Domingo
+    const domingoResult = validateEventoForm({
+      form: { ...baseForm, fechaEvento: "2026-05-03" },
+      requirements: {
+        requiereFecha: true,
+        requiereHora: true,
+        requiereMonto: true,
+      },
+      mode: "edit",
+      now,
+    });
+    expect(domingoResult).toContain("Domingo");
+  });
 });

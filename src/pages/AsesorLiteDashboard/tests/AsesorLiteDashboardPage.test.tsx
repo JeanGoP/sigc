@@ -272,6 +272,10 @@ const mockData = {
 const mockHookState = {
   currentUser: { id: 1, fullName: "Asesor Demo", username: "demo", role: "Asesor" },
   currentUserId: "1",
+  canViewOtherUsers: false,
+  usuariosDisponibles: [] as Array<{ userId: number; username: string; fullName: string; email: string; roleName: string }>,
+  loadingUsuarios: false,
+  cargarUsuarios: jest.fn(),
   data: mockData,
   consultar: mockConsultar,
   lastUpdatedAtMs: mockedNow.getTime(),
@@ -289,6 +293,10 @@ describe("AsesorLiteDashboardPage", () => {
     Object.assign(mockHookState, {
       currentUser: { id: 1, fullName: "Asesor Demo", username: "demo", role: "Asesor" },
       currentUserId: "1",
+      canViewOtherUsers: false,
+      usuariosDisponibles: [],
+      loadingUsuarios: false,
+      cargarUsuarios: jest.fn(),
       data: mockData,
       consultar: mockConsultar,
       lastUpdatedAtMs: mockedNow.getTime(),
@@ -396,15 +404,15 @@ describe("AsesorLiteDashboardPage", () => {
     expect(diarioCard).not.toBeNull();
     expect(monthCard).not.toBeNull();
 
-    expect(within(metaCard!).getByText(fmtCOP(expectedMeta))).toBeInTheDocument();
-    expect(within(recaudadoCard!).getByText(fmtCOP(overdueRecaudado))).toBeInTheDocument();
-    expect(within(faltanteCard!).getByText(fmtCOP(overdueFaltante))).toBeInTheDocument();
-    expect(within(diarioCard!).getByText(fmtCOP(overdueFaltante / remainingDays))).toBeInTheDocument();
-    expect(within(monthCard!).getAllByText(coveredPct).length).toBeGreaterThan(0);
-    expect(within(monthCard!).getByText(`${fmtCOP(coveredAmount)} · ${coveredPct}`)).toBeInTheDocument();
+    expect(within(metaCard as HTMLElement).getByText(fmtCOP(expectedMeta))).toBeInTheDocument();
+    expect(within(recaudadoCard as HTMLElement).getByText(fmtCOP(overdueRecaudado))).toBeInTheDocument();
+    expect(within(faltanteCard as HTMLElement).getByText(fmtCOP(overdueFaltante))).toBeInTheDocument();
+    expect(within(diarioCard as HTMLElement).getByText(fmtCOP(overdueFaltante / remainingDays))).toBeInTheDocument();
+    expect(within(monthCard as HTMLElement).getAllByText(coveredPct).length).toBeGreaterThan(0);
+    expect(within(monthCard as HTMLElement).getByText(`${fmtCOP(coveredAmount)} · ${coveredPct}`)).toBeInTheDocument();
     const expectedPctNum = getExpectedWorkingProgressPct(new Date());
     const expectedExpectedStr = `${fmtCOP(expectedMeta * expectedPctNum)} (${expectedWorkingProgress})`;
-    expect(within(monthCard!).getByText(expectedExpectedStr)).toBeInTheDocument();
+    expect(within(monthCard as HTMLElement).getByText(expectedExpectedStr)).toBeInTheDocument();
   });
 
   it("removes the monthly breakdown when the filter is global", () => {
@@ -438,7 +446,7 @@ describe("AsesorLiteDashboardPage", () => {
     expect(screen.getByText("10:00")).toBeInTheDocument();
   });
 
-  it("preserves negative falta values in the age table, total row and top kpi", () => {
+  it("clamps falta values to zero in the age table, total row and top kpi when balance decreased", () => {
     render(
       <MemoryRouter>
         <AsesorLiteDashboardPage />
@@ -457,20 +465,25 @@ describe("AsesorLiteDashboardPage", () => {
     expect(totalRow).not.toBeNull();
     expect(faltanteCard).not.toBeNull();
 
-    expect(within(thirtyRow!).getByText(fmtCOP(-50, true))).toBeInTheDocument();
-    expect(within(totalRow!).getByText(fmtCOP(-50, true))).toBeInTheDocument();
-    expect(within(faltanteCard!).getByText(fmtCOP(-50, true))).toBeInTheDocument();
-    expect(within(thirtyRow!).getByText(fmtCOP(-50, true))).toHaveClass("asesor-mockup-text--green");
-    expect(within(totalRow!).getByText(fmtCOP(-50, true))).toHaveClass("asesor-mockup-text--green");
+    expect(within(thirtyRow as HTMLElement).getByText(fmtCOP(0))).toBeInTheDocument();
+    expect(within(totalRow as HTMLElement).getByText(fmtCOP(0))).toBeInTheDocument();
+    expect(within(faltanteCard as HTMLElement).getByText(fmtCOP(0))).toBeInTheDocument();
+    expect(within(thirtyRow as HTMLElement).getByText(fmtCOP(0))).toHaveClass("asesor-mockup-text--green");
+    expect(within(totalRow as HTMLElement).getByText(fmtCOP(0))).toHaveClass("asesor-mockup-text--green");
   });
 
-  it("shows the numeric user id field only for administrators and uses it in the query", () => {
+  it("shows the active advisors select only when user can view other users and uses it in the query", () => {
     mockHookState.currentUser = {
       id: 1,
       fullName: "Administrador Demo",
       username: "admin",
       role: "Administrador",
     };
+    mockHookState.canViewOtherUsers = true;
+    mockHookState.usuariosDisponibles = [
+      { userId: 1, username: "admin", fullName: "Administrador Demo", email: "admin@test.com", roleName: "Administrador" },
+      { userId: 25, username: "carlos", fullName: "Carlos Asesor", email: "carlos@test.com", roleName: "Asesor" },
+    ];
 
     render(
       <MemoryRouter>
@@ -478,14 +491,14 @@ describe("AsesorLiteDashboardPage", () => {
       </MemoryRouter>,
     );
 
-    const input = screen.getByLabelText(/indicar usuario para consultar dashboard/i);
-    expect(input).toBeInTheDocument();
+    const select = screen.getByLabelText(/seleccionar asesor para consultar dashboard/i);
+    expect(select).toBeInTheDocument();
 
-    fireEvent.change(input, { target: { value: "25" } });
+    fireEvent.change(select, { target: { value: "25" } });
     fireEvent.click(screen.getByRole("button", { name: "Consultar" }));
     fireEvent.click(screen.getByRole("button", { name: "Forzar" }));
 
-    expect(mockConsultar).toHaveBeenNthCalledWith(1, { force: false, userId: 25 });
-    expect(mockConsultar).toHaveBeenNthCalledWith(2, { force: true, userId: 25 });
+    expect(mockConsultar).toHaveBeenCalledWith({ force: false, userId: 25 });
+    expect(mockConsultar).toHaveBeenCalledWith({ force: true, userId: 25 });
   });
 });

@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
 import type { View } from "react-big-calendar";
+import { toast } from "react-toastify";
 import { useAppSelector } from "@app/store/store";
 import { useEventosService, type Evento } from "@app/services/Calendario/CalendarioService";
+import {
+  validarDiaParaEvento,
+  getMensajeDiaInvalidoEvento,
+} from "@app/utils/colombianHolidays";
 import {
   buildCalendarioEventosParams,
   buildInitialCalendarRange,
@@ -65,6 +70,14 @@ export function useCalendarioPage() {
 
   const handleSeleccionDia = useCallback(
     (slotInfo: { start: Date }) => {
+      const validacion = validarDiaParaEvento(slotInfo.start);
+      if (validacion.noHabil) {
+        const mensaje = getMensajeDiaInvalidoEvento(slotInfo.start);
+        if (mensaje) {
+          toast.warn(mensaje);
+        }
+        return;
+      }
       setEventosDelDia(getEventosDelDia(eventos, slotInfo.start));
       setFechaSeleccionada(slotInfo.start);
       setMostrarModalDia(true);

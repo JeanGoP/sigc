@@ -54,8 +54,12 @@ export function useApi<T>(
           // Manejo centralizado de 401 No Autorizado
           if (axiosErr.response?.status === 401) {
             if (logoutOn401) {
+              const msg =
+                axiosErr.response?.data?.message ||
+                "Su jornada laboral ha finalizado o su sesión ha expirado.";
               try {
                 localStorage.removeItem("userAccess");
+                sessionStorage.setItem("shift_logout_reason", msg);
               } catch {/* ignore */}
               // recargar para forzar flujo a /login y limpiar estados en memoria
               window.location.reload();

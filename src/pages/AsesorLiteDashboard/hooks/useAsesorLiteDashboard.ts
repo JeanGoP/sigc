@@ -1,8 +1,17 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { useAppSelector } from "@app/store/store";
-import { useApi } from "@app/hooks/useApi";
-import type { ApiResponse } from "@app/models/apiResponse";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useAppSelector } from "../../../store/store";
+import { useApi } from "../../../hooks/useApi";
+import type { ApiResponse } from "../../../models/apiResponse";
+import { can } from "../../../utils/security";
 import { computeAsesorLiteDashboardKpis, computeEficienciaGestiones, type AnyRow } from "../domain/kpis";
+
+export interface DashboardAsesorUsuario {
+  userId: number;
+  username: string;
+  fullName: string;
+  email: string;
+  roleName: string;
+}
 
 export interface AsesorLiteDashboardResponse {
   cuentasTramos: AnyRow[];
@@ -47,15 +56,63 @@ function normalizeUserId(value: number | string | null | undefined): number | nu
 
 export function useAsesorLiteDashboard() {
   const currentUser = useAppSelector((state) => state.auth.currentUser);
+  const permissions = useAppSelector((state) => state.security.permissions);
   const currentUserId = useMemo(() => String(currentUser?.id ?? "").trim(), [currentUser?.id]);
+  const userRole = useMemo(() => String(currentUser?.role ?? "").trim().toLowerCase(), [currentUser?.role]);
+
+  const canViewOtherUsers = useMemo(() => {
+    if (userRole === "administrador" || userRole === "admin") {
+      return true;
+    }
+    return can(permissions, "dashboard.asesor.ver_otros");
+  }, [permissions, userRole]);
 
   const api = useApi<AsesorLiteDashboardResponse>("/api/v1", {
     timeout: 60000,
     retries: 0,
   });
 
+  const apiUsuarios = useApi<DashboardAsesorUsuario[]>("/api/v1", {
+    timeout: 15000,
+    retries: 1,
+  });
+
+  const apiRequestRef = useRef(api.request);
+  apiRequestRef.current = api.request;
+
+  const apiUsuariosRequestRef = useRef(apiUsuarios.request);
+  apiUsuariosRequestRef.current = apiUsuarios.request;
+
+  const hasLoadedUsuariosRef = useRef(false);
+  const isLoadingUsuariosRef = useRef(false);
+  const isConsultingRef = useRef(false);
+
+  const [usuariosDisponibles, setUsuariosDisponibles] = useState<DashboardAsesorUsuario[]>([]);
   const [data, setData] = useState<AsesorLiteDashboardResponse | null>(null);
   const [lastUpdatedAtMs, setLastUpdatedAtMs] = useState<number | null>(null);
+
+  const cargarUsuarios = useCallback(async () => {
+    if (!canViewOtherUsers || isLoadingUsuariosRef.current) return;
+    isLoadingUsuariosRef.current = true;
+    try {
+      const response = await apiUsuariosRequestRef.current({
+        method: "GET",
+        url: "/dashboard/asesor/usuarios",
+      });
+      if (response?.success && Array.isArray(response.data)) {
+        setUsuariosDisponibles(response.data);
+      }
+    } finally {
+      isLoadingUsuariosRef.current = false;
+    }
+  }, [canViewOtherUsers]);
+
+  useEffect(() => {
+    if (canViewOtherUsers && !hasLoadedUsuariosRef.current) {
+      hasLoadedUsuariosRef.current = true;
+      void cargarUsuarios();
+    }
+  }, [canViewOtherUsers, cargarUsuarios]);
 
   useEffect(() => {
     return () => pruneDashboardCache(Date.now());
@@ -63,7 +120,7 @@ export function useAsesorLiteDashboard() {
 
   const consultar = useCallback(async (options?: ConsultarOptions) => {
     const userId = normalizeUserId(options?.userId) ?? normalizeUserId(currentUserId);
-    if (!userId) {
+    if (!userId || isConsultingRef.current) {
       return;
     }
 
@@ -77,20 +134,25 @@ export function useAsesorLiteDashboard() {
       return;
     }
 
-    const response: ApiResponse<AsesorLiteDashboardResponse> | null = await api.request({
-      method: "POST",
-      url: "/dashboard/asesor",
-      data: { userId },
-    });
+    isConsultingRef.current = true;
+    try {
+      const response: ApiResponse<AsesorLiteDashboardResponse> | null = await apiRequestRef.current({
+        method: "POST",
+        url: "/dashboard/asesor",
+        data: { userId },
+      });
 
-    if (!response?.success || !response.data) {
-      return;
+      if (!response?.success || !response.data) {
+        return;
+      }
+
+      dashboardCache.set(userId, { data: response.data, fetchedAtMs: nowMs });
+      setData(response.data);
+      setLastUpdatedAtMs(nowMs);
+    } finally {
+      isConsultingRef.current = false;
     }
-
-    dashboardCache.set(userId, { data: response.data, fetchedAtMs: nowMs });
-    setData(response.data);
-    setLastUpdatedAtMs(nowMs);
-  }, [api, currentUserId]);
+  }, [currentUserId]);
 
   const kpis = useMemo(
     () =>
@@ -117,6 +179,10 @@ export function useAsesorLiteDashboard() {
   return {
     currentUser,
     currentUserId,
+    canViewOtherUsers,
+    usuariosDisponibles,
+    loadingUsuarios: apiUsuarios.loading,
+    cargarUsuarios,
     data,
     kpis,
     eficiencia,

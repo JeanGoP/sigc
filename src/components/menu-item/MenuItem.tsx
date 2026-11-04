@@ -4,6 +4,14 @@ import { NavLink, useNavigate, useLocation, Location } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { IMenuItem } from '@app/modules/main/menu-sidebar/MenuSidebar';
 
+const normalizeIconClass = (icon?: string): string => {
+  const trimmed = String(icon ?? '').trim();
+  if (!trimmed) {
+    return 'far fa-circle nav-icon';
+  }
+  return trimmed.includes('nav-icon') ? trimmed : `${trimmed} nav-icon`;
+};
+
 const MenuItem = ({ menuItem }: { menuItem: IMenuItem }) => {
   const [t] = useTranslation();
   const [isMenuExtended, setIsMenuExtended] = useState(false);
@@ -68,7 +76,7 @@ const MenuItem = ({ menuItem }: { menuItem: IMenuItem }) => {
         onClick={handleMainMenuAction}
         style={{ cursor: 'pointer' }}
       >
-        <i className={`${menuItem.icon}`} />
+        <i className={normalizeIconClass(menuItem.icon)} />
         <p>{t(menuItem.name)}</p>
         {isExpandable ? <i className="right fas fa-angle-left" /> : null}
       </a>
@@ -80,7 +88,7 @@ const MenuItem = ({ menuItem }: { menuItem: IMenuItem }) => {
           <ul key={item.name} className="nav nav-treeview">
             <li className="nav-item">
               <NavLink className="nav-link" to={`${item.path}`}>
-                <i className={`${item.icon}`} />
+                <i className={normalizeIconClass(item.icon)} />
                 <p>{t(item.name)}</p>
               </NavLink>
             </li>

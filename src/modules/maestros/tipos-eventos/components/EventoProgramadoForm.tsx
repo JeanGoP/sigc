@@ -1,5 +1,6 @@
 import { Button, Form } from "react-bootstrap";
 import { SingleSelect } from "@app/components/singleSelect/singleSelect";
+import { validarDiaParaEvento } from "@app/utils/colombianHolidays";
 import type { HoraDispItem } from "@app/services/ConsultaCartera/HorasDispDiaService";
 import type { Evento, TipoEventoOption } from "../domain/types";
 import { HoraSelectorEvento } from "./HoraSelectorEvento";
@@ -36,7 +37,9 @@ export function EventoProgramadoForm({
   const tipoSeleccionado = tiposEvento.find(
     (tipo) => tipo.nombre === formEvento.tipo
   );
-  const isActionDisabled = loadingEvento || isValidatingEvent;
+  const diaValidacion = validarDiaParaEvento(formEvento.fecha || "");
+  const isFechaInvalida = Boolean(tipoSeleccionado?.requiereFecha) && diaValidacion.noHabil;
+  const isActionDisabled = loadingEvento || isValidatingEvent || isFechaInvalida;
 
   return (
     <div
@@ -67,13 +70,21 @@ export function EventoProgramadoForm({
           <Form.Label>Fecha</Form.Label>
           <input
             type="date"
-            className="form-control"
+            className={`form-control ${isFechaInvalida ? "is-invalid border-danger" : ""}`}
             style={{ width: 140, borderRadius: 6, margin: 0 }}
             value={formEvento.fecha || ""}
             onChange={(event) =>
               onFormCampoChange("fecha", event.target.value)
             }
           />
+          {isFechaInvalida && (
+            <div
+              className="text-danger mt-1 font-weight-bold"
+              style={{ fontSize: "0.75rem", maxWidth: 190, lineHeight: 1.2 }}
+            >
+              ⚠️ {diaValidacion.motivo}
+            </div>
+          )}
         </Form.Group>
       )}
 

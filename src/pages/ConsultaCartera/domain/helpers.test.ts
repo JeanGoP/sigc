@@ -128,6 +128,46 @@ describe("consulta cartera helpers", () => {
     });
   });
 
+  it("uses selected advisor id when checkSoloAsignadas is true and asesorAsignadoId is provided", () => {
+    const params = buildFacturasListParams({
+      fechaConsultaFacturas: "2026-11-04",
+      filtros: {
+        checkIncluirSaldosCero: false,
+        checkSoloAsignadas: true,
+        checkSoloEventosPendientes: false,
+        asesorAsignadoId: 15,
+        sinGestionDias: 0,
+      },
+      currentUserId: 42,
+      tablaPage: 0,
+      tablaRowsPerPage: 50,
+      tablaSearch: "",
+    });
+
+    expect(params.forUser).toBe(true);
+    expect(params.user).toBe(15);
+  });
+
+  it("falls back to currentUserId when checkSoloAsignadas is true but asesorAsignadoId is null or empty", () => {
+    const params = buildFacturasListParams({
+      fechaConsultaFacturas: "2026-11-04",
+      filtros: {
+        checkIncluirSaldosCero: false,
+        checkSoloAsignadas: true,
+        checkSoloEventosPendientes: false,
+        asesorAsignadoId: null,
+        sinGestionDias: 0,
+      },
+      currentUserId: 42,
+      tablaPage: 0,
+      tablaRowsPerPage: 50,
+      tablaSearch: "",
+    });
+
+    expect(params.forUser).toBe(true);
+    expect(params.user).toBe(42);
+  });
+
   it("parses query params and resolves the search value with the current priority", () => {
     const params = parseConsultaCarteraSearchParams(
       "?cuenta=CU-1&factura=FAC-9&identificacionCliente=CLI-7"

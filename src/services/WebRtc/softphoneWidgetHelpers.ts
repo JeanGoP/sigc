@@ -120,9 +120,15 @@ export function buildEndedCallSummary(
         ? Math.floor((endedMs - startedMs) / 1000)
         : 0;
 
+  const rawFrom = String(call.from ?? (call as any)?.parameters?.From ?? "").trim();
+  const formattedFrom =
+    rawFrom && /^\d{3,4}$/.test(rawFrom)
+      ? `Ext. ${rawFrom}`
+      : rawFrom || (call.direction?.includes("outbound") ? "Ext. 200" : "-");
+
   return {
     callSid: String(call.callSid ?? "").trim(),
-    from: String(call.from ?? "").trim() || "-",
+    from: formattedFrom,
     to: String(call.to ?? "").trim() || "-",
     status: getCallStatusLabel(call.status),
     durationText: formatCallDuration(durationSec),

@@ -319,7 +319,8 @@
 
 .asesor-mockup-toggle button:focus-visible,
 .asesor-mockup-field select:focus-visible,
-.asesor-mockup-admin-field input:focus-visible {
+.asesor-mockup-admin-field input:focus-visible,
+.asesor-mockup-admin-field select:focus-visible {
   outline: 2px solid rgba(30, 95, 191, 0.22);
   outline-offset: 1px;
 }
@@ -333,8 +334,10 @@
   font-weight: 600;
 }
 
-.asesor-mockup-admin-field input {
-  width: 118px;
+.asesor-mockup-admin-field input,
+.asesor-mockup-admin-field select {
+  min-width: 170px;
+  max-width: 250px;
   height: 34px;
   border: 1px solid rgba(255, 255, 255, 0.3);
   border-radius: 9px;
@@ -343,6 +346,7 @@
   font-size: 13px;
   font-weight: 600;
   padding: 0 10px;
+  cursor: pointer;
 }
 
 .asesor-mockup-field {
@@ -1071,8 +1075,10 @@
     align-items: flex-start;
   }
 
-  .asesor-mockup-admin-field input {
+  .asesor-mockup-admin-field input,
+  .asesor-mockup-admin-field select {
     width: 100%;
+    max-width: 100%;
   }
 
   .asesor-mockup-field select {

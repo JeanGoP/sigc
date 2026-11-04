@@ -89,6 +89,7 @@ describe("consulta cartera filter storage", () => {
       cuenta: "",
       minValorCuota: null,
       maxValorCuota: null,
+      asesorAsignadoId: null,
     });
     expect(storage.setItem).toHaveBeenCalledTimes(1);
     expect(hasConsultaCarteraStoredFilters(storage)).toBe(true);

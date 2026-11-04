@@ -3,6 +3,7 @@ import { Alert, Badge, Button, Card, Col, Dropdown, Form, OverlayTrigger, Row, T
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faPhone, faTimes, faRedo } from "@fortawesome/free-solid-svg-icons";
 import { Call, Device } from "@twilio/voice-sdk";
+import { AsteriskSipDevice, type AsteriskIncomingCall } from "@app/services/WebRtc/Asterisk/AsteriskSipDevice";
 import {
   AdvisorInternalState,
   WebRtcCallDto,
@@ -124,6 +125,7 @@ export default function WebRtcDialer({
     loading,
     getVoiceToken,
     createCall,
+    getCallStatus,
     hangupCall,
     connectPresence,
     heartbeatPresence,
@@ -143,6 +145,8 @@ export default function WebRtcDialer({
   );
   const [agentId, setAgentId] = useState<string>("");
   const [tokenExpiresAtUtc, setTokenExpiresAtUtc] = useState<string>("");
+  const [telephonyProvider, setTelephonyProvider] = useState<string>("Twilio");
+  const [sipExtension, setSipExtension] = useState<string>("");
   const [activeCall, setActiveCall] = useState<WebRtcCallDto | null>(null);
   const [lastDialedNumber, setLastDialedNumber] = useState<string>("");
   const [lastError, setLastError] = useState<WebRtcUiError | null>(null);
@@ -158,9 +162,9 @@ export default function WebRtcDialer({
   const softphoneStatusRef = useRef<"disabled" | "initializing" | "registered" | "error">(
     SoftphoneEnabled ? "initializing" : "disabled"
   );
-  const twilioDeviceRef = useRef<Device | null>(null);
-  const twilioCallRef = useRef<Call | null>(null);
-  const incomingCallRef = useRef<Call | null>(null);
+  const twilioDeviceRef = useRef<any>(null);
+  const twilioCallRef = useRef<any>(null);
+  const incomingCallRef = useRef<any>(null);
   const callSystemTenantIdRef = useRef<string | null>(null);
   const latestVoiceTokenRef = useRef<string>("");
   const presenceSessionRef = useRef<string>(`sigc-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`);
@@ -455,6 +459,231 @@ export default function WebRtcDialer({
             softphoneEnabled: false,
           });
           return true;
+        }
+
+        const isAsterisk = response.data.provider === "Asterisk";
+        if (isAsterisk) {
+          setTelephonyProvider("Asterisk");
+          const ext = response.data.sipExtension || "200";
+          setSipExtension(ext);
+          setFromNumber((prev) => prev || `Ext. ${ext}`);
+
+          const existingDevice = twilioDeviceRef.current;
+          if (existingDevice && existingDevice instanceof AsteriskSipDevice && existingDevice.isRegistered) {
+            setSoftphoneStatus("registered");
+            setConnectionStatus("connected");
+            setLastError(null);
+            await syncPresenceConnect(
+              mapAdvisorInternalStateToCommsAvailability(advisorInternalState) === "available"
+            );
+            await syncAdvisorInternalState(advisorInternalState, "asterisk_ready", null, "asterisk_connect");
+            return true;
+          }
+
+          setSoftphoneStatus("initializing");
+
+          const sipDevice = new AsteriskSipDevice({
+            wssUrl: response.data.wssUrl || "wss://mch.lab.nethexa.com/ws",
+            domain: response.data.realm || "mch.lab.nethexa.com",
+            extension: ext,
+            password: response.data.sipPassword || "",
+            displayName: response.data.agentId,
+          });
+          twilioDeviceRef.current = sipDevice;
+
+          sipDevice.on("registered", () => {
+            setSoftphoneStatus("registered");
+            setConnectionStatus("connected");
+            setLastError(null);
+            logWebRtcInfo("softphone_registered", {
+              context: contextSnapshot,
+              provider: "Asterisk",
+              extension: ext,
+            });
+          });
+
+          sipDevice.on("unregistered", () => {
+            if (SoftphoneEnabled) {
+              setSoftphoneStatus("initializing");
+            }
+          });
+
+          sipDevice.on("incoming", (incomingAsteriskCall: AsteriskIncomingCall) => {
+            if (incomingCallRef.current) {
+              try {
+                incomingAsteriskCall.reject();
+              } catch {}
+              return;
+            }
+
+            if (isCompanionTab) {
+              try {
+                incomingAsteriskCall.reject();
+              } catch {}
+              return;
+            }
+
+            incomingCallRef.current = incomingAsteriskCall;
+            const provisionalCall: WebRtcCallDto = {
+              id: 0,
+              callSid: incomingAsteriskCall.callSid,
+              direction: "inbound-client",
+              from: incomingAsteriskCall.from,
+              to: incomingAsteriskCall.to,
+              status: "ringing",
+              startedAt: new Date().toISOString(),
+              endedAt: null,
+              durationSec: null,
+              recordingSid: null,
+              costEstimated: null,
+              costFinal: null,
+              currency: null,
+              provider: "Asterisk",
+            };
+            setIncomingCall({
+              callSid: provisionalCall.callSid || "",
+              from: provisionalCall.from,
+              to: provisionalCall.to,
+              receivedAt: new Date().toISOString(),
+            });
+            setActiveCall(provisionalCall);
+            logWebRtcWarn("softphone_incoming_asterisk", {
+              context: contextSnapshot,
+              callSid: incomingAsteriskCall.callSid,
+              from: incomingAsteriskCall.from,
+              to: incomingAsteriskCall.to,
+            });
+
+            incomingAsteriskCall.on("accept", (acceptedSession: any) => {
+              const acceptedCallSid = acceptedSession?.parameters?.CallSid ?? provisionalCall.callSid ?? "";
+              twilioCallRef.current = acceptedSession || incomingAsteriskCall;
+              setIsMuted(false);
+              incomingCallRef.current = null;
+              setIncomingCall(null);
+              setConnectionStatus("in_call");
+              setActiveCall((previous) => ({
+                ...(previous ?? provisionalCall),
+                callSid: acceptedCallSid,
+                status: "in-progress",
+                startedAt: previous?.startedAt ?? provisionalCall.startedAt,
+              }));
+              notifyCallStarted({
+                ...(provisionalCall),
+                callSid: acceptedCallSid,
+                status: "in-progress",
+              });
+              void syncPresenceAvailability("busy", acceptedCallSid || null);
+              void syncAdvisorInternalState(
+                "ocupado_llamada",
+                "incoming_call_accepted",
+                acceptedCallSid || null,
+                "softphone_incoming_accept"
+              );
+              logWebRtcInfo("call_softphone_incoming_accept_asterisk", {
+                callSid: acceptedCallSid,
+                context: contextSnapshot,
+              });
+            });
+
+            incomingAsteriskCall.on("disconnect", (disconnectedSession: any) => {
+              twilioCallRef.current = null;
+              incomingCallRef.current = null;
+              setIncomingCall(null);
+              const endedCall: WebRtcCallDto = {
+                ...provisionalCall,
+                callSid: disconnectedSession?.parameters?.CallSid ?? provisionalCall.callSid,
+                status: "completed",
+                endedAt: new Date().toISOString(),
+              };
+              setActiveCall(endedCall);
+              setConnectionStatus("connected");
+              notifyCallEnded(endedCall);
+              void syncPresenceAvailability("available");
+              void syncAdvisorInternalState(
+                "disponible",
+                "incoming_call_disconnected",
+                endedCall.callSid || null,
+                "softphone_incoming_disconnect"
+              );
+              void refreshRecentCalls("after-softphone-incoming-disconnect");
+            });
+
+            incomingAsteriskCall.on("cancel", () => {
+              twilioCallRef.current = null;
+              incomingCallRef.current = null;
+              setIncomingCall(null);
+              const canceledCall: WebRtcCallDto = {
+                ...provisionalCall,
+                callSid: incomingAsteriskCall.parameters?.CallSid ?? provisionalCall.callSid,
+                status: "canceled",
+                endedAt: new Date().toISOString(),
+              };
+              setActiveCall(canceledCall);
+              setConnectionStatus("connected");
+              notifyCallEnded(canceledCall);
+              void syncPresenceAvailability("available");
+              void syncAdvisorInternalState(
+                "disponible",
+                "incoming_call_canceled",
+                canceledCall.callSid || null,
+                "softphone_incoming_cancel"
+              );
+            });
+
+            incomingAsteriskCall.on("reject", () => {
+              twilioCallRef.current = null;
+              incomingCallRef.current = null;
+              setIncomingCall(null);
+              const rejectedCall: WebRtcCallDto = {
+                ...provisionalCall,
+                callSid: incomingAsteriskCall.parameters?.CallSid ?? provisionalCall.callSid,
+                status: "rejected",
+                endedAt: new Date().toISOString(),
+              };
+              setActiveCall(rejectedCall);
+              setConnectionStatus("connected");
+              notifyCallEnded(rejectedCall);
+              void syncPresenceAvailability("available");
+              void syncAdvisorInternalState(
+                "disponible",
+                "incoming_call_rejected",
+                rejectedCall.callSid || null,
+                "softphone_incoming_reject"
+              );
+            });
+          });
+
+          sipDevice.on("error", (err: any) => {
+            logWebRtcError("sip_device_error", err, { context: contextSnapshot });
+          });
+
+          try {
+            await sipDevice.register();
+            setSoftphoneStatus("registered");
+            setConnectionStatus("connected");
+            setLastError(null);
+            await syncPresenceConnect(
+              mapAdvisorInternalStateToCommsAvailability(advisorInternalState) === "available"
+            );
+            await syncAdvisorInternalState(advisorInternalState, "asterisk_ready", null, "asterisk_connect");
+
+            logWebRtcSuccess("agent_connect_asterisk", {
+              context: contextSnapshot,
+              agentId: response.data.agentId,
+              extension: ext,
+              provider: "Asterisk",
+              tenantId,
+            });
+            return true;
+          } catch (sipErr: any) {
+            logWebRtcError("agent_connect_asterisk_failed", sipErr, {
+              context: contextSnapshot,
+              extension: ext,
+            });
+            setSoftphoneStatus("error");
+            setConnectionStatus("disconnected");
+            return false;
+          }
         }
 
         if (!voiceToken) {
@@ -953,6 +1182,8 @@ export default function WebRtcDialer({
     softphoneStatusRef,
     syncAdvisorInternalState,
     syncPresenceAvailability,
+    telephonyProvider,
+    sipExtension,
     twilioCallRef,
     twilioDeviceRef,
   });
@@ -976,6 +1207,88 @@ export default function WebRtcDialer({
     runtimeIsMuted: Boolean(twilioCallRef.current) ? isMuted : false,
     softphoneStatus,
   });
+
+  useEffect(() => {
+    if (
+      telephonyProvider !== "Asterisk" ||
+      !activeCall ||
+      isEndedCallStatus(activeCall.status) ||
+      isCompanionTab
+    ) {
+      return;
+    }
+
+    const callIdentifier = activeCall.callSid || activeCall.id;
+    if (!callIdentifier) {
+      return;
+    }
+
+    const interval = window.setInterval(async () => {
+      try {
+        const res = await getCallStatus(callIdentifier);
+        if (res?.success && res.data) {
+          const remoteCall = res.data;
+          const currentStatus = remoteCall.status?.toLowerCase();
+
+          if (isEndedCallStatus(currentStatus)) {
+            setActiveCall(remoteCall);
+            setConnectionStatus("connected");
+            notifyCallEnded(remoteCall);
+            void syncPresenceAvailability("available");
+            void syncAdvisorInternalState(
+              "disponible",
+              "asterisk_call_ended",
+              remoteCall.callSid || null,
+              "asterisk_remote_hangup"
+            );
+            logWebRtcSuccess("asterisk_call_remote_ended", {
+              callSid: remoteCall.callSid,
+              status: remoteCall.status,
+              durationSec: remoteCall.durationSec,
+            });
+          } else if (currentStatus === "in-progress" || currentStatus === "answered") {
+            if (connectionStatus !== "in_call") {
+              setConnectionStatus("in_call");
+              setActiveCall((prev) => ({
+                ...(prev ?? remoteCall),
+                status: "in-progress",
+              }));
+              notifyCallStatusChanged({
+                ...remoteCall,
+                status: "in-progress",
+              });
+              void syncPresenceAvailability("busy", remoteCall.callSid || null);
+              void syncAdvisorInternalState(
+                "ocupado_llamada",
+                "outbound_call_connected",
+                remoteCall.callSid || null,
+                "asterisk_call_connected"
+              );
+              logWebRtcInfo("asterisk_call_in_progress", {
+                callSid: remoteCall.callSid,
+              });
+            }
+          }
+        }
+      } catch {
+        // Silently ignore polling errors during call
+      }
+    }, 2500);
+
+    return () => window.clearInterval(interval);
+  }, [
+    activeCall?.callSid,
+    activeCall?.id,
+    activeCall?.status,
+    connectionStatus,
+    getCallStatus,
+    isCompanionTab,
+    notifyCallEnded,
+    notifyCallStatusChanged,
+    syncAdvisorInternalState,
+    syncPresenceAvailability,
+    telephonyProvider,
+  ]);
 
   const notifyOutboundCallBlocked = useCallback(() => {
     const blockedByCompanionMode = isCompanionTab;
@@ -1062,9 +1375,16 @@ export default function WebRtcDialer({
     <Card className={`shadow-sm border-0 ${className ?? ""}`}>
       <Card.Header className="bg-white border-0 pb-0">
         <div className="d-flex justify-content-between align-items-center">
-          <h6 className="mb-0" style={{ fontWeight: 700 }}>
-            Llamadas WebRTC
-          </h6>
+          <div className="d-flex align-items-center">
+            <h6 className="mb-0 mr-2" style={{ fontWeight: 700 }}>
+              Llamadas WebRTC
+            </h6>
+            {telephonyProvider === "Asterisk" && (
+              <Badge variant="info" className="ml-2">
+                Asterisk Ext. {sipExtension || "100"}
+              </Badge>
+            )}
+          </div>
           <Badge variant={getConnectionBadgeVariant(connectionStatus)}>
             {getConnectionLabel(connectionStatus)}
           </Badge>

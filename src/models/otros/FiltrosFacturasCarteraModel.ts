@@ -37,6 +37,7 @@ export class FiltrosFacturasCarteraModel {
   cuenta: string | null = "";
   minValorCuota: number | null = null;
   maxValorCuota: number | null = null;
+  asesorAsignadoId: number | null = null;
 
   constructor(init?: Partial<FiltrosFacturasCarteraModel>) {
     if (init) {
@@ -46,5 +47,6 @@ export class FiltrosFacturasCarteraModel {
     this.sinGestionDias = normalizeSinGestionDiasOption(this.sinGestionDias);
     this.minValorCuota = normalizeOptionalNonNegativeInt(this.minValorCuota);
     this.maxValorCuota = normalizeOptionalNonNegativeInt(this.maxValorCuota);
+    this.asesorAsignadoId = normalizeOptionalNonNegativeInt(this.asesorAsignadoId);
   }
 }

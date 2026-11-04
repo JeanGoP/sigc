@@ -50,9 +50,9 @@ interface UseWebRtcCallControlsOptions {
   defaultDirection: string;
   destination: string;
   fromNumber: string;
-  hangupCall: (callId: number) => CallResponse;
+  hangupCall: (callId: number | string) => CallResponse;
   incomingCall: GlobalWebRtcIncomingCallSnapshot | null;
-  incomingCallRef: MutableRefObject<Call | null>;
+  incomingCallRef: MutableRefObject<any>;
   isCompanionTab: boolean;
   isMuted: boolean;
   notifyCallEnded: (call: WebRtcCallDto | null) => void;
@@ -74,6 +74,8 @@ interface UseWebRtcCallControlsOptions {
   softphoneStatusRef: MutableRefObject<
     "disabled" | "initializing" | "registered" | "error"
   >;
+  telephonyProvider?: string;
+  sipExtension?: string;
   syncAdvisorInternalState: (
     nextState: AdvisorInternalState,
     reason: string,
@@ -84,21 +86,50 @@ interface UseWebRtcCallControlsOptions {
     availability: PresenceAvailability,
     currentCallSid?: string | null
   ) => Promise<void>;
-  twilioCallRef: MutableRefObject<Call | null>;
-  twilioDeviceRef: MutableRefObject<Device | null>;
+  twilioCallRef: MutableRefObject<any>;
+  twilioDeviceRef: MutableRefObject<any>;
+}
+
+export function formatCallFrom(from?: string | null, fallbackExtension?: string | null): string | null {
+  const cleanFrom = String(from ?? "").trim();
+  if (cleanFrom && cleanFrom !== "-") {
+    if (/^\d{3,4}$/.test(cleanFrom)) {
+      return `Ext. ${cleanFrom}`;
+    }
+    return cleanFrom;
+  }
+  const cleanExt = String(fallbackExtension ?? "").trim();
+  if (cleanExt && cleanExt !== "-") {
+    if (/^\d{3,4}$/.test(cleanExt)) {
+      return `Ext. ${cleanExt}`;
+    }
+    return cleanExt;
+  }
+  return null;
 }
 
 function buildSoftphoneCallDto(
-  call: Call,
+  call: any,
   to: string,
-  from?: string | null
+  from?: string | null,
+  fallbackExtension?: string | null
 ): WebRtcCallDto {
-  const callSid = call.parameters?.CallSid ?? call.outboundConnectionId ?? "";
+  const callSid = call?.parameters?.CallSid ?? call?.callSid ?? call?.outboundConnectionId ?? "";
+  const rawFrom =
+    from
+    || call?.parameters?.From
+    || call?.from
+    || fallbackExtension
+    || (call?.identity ? String(call.identity) : null)
+    || null;
+
+  const resolvedFrom = formatCallFrom(rawFrom, fallbackExtension);
+
   return {
     id: 0,
     callSid,
     direction: "outbound-client",
-    from: from ?? null,
+    from: resolvedFrom,
     to,
     status: "dialing",
     startedAt: new Date().toISOString(),
@@ -108,7 +139,7 @@ function buildSoftphoneCallDto(
     costEstimated: null,
     costFinal: null,
     currency: null,
-    provider: "Twilio",
+    provider: call?.provider || "Asterisk",
   };
 }
 
@@ -147,6 +178,8 @@ export function useWebRtcCallControls({
   softphoneStatusRef,
   syncAdvisorInternalState,
   syncPresenceAvailability,
+  telephonyProvider,
+  sipExtension,
   twilioCallRef,
   twilioDeviceRef,
 }: UseWebRtcCallControlsOptions) {
@@ -173,16 +206,17 @@ export function useWebRtcCallControls({
       let callSystemTenantId = callSystemTenantIdRef.current;
       let currentConnectionStatus = connectionStatusRef.current;
       let currentSoftphoneStatus = softphoneStatusRef.current;
+      const isAsterisk = telephonyProvider === "Asterisk";
       const hasReadySoftphone = Boolean(
         softphoneEnabled
         && activeDevice
-        && callSystemTenantId
         && currentSoftphoneStatus === "registered"
+        && (isAsterisk || callSystemTenantId)
       );
       let useSoftphonePath = Boolean(
         softphoneEnabled
         && activeDevice
-        && callSystemTenantId
+        && (isAsterisk || callSystemTenantId)
       );
       const shouldEnsureSoftphoneReady = softphoneEnabled && !hasReadySoftphone;
 
@@ -217,7 +251,7 @@ export function useWebRtcCallControls({
         useSoftphonePath = Boolean(
           softphoneEnabled
           && activeDevice
-          && callSystemTenantId
+          && (isAsterisk || callSystemTenantId)
         );
       }
 
@@ -300,7 +334,7 @@ export function useWebRtcCallControls({
         context: contextSnapshot,
       });
 
-      if (softphoneEnabled && !useSoftphonePath) {
+      if (softphoneEnabled && !useSoftphonePath && !isAsterisk) {
         logWebRtcWarn("call_softphone_fallback_backend", {
           source,
           hasDevice: Boolean(activeDevice),
@@ -311,13 +345,24 @@ export function useWebRtcCallControls({
       }
 
       if (useSoftphonePath && activeDevice) {
+        const deviceExtension =
+          sipExtension
+          || activeDevice?.identity
+          || (activeDevice as any)?.config?.extension
+          || (isAsterisk ? "200" : null);
+
+        const effectiveFrom =
+          normalizedFrom
+          || deviceExtension
+          || null;
+
         const twimlParams: Record<string, string> = {
           to: normalizedTo,
           tenantId: callSystemTenantId!,
         };
 
-        if (normalizedFrom) {
-          twimlParams.callerId = normalizedFrom;
+        if (effectiveFrom) {
+          twimlParams.callerId = effectiveFrom;
         }
 
         try {
@@ -328,7 +373,8 @@ export function useWebRtcCallControls({
           const provisionalCall = buildSoftphoneCallDto(
             browserCall,
             normalizedTo,
-            normalizedFrom || null
+            effectiveFrom,
+            deviceExtension
           );
           bindRuntimeCall(provisionalCall.callSid);
           setActiveCall(provisionalCall);
@@ -350,13 +396,17 @@ export function useWebRtcCallControls({
             context: contextSnapshot,
           });
 
-          browserCall.on("accept", (acceptedCall: Call) => {
+          browserCall.on("accept", (acceptedCall: any) => {
             const acceptedCallSid =
-              acceptedCall.parameters?.CallSid ?? provisionalCall.callSid ?? "";
+              acceptedCall?.parameters?.CallSid ?? acceptedCall?.callSid ?? provisionalCall.callSid ?? "";
             bindRuntimeCall(acceptedCallSid);
+            const resolvedFrom =
+              provisionalCall.from
+              || formatCallFrom(acceptedCall?.parameters?.From || acceptedCall?.from, deviceExtension);
             const acceptedCallState: WebRtcCallDto = {
               ...provisionalCall,
               callSid: acceptedCallSid,
+              from: resolvedFrom,
               status: "in-progress",
               startedAt: provisionalCall.startedAt,
             };
@@ -364,6 +414,7 @@ export function useWebRtcCallControls({
             setActiveCall((previous) => ({
               ...(previous ?? provisionalCall),
               callSid: acceptedCallSid,
+              from: resolvedFrom,
               status: "in-progress",
               startedAt: previous?.startedAt ?? provisionalCall.startedAt,
             }));
@@ -409,12 +460,19 @@ export function useWebRtcCallControls({
             });
           });
 
-          browserCall.on("disconnect", (disconnectedCall: Call) => {
+          browserCall.on("disconnect", (disconnectedCall: any) => {
             twilioCallRef.current = null;
+            const resolvedFrom =
+              provisionalCall.from
+              || formatCallFrom(
+                disconnectedCall?.parameters?.From || disconnectedCall?.from,
+                deviceExtension
+              );
             const endedCall: WebRtcCallDto = {
               ...provisionalCall,
               callSid:
-                disconnectedCall.parameters?.CallSid ?? provisionalCall.callSid,
+                disconnectedCall?.parameters?.CallSid ?? disconnectedCall?.callSid ?? provisionalCall.callSid,
+              from: resolvedFrom,
               status: "completed",
               endedAt: new Date().toISOString(),
             };
@@ -442,10 +500,17 @@ export function useWebRtcCallControls({
 
           browserCall.on("cancel", () => {
             twilioCallRef.current = null;
+            const resolvedFrom =
+              provisionalCall.from
+              || formatCallFrom(
+                browserCall?.parameters?.From || browserCall?.from,
+                deviceExtension
+              );
             const canceledCall: WebRtcCallDto = {
               ...provisionalCall,
               callSid:
                 browserCall.parameters?.CallSid ?? provisionalCall.callSid,
+              from: resolvedFrom,
               status: "canceled",
               endedAt: new Date().toISOString(),
             };
@@ -471,10 +536,17 @@ export function useWebRtcCallControls({
 
           browserCall.on("reject", () => {
             twilioCallRef.current = null;
+            const resolvedFrom =
+              provisionalCall.from
+              || formatCallFrom(
+                browserCall?.parameters?.From || browserCall?.from,
+                deviceExtension
+              );
             const rejectedCall: WebRtcCallDto = {
               ...provisionalCall,
               callSid:
                 browserCall.parameters?.CallSid ?? provisionalCall.callSid,
+              from: resolvedFrom,
               status: "rejected",
               endedAt: new Date().toISOString(),
             };
@@ -585,15 +657,16 @@ export function useWebRtcCallControls({
               ? "backend_call_in_progress"
               : "backend_call_dialing",
           call.callSid ?? null,
-          "backend_call_create"
+          isAsterisk ? "asterisk_call_create" : "backend_call_create"
         );
-        logWebRtcSuccess("call_create", {
+        logWebRtcSuccess(isAsterisk ? "call_create_asterisk" : "call_create", {
           source,
           callId: call.id,
           callSid: call.callSid,
           status: call.status,
           to: call.to ?? normalizedTo,
           from: call.from ?? normalizedFrom,
+          provider: isAsterisk ? "Asterisk" : "Twilio",
           context: contextSnapshot,
         });
 
@@ -652,6 +725,7 @@ export function useWebRtcCallControls({
       softphoneStatusRef,
       syncAdvisorInternalState,
       syncPresenceAvailability,
+      telephonyProvider,
       twilioCallRef,
       twilioDeviceRef,
     ]
@@ -672,13 +746,24 @@ export function useWebRtcCallControls({
       });
 
       try {
+        const isAsterisk = telephonyProvider === "Asterisk";
+        const activeDevice = twilioDeviceRef.current;
+        const deviceExtension =
+          sipExtension
+          || activeDevice?.identity
+          || (activeDevice as any)?.config?.extension
+          || (isAsterisk ? "200" : null);
+
         browserCall.disconnect();
         twilioCallRef.current = null;
         setConnectionStatus("connected");
 
         const endedCall: WebRtcCallDto = {
-          ...(activeCall ?? buildSoftphoneCallDto(browserCall, destination, fromNumber || null)),
+          ...(activeCall ?? buildSoftphoneCallDto(browserCall, destination, fromNumber || null, deviceExtension)),
           callSid: browserCall.parameters?.CallSid ?? activeCall?.callSid ?? "",
+          from:
+            activeCall?.from
+            || formatCallFrom(browserCall.parameters?.From || browserCall.from, deviceExtension),
           status: "completed",
           endedAt: new Date().toISOString(),
         };
@@ -719,7 +804,7 @@ export function useWebRtcCallControls({
       }
     }
 
-    if (!activeCall || !activeCall.id) {
+    if (!activeCall || (!activeCall.id && !activeCall.callSid)) {
       const warning: WebRtcUiError = {
         message: "No hay una llamada activa para colgar.",
         code: "WebRtc.Hangup.NoActiveCall",
@@ -739,6 +824,10 @@ export function useWebRtcCallControls({
       return;
     }
 
+    const callIdentifier = (activeCall.callSid && (activeCall.callSid.includes(".") || isNaN(Number(activeCall.callSid))))
+      ? activeCall.callSid
+      : activeCall.id;
+
     setLastError(null);
     logWebRtcInfo("call_hangup_start", {
       callId: activeCall.id,
@@ -747,7 +836,7 @@ export function useWebRtcCallControls({
       context: contextSnapshot,
     });
 
-    const response = await hangupCall(activeCall.id);
+    const response = await hangupCall(callIdentifier);
     if (response?.success && response.data) {
       setActiveCall(response.data);
       setConnectionStatus("connected");
@@ -816,7 +905,18 @@ export function useWebRtcCallControls({
     }
 
     try {
-      incomingBrowserCall.accept();
+      const maybePromise = incomingBrowserCall.accept();
+      if (maybePromise && typeof maybePromise.then === "function") {
+        maybePromise
+          .then((session: any) => {
+            if (session) {
+              twilioCallRef.current = session;
+            }
+          })
+          .catch((err: any) => {
+            console.warn("[useWebRtcCallControls] Error en accept promise:", err);
+          });
+      }
       setConnectionStatus("dialing");
       logWebRtcInfo("call_softphone_incoming_accept_click", {
         context: contextSnapshot,
@@ -845,6 +945,7 @@ export function useWebRtcCallControls({
     onError,
     setConnectionStatus,
     setLastError,
+    twilioCallRef,
   ]);
 
   const handleRejectIncoming = useCallback(() => {
@@ -859,7 +960,13 @@ export function useWebRtcCallControls({
     }
 
     try {
-      incomingBrowserCall.reject();
+      const maybePromise = incomingBrowserCall.reject();
+      if (maybePromise && typeof maybePromise.then === "function") {
+        maybePromise.catch((err: any) => {
+          console.warn("[useWebRtcCallControls] Error en reject promise:", err);
+        });
+      }
+      incomingCallRef.current = null;
       logWebRtcInfo("call_softphone_incoming_reject_click", {
         context: contextSnapshot,
         callSid:

@@ -33,6 +33,9 @@ import EtiquetasClientes from "./modules/maestros/etiquetas-cliente/EtiquetasCli
 import AsignacionCarterasPage from "@app/modules/asignacion-carteras/AsignacionCarterasPage";
 import UsuariosPage from "@app/modules/parametrizacion/usuarios/UsuariosPage";
 import RolesPermisosPage from "@app/modules/parametrizacion/roles-permisos/RolesPermisosPage";
+import ControlHorariosPage from "@app/modules/parametrizacion/control-horarios/ControlHorariosPage";
+import CodeudoresPage from "@app/modules/parametrizacion/codeudores/CodeudoresPage";
+import DataCreditoPrefijosPage from "@app/modules/maestros/datacredito-prefijos/DataCreditoPrefijosPage";
 import { ModificacionEventos } from "./pages/ModificacionEventos/ModificacionEventos";
 import Unauthorized from "./pages/Unauthorized";
 import CambiarContrasena from "./pages/CambiarContrasena";
@@ -149,6 +152,22 @@ const App = () => {
               }
             />
             <Route
+              path="/parametrizacion/control-horarios"
+              element={
+                <PermissionRoute permission="control_horarios.view">
+                  <ControlHorariosPage />
+                </PermissionRoute>
+              }
+            />
+            <Route
+              path="/parametrizacion/codeudores"
+              element={
+                <PermissionRoute permission="codeudores.view">
+                  <CodeudoresPage />
+                </PermissionRoute>
+              }
+            />
+            <Route
               path="/tipos_eventos"
               element={
                 <PermissionRoute permission="tipos_eventos.view">
@@ -169,6 +188,14 @@ const App = () => {
               element={
                 <PermissionRoute permission="etiquetas_clientes.view">
                   <EtiquetasClientes />
+                </PermissionRoute>
+              }
+            />
+            <Route
+              path="/maestros/prefijos-datacredito"
+              element={
+                <PermissionRoute permission="datacredito_prefijos.view">
+                  <DataCreditoPrefijosPage />
                 </PermissionRoute>
               }
             />

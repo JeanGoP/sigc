@@ -1,5 +1,6 @@
 import { Col, Form, Row } from "react-bootstrap";
 import { SingleSelect } from "@app/components/singleSelect/singleSelect";
+import { validarDiaParaEvento } from "@app/utils/colombianHolidays";
 import type { HoraDispItem } from "@app/services/ConsultaCartera/HorasDispDiaService";
 import { HoraSelectorEvento } from "@app/modules/maestros/tipos-eventos/components/HoraSelectorEvento";
 import type { EdicionEventoForm } from "../domain/types";
@@ -76,12 +77,29 @@ export function EventoFormFields({
         <Col xs={12} sm={6} md={3}>
           <Form.Group>
             <Form.Label>Fecha evento</Form.Label>
-            <Form.Control
-              type="date"
-              value={form.fechaEvento}
-              disabled={!requiereFecha}
-              onChange={(event) => onFechaEventoChange(event.target.value)}
-            />
+            {(() => {
+              const diaVal = validarDiaParaEvento(form.fechaEvento);
+              const isInvalid = Boolean(requiereFecha && form.fechaEvento && diaVal.noHabil);
+              return (
+                <>
+                  <Form.Control
+                    type="date"
+                    value={form.fechaEvento}
+                    disabled={!requiereFecha}
+                    isInvalid={isInvalid}
+                    onChange={(event) => onFechaEventoChange(event.target.value)}
+                  />
+                  {isInvalid && (
+                    <div
+                      className="text-danger mt-1 font-weight-bold"
+                      style={{ fontSize: "0.75rem", lineHeight: 1.2 }}
+                    >
+                      ⚠️ {diaVal.motivo} (No permitido)
+                    </div>
+                  )}
+                </>
+              );
+            })()}
           </Form.Group>
         </Col>
         <Col xs={12} sm={6} md={3}>

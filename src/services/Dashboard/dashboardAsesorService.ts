@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useRef } from "react";
 import { useApi } from "@app/hooks/useApi";
 import type { ApiResponse } from "@app/models/apiResponse";
 
@@ -21,16 +21,19 @@ export function useDashboardAsesorService() {
     retries: 0,
   });
 
+  const apiRequestRef = useRef(api.request);
+  apiRequestRef.current = api.request;
+
   const obtenerDashboardPorUsuario = useCallback(
     async (
       payload: DashboardAsesorPorUsuarioPayload,
     ): Promise<ApiResponse<DashboardAsesorPorUsuarioResponse> | null> =>
-      api.request({
+      apiRequestRef.current({
         method: "POST",
         url: "/dashboard/asesor",
         data: payload,
       }),
-    [api.request],
+    [],
   );
 
   return {

@@ -22,6 +22,11 @@ export interface WebRtcVoiceTokenDto {
   expiresAtUtc: string;
   agentId: string;
   callSystemTenantId?: number | string;
+  provider?: string;
+  sipExtension?: string;
+  sipPassword?: string;
+  wssUrl?: string;
+  realm?: string;
 }
 
 export interface CreateWebRtcCallPayload {
@@ -54,7 +59,24 @@ export interface WebRtcCallDto {
   costEstimated?: number | null;
   costFinal?: number | null;
   currency?: string | null;
-  provider: string;
+  provider?: string | null;
+}
+
+export interface AsteriskUserExtensionDto {
+  userId: number;
+  username: string;
+  fullName: string;
+  extension: string;
+  password?: string;
+  isActive: boolean;
+  updatedAtUtc?: string | null;
+}
+
+export interface AssignUserExtensionPayload {
+  userId: number;
+  username: string;
+  extension: string;
+  password?: string;
 }
 
 export interface WebRtcPresenceSessionDto {
@@ -191,6 +213,16 @@ export function useWebRtcService() {
     retryDelay: 1000,
   });
 
+  const extensionsListApi = useApi<AsteriskUserExtensionDto[]>(baseUrl, {
+    timeout: 15000,
+    retries: 0,
+  });
+
+  const extensionAssignApi = useApi<any>(baseUrl, {
+    timeout: 15000,
+    retries: 0,
+  });
+
   const getVoiceToken = useCallback((): ApiResult<WebRtcVoiceTokenDto> => {
     return tokenApi.request({
       method: "GET",
@@ -230,11 +262,31 @@ export function useWebRtcService() {
     [getCallByIdApi.request]
   );
 
+  const getCallStatus = useCallback(
+    (id: number | string): ApiResult<WebRtcCallDto> => {
+      const isChannelSid = typeof id === "string" && (id.includes(".") || isNaN(Number(id)));
+      const url = isChannelSid
+        ? `/webrtc/calls/${encodeURIComponent(id)}/status`
+        : `/webrtc/calls/${id}`;
+
+      return getCallByIdApi.request({
+        method: "GET",
+        url,
+      });
+    },
+    [getCallByIdApi.request]
+  );
+
   const hangupCall = useCallback(
-    (id: number): ApiResult<WebRtcCallDto> => {
+    (id: number | string): ApiResult<WebRtcCallDto> => {
+      const isChannelSid = typeof id === "string" && (id.includes(".") || isNaN(Number(id)));
+      const url = isChannelSid
+        ? `/webrtc/calls/${encodeURIComponent(id)}/hangup-channel`
+        : `/webrtc/calls/${id}/hangup`;
+
       return hangupCallApi.request({
         method: "POST",
-        url: `/webrtc/calls/${id}/hangup`,
+        url,
       });
     },
     [hangupCallApi.request]
@@ -304,6 +356,32 @@ export function useWebRtcService() {
     [internalStateSetApi.request]
   );
 
+  const listUserExtensions = useCallback((): ApiResult<AsteriskUserExtensionDto[]> => {
+    return extensionsListApi.request({
+      method: "GET",
+      url: "/webrtc/extensions",
+    });
+  }, [extensionsListApi.request]);
+
+  const assignUserExtension = useCallback(
+    (payload: AssignUserExtensionPayload): ApiResult<any> => {
+      return extensionAssignApi.request({
+        method: "POST",
+        url: "/webrtc/extensions/assign",
+        data: payload,
+      });
+    },
+    [extensionAssignApi.request]
+  );
+
+  const getRecordingStreamUrl = useCallback(
+    (recordingName: string): string => {
+      const normalizedBase = baseUrl.replace(/\/+$/, "");
+      return `${normalizedBase}/webrtc/recordings/${encodeURIComponent(recordingName)}/stream`;
+    },
+    [baseUrl]
+  );
+
   return {
     loading:
       tokenApi.loading ||
@@ -316,7 +394,9 @@ export function useWebRtcService() {
       presenceAvailabilityApi.loading ||
       presenceDisconnectApi.loading ||
       internalStateGetApi.loading ||
-      internalStateSetApi.loading,
+      internalStateSetApi.loading ||
+      extensionsListApi.loading ||
+      extensionAssignApi.loading,
     error:
       tokenApi.error ||
       createCallApi.error ||
@@ -328,11 +408,14 @@ export function useWebRtcService() {
       presenceAvailabilityApi.error ||
       presenceDisconnectApi.error ||
       internalStateGetApi.error ||
-      internalStateSetApi.error,
+      internalStateSetApi.error ||
+      extensionsListApi.error ||
+      extensionAssignApi.error,
     getVoiceToken,
     createCall,
     listCalls,
     getCallById,
+    getCallStatus,
     hangupCall,
     connectPresence,
     heartbeatPresence,
@@ -340,5 +423,8 @@ export function useWebRtcService() {
     disconnectPresence,
     getAdvisorInternalState,
     setAdvisorInternalState,
+    listUserExtensions,
+    assignUserExtension,
+    getRecordingStreamUrl,
   };
 }

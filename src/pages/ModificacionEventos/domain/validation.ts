@@ -3,6 +3,10 @@ import type {
   CrearEventoGestionRequest,
 } from "@app/services/Calendario/CalendarioService";
 import {
+  validarDiaParaEvento,
+  getMensajeDiaInvalidoEvento,
+} from "@app/utils/colombianHolidays";
+import {
   mergeDateAndTime,
   parseNumberValue,
   toLocalDateString,
@@ -28,6 +32,8 @@ interface EventFormValidationInput {
   requirements: EventRequirements;
   mode: EventValidationMode;
   now?: Date;
+  isAdmin?: boolean;
+  isDateChanged?: boolean;
 }
 
 interface EditValidationInput {
@@ -38,6 +44,7 @@ interface EditValidationInput {
     requiereHoraInicial: boolean;
   };
   now?: Date;
+  isAdmin?: boolean;
 }
 
 interface AddValidationInput {
@@ -45,6 +52,7 @@ interface AddValidationInput {
   formAgregar: EdicionEventoForm;
   requirements: EventRequirements;
   now?: Date;
+  isAdmin?: boolean;
 }
 
 export interface EditValidationChanges {
@@ -98,6 +106,8 @@ export const validateEventoForm = ({
   requirements,
   mode,
   now = new Date(),
+  isAdmin = false,
+  isDateChanged = true,
 }: EventFormValidationInput): string | null => {
   const usuarioValue = String(form.usuario ?? "").trim();
   const tipoEventoValue = String(form.tipoEventoId ?? "").trim();
@@ -118,8 +128,20 @@ export const validateEventoForm = ({
     return "La fecha del evento es obligatoria.";
   }
 
-  if (requirements.requiereFecha && form.fechaEvento < today) {
+  const isDateEvaluationNeeded = mode === "add" || isDateChanged;
+
+  if (requirements.requiereFecha && form.fechaEvento < today && isDateEvaluationNeeded) {
     return "La fecha del evento no puede ser menor a la fecha actual.";
+  }
+
+  if (requirements.requiereFecha && form.fechaEvento && isDateEvaluationNeeded && !isAdmin) {
+    const diaValidacion = validarDiaParaEvento(form.fechaEvento);
+    if (diaValidacion.noHabil) {
+      return (
+        getMensajeDiaInvalidoEvento(form.fechaEvento) ||
+        "No se pueden programar eventos los domingos ni festivos nacionales."
+      );
+    }
   }
 
   if (requirements.requiereHora && !form.horaEvento) {
@@ -166,12 +188,27 @@ export const buildActualizarEventoValidation = ({
   formEdicionInicial,
   requirements,
   now,
+  isAdmin = false,
 }: EditValidationInput): EditValidationResult => {
+  const currentFHP = mergeDateAndTime(
+    formEdicion.fechaEvento,
+    formEdicion.horaEvento,
+    requirements.requiereHora
+  );
+  const initialFHP = mergeDateAndTime(
+    formEdicionInicial.fechaEvento,
+    formEdicionInicial.horaEvento,
+    requirements.requiereHoraInicial
+  );
+  const fechaHoraChanged = requirements.requiereFecha && currentFHP !== initialFHP;
+
   const formError = validateEventoForm({
     form: formEdicion,
     requirements,
     mode: "edit",
     now,
+    isAdmin,
+    isDateChanged: fechaHoraChanged,
   });
 
   if (formError) {
@@ -184,17 +221,6 @@ export const buildActualizarEventoValidation = ({
   const tipoEventoChanged =
     String(formEdicion.tipoEventoId ?? "").trim() !==
     String(formEdicionInicial.tipoEventoId ?? "").trim();
-  const currentFHP = mergeDateAndTime(
-    formEdicion.fechaEvento,
-    formEdicion.horaEvento,
-    requirements.requiereHora
-  );
-  const initialFHP = mergeDateAndTime(
-    formEdicionInicial.fechaEvento,
-    formEdicionInicial.horaEvento,
-    requirements.requiereHoraInicial
-  );
-  const fechaHoraChanged = requirements.requiereFecha && currentFHP !== initialFHP;
   const currentMonto =
     formEdicion.monto.trim() === "" ? null : Number(formEdicion.monto);
   const initialMonto =
@@ -252,12 +278,14 @@ export const buildCrearEventoValidation = ({
   formAgregar,
   requirements,
   now,
+  isAdmin = false,
 }: AddValidationInput): AddValidationResult => {
   const formError = validateEventoForm({
     form: formAgregar,
     requirements,
     mode: "add",
     now,
+    isAdmin,
   });
 
   if (formError) {

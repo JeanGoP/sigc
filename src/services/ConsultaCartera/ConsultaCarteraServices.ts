@@ -26,6 +26,13 @@ export interface PlantillaCorreo {
   key: string;
 }
 
+export interface CarteraFiltroAsesor {
+  userId: number;
+  fullName: string;
+  email: string;
+  roleName: string;
+}
+
 // Hook de servicios para ConsultaCartera
 export function useConsultaCarteraService() {
   const { request, loading, error } = useApi<any>("/api/v1");
@@ -38,6 +45,15 @@ export function useConsultaCarteraService() {
       url: "/GetFacturasList",
       method: "POST",
       data: params,
+    });
+  };
+
+  // 🔹 Obtener asesores para filtro
+  const getAsesoresFiltro = async (): Promise<ApiResponse<CarteraFiltroAsesor[]> | null> => {
+    return await request({
+      url: "/consulta-carteras/asesores",
+      method: "GET",
+      params: { soloActivos: true },
     });
   };
 
@@ -65,6 +81,7 @@ export function useConsultaCarteraService() {
 
   return {
     getFacturasList,
+    getAsesoresFiltro,
     getListTemplate,
     sendWithTemplate,
     loading,

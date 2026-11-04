@@ -24,6 +24,14 @@ export const mapSecurityMenuToMenuItems = (
   ]);
   const hiddenMenuPaths = new Set(["/monitor_seguimientos", "/campanas"]);
 
+  const normalizeIconClass = (iconClass?: string | null): string => {
+    const trimmed = String(iconClass ?? "").trim();
+    if (!trimmed) {
+      return "far fa-circle nav-icon";
+    }
+    return trimmed.includes("nav-icon") ? trimmed : `${trimmed} nav-icon`;
+  };
+
   const mapNode = (node: SecurityMenuItem): IMenuItem | null => {
     const normalizedMenuKey = String(node.menuKey ?? "").trim().toLowerCase();
     const normalizedMenuPath = String(node.menuPath ?? "").trim().toLowerCase();
@@ -49,7 +57,7 @@ export const mapSecurityMenuToMenuItems = (
 
     return {
       name: node.menuName,
-      icon: node.iconClass || "far fa-circle nav-icon",
+      icon: normalizeIconClass(node.iconClass),
       path: node.menuPath || undefined,
       children: hasChildren ? children : undefined,
     };

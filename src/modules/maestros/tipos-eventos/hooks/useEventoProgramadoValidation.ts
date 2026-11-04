@@ -2,6 +2,7 @@ import React from "react";
 import { useValidarEvento } from "@app/services/ConsultaCartera/ValidarEventoNuevoService";
 import {
   buildDuplicateEventoValidationResult,
+  buildFechaNoHabilEventoValidationResult,
   buildEventoValidationPayload,
   mapBackendEventoValidationResult,
   mapEventoValidationException,
@@ -36,6 +37,13 @@ export function useEventoProgramadoValidation() {
       setIsValidatingEvent(true);
 
       try {
+        const fechaInvalidaResult = buildFechaNoHabilEventoValidationResult(
+          evento.fecha
+        );
+        if (fechaInvalidaResult) {
+          return fechaInvalidaResult;
+        }
+
         const duplicateResult = buildDuplicateEventoValidationResult(
           eventos,
           evento,

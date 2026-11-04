@@ -9,6 +9,7 @@ export interface FacturasFiltroLike {
   checkIncluirSaldosCero: boolean;
   checkSoloAsignadas: boolean;
   checkSoloEventosPendientes: boolean;
+  asesorAsignadoId?: number | null;
   cuenta?: string | null;
   sinGestionDias: number;
   filtroEdadMora?: string | null;
@@ -261,10 +262,18 @@ export function buildFacturasListParams({
   tablaSearch,
   filterOverride,
 }: BuildFacturasListParamsInput): FacturasListParams {
+  const effectiveUser =
+    filtros.checkSoloAsignadas &&
+    filtros.asesorAsignadoId !== null &&
+    filtros.asesorAsignadoId !== undefined &&
+    Number(filtros.asesorAsignadoId) > 0
+      ? Number(filtros.asesorAsignadoId)
+      : currentUserId;
+
   return {
     fecha: fechaConsultaFacturas,
     incluirCarterasSaldoCero: filtros.checkIncluirSaldosCero,
-    user: currentUserId,
+    user: effectiveUser,
     forUser: filtros.checkSoloAsignadas,
     mostrarYaGestionados: filtros.checkSoloEventosPendientes,
     cuenta: filtros.cuenta ?? "",

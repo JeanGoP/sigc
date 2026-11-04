@@ -28,6 +28,19 @@ const Login = () => {
     saveObjectToLocalStorage("userAccess", {
       tenantId: listadoEmpresas[0]?.id || "",
     });
+
+    try {
+      const msg = sessionStorage.getItem("shift_logout_reason");
+      if (msg) {
+        toast.warning(msg, {
+          autoClose: 5000, // 2 segundos más que lo normal (3000ms -> 5000ms)
+          icon: () => <i className="fas fa-business-time text-warning mr-1" />,
+        });
+        sessionStorage.removeItem("shift_logout_reason");
+      }
+    } catch {
+      // ignore
+    }
   }, []);
 
   const navigate = useNavigate();

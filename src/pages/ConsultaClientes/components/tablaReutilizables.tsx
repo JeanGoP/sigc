@@ -29,6 +29,7 @@ interface DynamicTableProps {
   footerIdentifier?: string; // Identifier for the footer row, default is "Total"
   /** Muestra las filas como tarjetas apiladas en móvil (screenSize === 'xs'). Patrón híbrido del proyecto. */
   enableMobileCards?: boolean;
+  maxHeight?: number | string;
 }
 
 export const DynamicTable: React.FC<DynamicTableProps> = ({
@@ -39,6 +40,7 @@ export const DynamicTable: React.FC<DynamicTableProps> = ({
   showFooter = false,
   footerIdentifier = "Totales",
   enableMobileCards = false,
+  maxHeight = 400,
 }) => {
   const screenSize = useAppSelector((state) => state.ui.screenSize);
   const showCards = enableMobileCards && screenSize === "xs";
@@ -150,7 +152,7 @@ export const DynamicTable: React.FC<DynamicTableProps> = ({
           )}
         </div>
       ) : (
-      <TableContainer component={Paper} sx={{ maxHeight: 400, width: "100%" }}>
+      <TableContainer component={Paper} sx={{ maxHeight, width: "100%" }}>
         <Table stickyHeader size="small" sx={{ width: "100%" }}>
           <TableHead>
             <TableRow>
@@ -185,19 +187,30 @@ export const DynamicTable: React.FC<DynamicTableProps> = ({
               </TableRow>
             ))}
           </TableBody>
-          {/* Pie con totales */}
+          {/* Pie con totales sticky */}
           {footerRow && (
-            <TableFooter>
+            <TableFooter
+              sx={{
+                position: "sticky",
+                bottom: 0,
+                zIndex: 2,
+              }}
+            >
               <TableRow>
                 {columns.map((column) => (
                   <TableCell
                     key={column.id}
                     align={column.align || "left"}
                     sx={{
+                      position: "sticky",
+                      bottom: 0,
+                      zIndex: 2,
                       backgroundColor: "#343A40",
                       color: "white",
-                      // fontWeight: "bold",
-                      fontSize: "1rem",
+                      fontWeight: "bold",
+                      fontSize: "0.95rem",
+                      borderTop: "2px solid #4b545c",
+                      boxShadow: "0px -2px 6px rgba(0, 0, 0, 0.25)",
                     }}
                   >
                     {column.format
