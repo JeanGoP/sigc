@@ -29,7 +29,7 @@ export interface ReporteFiltroItem {
 
 export function useReportesService() {
   const { request } = useApi<unknown>("/api/v1/reportes", {
-    timeout: 10000,
+    timeout: 60000,
     retries: 0,
   });
 
